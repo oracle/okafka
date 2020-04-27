@@ -58,8 +58,8 @@ The following properties have to be provided to use these protocols.
         
    and following properties in `ojdbc.properties` file and `ojdbc.properties` file should be in location  `oracle.net.tns_admin`.  
    
-        user(in small letters) = "user name of database user" 
-        password(in small letters) = "user password"
+        user(in lowercase) = "user name of database user" 
+        password(in lowercase) = "user password"
    
         
                              
@@ -98,8 +98,8 @@ The following properties have to be provided to use these protocols.
                    
                and following properties in `ojdbc.properties` file and `ojdbc.properties` file should be in location  `oracle.net.tns_admin`
                
-                   user(in small letters) = "name of database user" 
-                   password(in small letters) = "user password"
+                   user(in lowercase) = "name of database user" 
+                   password(in lowercase) = "user password"
                    oracle.net.ssl_server_dn_match=true
                    oracle.net.wallet_location="(SOURCE=(METHOD=FILE)(METHOD_DATA=(DIRECTORY=/location../wallet_dbname)))"  
                    
@@ -112,8 +112,8 @@ The following properties have to be provided to use these protocols.
           
           and following properties in `ojdbc.properties` file and `ojdbc.properties` file should be in location  `oracle.net.tns_admin`
           
-              user(in small letters) = "user name of database user" 
-              password(in small letters) = "user password"
+              user(in lowercase) = "user name of database user" 
+              password(in lowercase) = "user password"
               oracle.net.ssl_server_dn_match=true
               javax.net.ssl.trustStore==${TNS_ADMIN}/truststore.jks
               javax.net.ssl.trustStorePassword = password
