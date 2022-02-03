@@ -1,0 +1,13 @@
+.vscode
+.gradle
+
+# Maven assets
+.mvn
+mvnw
+mvnw.cmd
+
+.java-version
+
+target/
+
+.dccache
