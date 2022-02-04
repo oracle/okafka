@@ -423,8 +423,10 @@ public class KafkaProducerTest {
             public void run() {
                 long startTimeMs = System.currentTimeMillis();
                 for (int i = 0; i < 10; i++) {
-                    while (!metadata.updateRequested() && System.currentTimeMillis() - startTimeMs < 1000)
-                        yield();
+                    while (!metadata.updateRequested() && System.currentTimeMillis() - startTimeMs < 1000) {
+                        //TODO return to this issue.
+                        //syield();
+                    }
                     metadata.update(Cluster.empty(), Collections.singleton(topic), time.milliseconds());
                     time.sleep(60 * 1000L);
                 }

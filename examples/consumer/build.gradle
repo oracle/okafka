@@ -1,0 +1,33 @@
+/*
+** OKafka Java Client version 0.8.
+**
+** Copyright (c) 2019, 2022 Oracle and/or its affiliates.
+** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
+*/
+
+plugins {
+    // Apply the application plugin to add support for building a Java App.
+    id 'java'
+}
+
+version = '0.8'
+
+repositories {
+    // Use Maven Central for resolving dependencies.
+    mavenCentral()
+}
+
+dependencies {
+    // These dependencies are used by the application.
+    implementation project(':clients')
+}
+
+tasks.named('jar') {
+    description('Generates okafka client consumer jar ')
+    archiveBaseName = 'okafka'
+    archiveClassifier = 'consumer'
+    manifest {
+        attributes('Implementation-Title'  : 'okafka consumer',
+                'Implementation-Version': project.version)
+    }
+}

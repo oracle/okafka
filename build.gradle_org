@@ -30,8 +30,9 @@ allprojects {
 }
 
 ext {
-  gradleVersion = "5.0"
+  gradleVersion = "7.3"
   minJavaVersion = "8"
+  targetJavaVersion = "11"
   
   mavenUrl = project.hasProperty('mavenUrl') ? project.mavenUrl : ''
   mavenUsername = project.hasProperty('mavenUsername') ? project.mavenUsername : ''
@@ -44,7 +45,7 @@ subprojects {
  apply plugin : 'java-library'
 
  sourceCompatibility = minJavaVersion
- targetCompatibility = minJavaVersion
+ targetCompatibility = targetJavaVersion
  
  jar {
       from "$rootDir/LICENSE"
@@ -65,12 +66,17 @@ project(':clients') {
       compile group: 'javax.jms', name: 'javax.jms-api', version: '2.0'
       compile group: 'org.slf4j', name: 'slf4j-api', version: '2.0.0-alpha0'
       compile group: 'com.oracle.database.messaging', name: 'aqapi', version: '19.3.0.0'
-      testImplementation group: 'org.easymock', name: 'easymock', version: '3.6'
-      testImplementation group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.0-beta.5'
-      testImplementation group: 'org.powermock', name: 'powermock-api-support', version: '2.0.5'
-      testImplementation group: 'org.powermock', name: 'powermock-api-easymock', version: '2.0.0-beta.5'
+      // testImplementation group: 'org.easymock', name: 'easymock', version: '3.6'
+      // testImplementation group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.0-beta.5'
+      // testImplementation group: 'org.powermock', name: 'powermock-api-support', version: '2.0.5'
+      // testImplementation group: 'org.powermock', name: 'powermock-api-easymock', version: '2.0.0-beta.5'
       compile fileTree(dir: 'libs', include: ['*.jar'])
       
+      testImplementation('org.easymock:easymock:4.3')
+      testImplementation('org.powermock:powermock-module-junit4:2.0.9')
+      testImplementation('org.powermock:powermock-api-support:2.0.9')
+      testImplementation('org.powermock:powermock-api-easymock:2.0.9')
+
     }
     
     jar {
@@ -102,14 +108,14 @@ project(':clients') {
 
 }
 
-project(':examples') {
+project(':examples:consumer') {
 
     dependencies {
       compile project(':clients')
     }
     jar {
-      description 'Generates a jar containg examples for okafka client demo'
-      baseName = 'okafka-examples'
+      description 'Generates a jar containg examples for okafka client consumer demo'
+      baseName = 'okafka-examples-consumer'
       version = '0.8'
     }
     javadoc {
@@ -117,6 +123,21 @@ project(':examples') {
     }
 }
  
+project(':examples:producer') {
+
+    dependencies {
+      compile project(':clients')
+    }
+    jar {
+      description 'Generates a jar containg examples for okafka client producer demo'
+      baseName = 'okafka-examples-producer'
+      version = '0.8'
+    }
+    javadoc {
+      enabled = false
+    }
+}
+
 apply plugin: 'java' 
   
 configurations {

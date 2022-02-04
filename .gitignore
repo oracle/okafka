@@ -10,5 +10,6 @@ mvnw.cmd
 .java-version
 
 target/
+build/
 
 .dccache
