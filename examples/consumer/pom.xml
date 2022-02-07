@@ -18,6 +18,7 @@
     <maven.compiler.source>${java.version}</maven.compiler.source>
     <java.version>11</java.version>
     <okafka.version>0.8</okafka.version>
+    <oracle-jdbc.version>21.5.0.0</oracle-jdbc.version>
   </properties>
 
   <dependencies>
@@ -25,6 +26,11 @@
       <groupId>org.oracle.okafka</groupId>
       <artifactId>okafka</artifactId>
       <version>0.8</version>
+    </dependency>
+    <dependency>
+      <groupId>com.oracle.database.security</groupId>
+      <artifactId>oraclepki</artifactId>
+      <version>${oracle-jdbc.version}</version>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
