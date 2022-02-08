@@ -21,7 +21,7 @@ import org.oracle.okafka.clients.producer.ProducerRecord;
 public class Producer {
 	
 	public static void main(String[] args) {
-		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "DEBUG");
+		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "INFO");
 
 		// Get application properties
 		Properties appProperties = null;
@@ -62,9 +62,9 @@ public class Producer {
 		// Get Oracle Database address, eg: "host:port"
 		props.put("bootstrap.servers", appProperties.getProperty("bootstrap.servers"));
 
-		props.put("batch.size", Integer.parseInt(appProperties.getProperty("batch.size", "200")));
+		//props.put("batch.size", Integer.parseInt(appProperties.getProperty("batch.size", "200")));
 		props.put("linger.ms", Integer.parseInt(appProperties.getProperty("linger.ms", "100")));
-		props.put("buffer.memory", Integer.parseInt(appProperties.getProperty("buffer.memory", "335544")));
+		//props.put("buffer.memory", Integer.parseInt(appProperties.getProperty("buffer.memory", "335544")));
 
 		props.put("key.serializer", appProperties.getProperty("key.serializer",
 				"org.oracle.okafka.common.serialization.StringSerializer"));
@@ -80,7 +80,7 @@ public class Producer {
 		
 		 try {
 			 int i;	
-			 for(i = 0; i < 10; i++)				 
+			 for(i = 0; i < 3; i++)
 			     prod.send(new ProducerRecord<String, String>(topic ,0, i+"000","This is new message"+i));
  
 		     System.out.println("Sent "+ i + " messages");
@@ -122,7 +122,7 @@ public class Producer {
 	private static void addOraclePKIProvider() {
 		System.out.println("Installing Oracle PKI provider.");
 		Provider oraclePKI = new oracle.security.pki.OraclePKIProvider();
-		Security.addProvider(oraclePKI);
+		Security.insertProviderAt(oraclePKI,3);
 	}
 }
 
