@@ -170,7 +170,7 @@ If one is using the `okafka.jar` file generated using `./gradlew fullJar` comman
 
 ## Using the okafka.jar
 
-This section describes the sample Producer and Consumer application that uses `okafka.jar` file. These files are available in the examples directory.  Assuming user has built the `okafka.jar` file using the `./gradlew fatJar` build command, so that no other jar file is required to be placed in the classpath.
+This section describes the sample Producer and Consumer application that uses `okafka.jar` file. These files are available in the examples directory.  Assuming user has built the `okafka.jar` file using the `./gradlew fullJar` build command, so that no other jar file is required to be placed in the classpath.
 
 To compile `Producer.java`
 
