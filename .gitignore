@@ -1,0 +1,15 @@
+.idea
+.vscode
+.gradle
+
+# Maven assets
+.mvn
+mvnw
+mvnw.cmd
+
+.java-version
+
+target/
+build/
+
+.dccache
