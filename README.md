@@ -4,7 +4,7 @@
 
 This distribution contains Java source code to provide Kafka Java client compatibility to Oracle Transactional Event Queues. Some Kafka Java producer and consumer applications can migrate seamlessly to Oracle Transactional Event Queues for scalable event streaming directly built into the Oracle Database.
 
-You need to have [Gradle 4.3 or above](http://www.gradle.org/installation) and [Java](http://www.oracle.com/technetwork/java/javase/downloads/index.html) installed.
+You need to have [Gradle 7.3 or above](http://www.gradle.org/installation) and [Java](http://www.oracle.com/technetwork/java/javase/downloads/index.html) installed.
 
 This distribution contains preview version 0.8 of the `Kafka Java Client for Oracle Transactional Event Queues` project. This is tested with [JRE 8u162](https://www.oracle.com/technetwork/java/javase/downloads/jre8-downloads-2133155.html) but we recommend using the latest version.
 
@@ -135,36 +135,38 @@ gradle wrapper
 ### Building okafka.jar
 
 Simplest way to build the `okafka.jar` file is by using Gradle build tool.
-This distribution contains gradle build files which will work for Gradle 4.3 or higher.
+This distribution contains gradle build files which will work for Gradle 7.3 or higher.
 
 To build the `okafka.jar` file which includes all the dependent jar files in itself.
 
 ```
-./gradlew fatJar 
+./gradlew fullJar 
 ```
-This generates `okafkafat-0.8.jar` in `okafka_source_dir/clients/build/libs`.
+This generates `okafka-0.8-full.jar` in `okafka_source_dir/clients/build/libs`.
 
 To build the `okafka.jar` file without including the dependent jar files in the `okafka.jar` itself.
 
 ```
 ./gradlew jar
 ```
-This generates `okafka-0.8.jar` in `okafka_source_dir/clients/build/libs` and `okafka-examples-0.8.jar` in `okafka_source_dir/examples/build/libs`.
+This generates `okafka-0.8.jar` in `okafka_source_dir/clients/build/libs` and `okafka-0.8-[producer|consumer].jar` in `okafka_source_dir/examples/[producer|consumer]/build/libs`.
 
 **Project Dependency:**
 
 Mandatory jar files for this project to work.
 
-* `jmscommon.jar` 
-* `aqapi.jar`  
-* `ojdbc8.jar`  
-* `jta.jar`   
-* `slf4j.jar`   
-
+* `ojdbc11-<version>.jar`
+* `aqapi-<version>.jar`
+* `oraclepki-<version>.jar`
+* `osdt_core-<version>.jar`
+* `osdt_cert-<version>.jar`
+* `javax.jms-api-<version>.jar`
+* `jta-<version>.jar`
+* `slf4j-api-<version>.jar`
 
 All these jars are downloaded from Maven Repository during gradle build.
 
-If one is using the `okafka.jar` file generated using `./gradlew fatJar` command, then it is not required to add other jar files in the classpath while running the Oracle Kafka application.
+If one is using the `okafka.jar` file generated using `./gradlew fullJar` command, then it is not required to add other jar files in the classpath while running the Oracle Kafka application.
 
 ## Using the okafka.jar
 

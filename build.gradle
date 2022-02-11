@@ -53,16 +53,18 @@ project(':clients') {
         testImplementation group: 'org.powermock', name: 'powermock-api-support', version: '2.0.9'
         testImplementation group: 'org.powermock', name: 'powermock-api-easymock', version: '2.0.9'
         testImplementation group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.9'
+        testImplementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.36'
 
         // These dependencies are used by the application.
         implementation group: 'com.oracle.database.jdbc', name: 'ojdbc11', version: '21.5.0.0'
         implementation group: 'com.oracle.database.messaging', name: 'aqapi', version: '19.3.0.0'
         implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '21.5.0.0'
-        implementation group: 'com.oracle.database.security', name: 'osdt_core', version: '21.5.0.0'
+        implementation group: 'com.oracle.database.security', name: '`osdt_core`', version: '21.5.0.0'
         implementation group: 'com.oracle.database.security', name: 'osdt_cert', version: '21.5.0.0'
         implementation group: 'javax.jms', name: 'javax.jms-api', version: '2.0.1'
         implementation group: 'javax.transaction', name: 'jta', version: '1.1'
-        implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.35'
+        implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.36'
+
     }
 
     javadoc {
@@ -92,7 +94,7 @@ project(':clients') {
 
     tasks.register('fullJar', Jar) {
         archiveBaseName = 'okafka'
-        archiveClassifier = 'dependencies'
+        archiveClassifier = 'full'
 
         manifest {
             attributes( 'Implementation-Title'  : 'okafka',
