@@ -1,6 +1,8 @@
 .idea
 .vscode
+
 .gradle
+gradle/
 
 # Maven assets
 .mvn
@@ -13,3 +15,6 @@ target/
 build/
 
 .dccache
+
+# removing local properties
+**/config.properties_local
