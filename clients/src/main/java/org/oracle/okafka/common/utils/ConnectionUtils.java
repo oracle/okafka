@@ -32,7 +32,9 @@ public class ConnectionUtils {
     public static String createUrl(Node node, AbstractConfig configs) {
     	
     	if( !configs.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG).equalsIgnoreCase("PLAINTEXT")) {
-		  return "jdbc:oracle:thin:@" + configs.getString(SslConfigs.TNS_ALIAS); // + "?TNS_ADMIN=" + configs.getString(SslConfigs.ORACLE_NET_TNS_ADMIN); 
+		  //return "jdbc:oracle:thin:@" + configs.getString(SslConfigs.TNS_ALIAS); // + "?TNS_ADMIN=" + configs.getString(SslConfigs.ORACLE_NET_TNS_ADMIN);
+			// the connection string for latest 18.3 JDBC driver or newer
+			return "jdbc:oracle:thin:@" + configs.getString(SslConfigs.TNS_ALIAS)+ "?TNS_ADMIN=" + configs.getString(CommonClientConfigs.ORACLE_NET_TNS_ADMIN);
         }
     	StringBuilder urlBuilder =new StringBuilder("jdbc:oracle:thin:@(DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(PORT=" + Integer.toString(node.port())+")(HOST=" + node.host() +"))");
 		urlBuilder.append("(CONNECT_DATA=(SERVICE_NAME=" + node.serviceName() + ")"+"(INSTANCE_NAME=" + node.instanceName() + ")))");
