@@ -99,7 +99,7 @@ public class Producer {
 
 		try {
 			Properties prop = new Properties();
-			String propFileName = "config.properties";
+			String propFileName = "config.properties_local";
 
 			inputStream = Producer.class.getClassLoader().getResourceAsStream(propFileName);
 			if (inputStream != null) {

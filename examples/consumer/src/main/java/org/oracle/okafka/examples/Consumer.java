@@ -84,7 +84,7 @@ public class Consumer {
 
         try {
 
-            records = consumer.poll(Duration.ofMillis(1000));
+            records = consumer.poll(Duration.ofMillis(15000));
             for (ConsumerRecord<String, String> record : records) {
                 System.out.println("topic = , partition=  ,key= , value = \n"+
                         record.topic()+ "  "+record.partition()+ "  "+record.key()+"  "+ record.value());
@@ -107,7 +107,7 @@ public class Consumer {
 
         try {
             Properties prop = new Properties();
-            String propFileName = "config.properties";
+            String propFileName = "config.properties_local";
 
             inputStream = Consumer.class.getClassLoader().getResourceAsStream(propFileName);
             if (inputStream != null) {

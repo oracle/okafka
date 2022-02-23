@@ -1,0 +1,20 @@
+# okafka consumer example properties
+oracle.service.name=bsenjiat5lmurtq_okafkadb_tp.adb.oraclecloud.com
+oracle.instance.name=okafkadb_tp
+
+oracle.net.tns_admin=/Users/pasimoes/Work/oracle/code/okafka/wallet
+security.protocol=SSL
+tns.alias=okafkadb_tp
+
+bootstrap.servers=adb.us-ashburn-1.oraclecloud.com:1522
+
+group.id=LAB8022_SUBSCRIBER
+
+enable.auto.commit=true
+auto.commit.interval.ms=10000
+max.poll.records=100
+
+key.deserializer=org.oracle.okafka.common.serialization.StringDeserializer
+value.deserializer=org.oracle.okafka.common.serialization.StringDeserializer
+
+topic.name=LAB8022_TOPIC
