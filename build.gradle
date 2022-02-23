@@ -125,6 +125,7 @@ project(':examples:consumer') {
     dependencies {
         // These dependencies are used by the application.
         implementation project(':clients')
+        implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '21.5.0.0'
     }
 
 
@@ -160,6 +161,7 @@ project(':examples:producer') {
     dependencies {
         // These dependencies are used by the application.
         implementation project(':clients')
+        implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '21.5.0.0'
     }
 
     tasks.named('jar') {
