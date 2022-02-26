@@ -13,29 +13,33 @@ Java 8u162 or above(recommended is 8U251) should be used for building in order t
 The Kafka Java Client works with Oracle Database 20c Cloud Preview (Database Cloud Service), although some features will work with Autonomous Database for testing the simpler producer/consumer examples.
 
 To test this distribution in free Oracle Cloud environment create [Oracle Cloud account](https://docs.cloud.oracle.com/en-us/iaas/Content/FreeTier/freetier.htm) then create [Oracle Autonomous Transaction Processing Database instance](https://docs.oracle.com/en/cloud/paas/autonomous-data-warehouse-cloud/tutorial-getting-started-autonomous-db/index.html) in cloud.   
-A database user should be created and should be granted the privileges mentioned in configuration section. Then create a Transactional Event Queue to produce and consume messages.     
-Then build `okafka.jar` and run [Producer.java](./examples/src/main/java/producer/Producer.java) to produce into TEQ, [Consumer.java](./examples/src/main/java/consumer/Consumer.java) to consume from TEQ.
+
+A database user should be created and should be granted the privileges mentioned in configuration section. Then create a Transactional Event Queue to produce and consume messages.
+
+Finally, build `okafka.jar` and run [Producer.java](./examples/producer/src/main/java/org/oracle/okafka/examples/Producer.java) to produce into Oracle TEQ, [Consumer.java](./examples/consumer/src/main/java/org/oracle/okafka/examples/Consumer.java) to consume from Oracle TEQ.
  
 ### Configuration ###
 
 To run `okafka.jar` against Oracle Database, a database user should be created and should be granted below privileges.
 
-* `create user <username> identified by <password>`
-* `grant connect, resource to user`
-* `grant execute on dbms_aqadm to user`
-* `grant execute on dbms_aqin to user`
-* `grant execute on dbms_aqjms to user`
-* `grant select_catalog_role to user`
+```roomsql
+create user <username> identified by <password>
+grant connect, resource to user
+grant execute on dbms_aqadm to use`
+grant execute on dbms_aqin to user
+grant execute on dbms_aqjms to user
+grant select_catalog_role to user
+```
 
 Once user is created and above privileges are granted, connect to Oracle Database as this user and create a Transactional Event Queue using below PL/SQL script. For this preview release, upper case Topic/queue names are only allowed. Also this preview supports TEQ with only 1 partition hence, in below script `SHARD_NUM` parameter for TEQ is set to 1.
 
-```
+```roomsql
 begin
-sys.dbms_aqadm.create_sharded_queue(queue_name=>"TEQ", multiple_consumers => TRUE); 
-sys.dbms_aqadm.set_queue_parameter('TEQ', 'SHARD_NUM', 1);
-sys.dbms_aqadm.set_queue_parameter('TEQ', 'STICKY_DEQUEUE', 1);
-sys.dbms_aqadm.set_queue_parameter('TEQ', 'KEY_BASED_ENQUEUE', 1);
-sys.dbms_aqadm.start_queue('TEQ');
+    sys.dbms_aqadm.create_sharded_queue(queue_name=>"TEQ", multiple_consumers => TRUE); 
+    sys.dbms_aqadm.set_queue_parameter('TEQ', 'SHARD_NUM', 1);
+    sys.dbms_aqadm.set_queue_parameter('TEQ', 'STICKY_DEQUEUE', 1);
+    sys.dbms_aqadm.set_queue_parameter('TEQ', 'KEY_BASED_ENQUEUE', 1);
+    sys.dbms_aqadm.start_queue('TEQ');
 end;
 ```
 
@@ -66,59 +70,75 @@ The following properties have to be provided to use these protocols.
 2. SSL: To use SSL secured connections to connect to Autonomous Database  on Oracle Cloud follow these steps.
     * JDBC Thin Driver Connection prerequisites for SSL security: Use JDK8u162 or higher(recommended latest). Use 18.3 JDBC Thin driver or higher(recommended latest)
 
-    * To leverage JDBC SSL security to connect to Oracle Database instance the following properties have to be set.  
-      JDBC supports SSL secured connections to Oracle Database in two ways 1. Wallets 2. Java Key Store.
-        + Using wallets: 
-            - Add the following required dependent jars for using Oracle Wallets in classpath. Download oraclepki.jar, osdt_cert.jar, and osdt_core.jar files along with JDBC thin driver from [JDBC and UCP download page](https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html) and add these jars to classpath.
-            - Enable Oracle PKI provider: Enable it statically as follows, Add OraclePKIProvider at the end of file  `java.security` located at `$JRE_HOME/jre/lib/security/java.security`. If SSO wallet i.e cwallet.sso  is used for providing SSL security.
+      * To leverage JDBC SSL security to connect to Oracle Database instance the following properties have to be set.  
+        JDBC supports SSL secured connections to Oracle Database in two ways 1. Wallets 2. Java Key Store.
+          + Using wallets: 
+              - Add the following required dependent jars for using Oracle Wallets in classpath. Download oraclepki.jar, osdt_cert.jar, and osdt_core.jar files along with JDBC thin driver from [JDBC and UCP download page](https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html) and add these jars to classpath.
+              - Enable Oracle PKI provider: Enable it statically as follows, Add OraclePKIProvider at the end of file  `java.security` located at `$JRE_HOME/jre/lib/security/java.security`. If SSO wallet i.e cwallet.sso  is used for providing SSL security.
             
-                  security.provider.1=sun.security.provider.Sun
-                  security.provider.2=sun.security.rsa.SunRsaSign            
-                  security.provider.3=com.sun.net.ssl.internal.ssl.Provider
-                  security.provider.4=com.sun.crypto.provider.SunJCE
-                  security.provider.5=sun.security.jgss.SunProvider
-                  security.provider.6=com.sun.security.sasl.Provider
-                  security.provider.7=oracle.security.pki.OraclePKIProvider  
+                    security.provider.1=sun.security.provider.Sun
+                    security.provider.2=sun.security.rsa.SunRsaSign            
+                    security.provider.3=com.sun.net.ssl.internal.ssl.Provider
+                    security.provider.4=com.sun.crypto.provider.SunJCE
+                    security.provider.5=sun.security.jgss.SunProvider
+                    security.provider.6=com.sun.security.sasl.Provider
+                    security.provider.7=oracle.security.pki.OraclePKIProvider  
                   
-              To use ewallet.p12 for SSL security then place OraclePKIProvider before sun provider in file `java.security`.  
+                To use ewallet.p12 for SSL security then place OraclePKIProvider before sun provider in file `java.security`.  
               
-                  security.provider.1=sun.security.provider.Sun
-                  security.provider.2=sun.security.rsa.SunRsaSign
-                  security.provider.3=oracle.security.pki.OraclePKIProvider
-                  security.provider.4=com.sun.net.ssl.internal.ssl.Provider
-                  security.provider.5=com.sun.crypto.provider.SunJCE
-                  security.provider.6=sun.security.jgss.SunProvider
-                  security.provider.7=com.sun.security.sasl.Provider
-                  
-            -  Must provide following properties through application.  
+                    security.provider.1=sun.security.provider.Sun
+                    security.provider.2=sun.security.rsa.SunRsaSign
+                    security.provider.3=oracle.security.pki.OraclePKIProvider
+                    security.provider.4=com.sun.net.ssl.internal.ssl.Provider
+                    security.provider.5=com.sun.crypto.provider.SunJCE
+                    security.provider.6=sun.security.jgss.SunProvider
+                    security.provider.7=com.sun.security.sasl.Provider
+              
+                Also, it is possible enabling it dynamically by code including Oracle PKI library in project dependencies
+                
+                ```
+                implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '21.5.0.0'
+                ```
+                
+                and the following code in your project.
             
-                   security.protocol = "SSL"
-                   oracle.net.tns_admin = "location of tnsnames.ora file"  (for parsing JDBC connection string)
-                   tns.alias = "alias of connection string in tnsnames.ora"
+                ```java
+                private static void addOraclePKIProvider(){
+                    System.out.println("Installing Oracle PKI provider.");
+                    Provider oraclePKI = new oracle.security.pki.OraclePKIProvider();
+                    Security.insertProviderAt(oraclePKI,3);
+                }
+                ```
+                  
+              - Must provide following properties through application.  
+            
+                     security.protocol = "SSL"
+                     oracle.net.tns_admin = "location of tnsnames.ora file"  (for parsing JDBC connection string)
+                     tns.alias = "alias of connection string in tnsnames.ora"
                    
-               and following properties in `ojdbc.properties` file and `ojdbc.properties` file should be in location  `oracle.net.tns_admin`
+                 and following properties in `ojdbc.properties` file and `ojdbc.properties` file should be in location  `oracle.net.tns_admin`
                
-                   user(in lowercase) = "name of database user" 
-                   password(in lowercase) = "user password"
-                   oracle.net.ssl_server_dn_match=true
-                   oracle.net.wallet_location="(SOURCE=(METHOD=FILE)(METHOD_DATA=(DIRECTORY=/location../wallet_dbname)))"  
+                     user(in lowercase) = "name of database user" 
+                     password(in lowercase) = "user password"
+                     oracle.net.ssl_server_dn_match=true
+                     oracle.net.wallet_location="(SOURCE=(METHOD=FILE)(METHOD_DATA=(DIRECTORY=/location../wallet_dbname)))"  
                    
-        + using Java Key Store: 
-          To Provide JDBC SSL security with Java Key Store then provide following properties through application.  
+          + using Java Key Store: 
+            To Provide JDBC SSL security with Java Key Store then provide following properties through application.  
           
-              security.protocol = "SSL"
-              oracle.net.tns_admin = "location of tnsnames.ora file"
-              tns.alias = "alias of connection string in tnsnames.ora"
+                security.protocol = "SSL"
+                oracle.net.tns_admin = "location of tnsnames.ora file"
+                tns.alias = "alias of connection string in tnsnames.ora"
           
-          and following properties in `ojdbc.properties` file and `ojdbc.properties` file should be in location  `oracle.net.tns_admin`
+            and following properties in `ojdbc.properties` file and `ojdbc.properties` file should be in location  `oracle.net.tns_admin`
           
-              user(in lowercase) = "user name of database user" 
-              password(in lowercase) = "user password"
-              oracle.net.ssl_server_dn_match=true
-              javax.net.ssl.trustStore==${TNS_ADMIN}/truststore.jks
-              javax.net.ssl.trustStorePassword = password
-              javax.net.ssl.keyStore= ${TNS_ADMIN}/keystore.jks
-              javax.net.ssl.keyStorePassword="password "" 
+                user(in lowercase) = "user name of database user" 
+                password(in lowercase) = "user password"
+                oracle.net.ssl_server_dn_match=true
+                javax.net.ssl.trustStore==${TNS_ADMIN}/truststore.jks
+                javax.net.ssl.trustStorePassword = password
+                javax.net.ssl.keyStore= ${TNS_ADMIN}/keystore.jks
+                javax.net.ssl.keyStorePassword="password "" 
               
 Note: tnsnames.ora file in wallet downloaded from Oracle Autonomous Database contains JDBC connection string which is used for establishing JDBC connection.
 
@@ -166,32 +186,58 @@ Mandatory jar files for this project to work.
 
 All these jars are downloaded from Maven Repository during gradle build.
 
-If one is using the `okafka.jar` file generated using `./gradlew fullJar` command, then it is not required to add other jar files in the classpath while running the Oracle Kafka application.
+If one is using the `okafka-0.8-full.jar` file generated using `./gradlew fullJar` command, then it is not required to add other jar files in the classpath while running the Oracle Kafka application.
 
-## Using the okafka.jar
+## Using the okafka-0.8-full.jar
 
-This section describes the sample Producer and Consumer application that uses `okafka.jar` file. These files are available in the examples directory.  Assuming user has built the `okafka.jar` file using the `./gradlew fullJar` build command, so that no other jar file is required to be placed in the classpath.
+This section describes the sample Producer and Consumer application that uses `okafka-0.8-full.jar` file. These files are available in the examples directory.  Assuming user has built the `okafka-0.8-full.jar` file using the `./gradlew fullJar` build command, so that no other jar file is required to be placed in the classpath.
 
-To compile `Producer.java`
+To compile `Producer.java` you can use java, for example: 
 
+```java
+javac -classpath  .:okafka-0.8-full.jar Producer.java
 ```
-javac -classpath  .:okafka.jar Producer.java
-```
-To run `Producer.java`
 
+or gradle
+
+```bash
+gradle :examples:producer:build -x test 
 ```
-java -classpath  .:okafka.jar Producer
+
+To run `Producer.java` 
+
+```java
+java -classpath  .:okafka-0.8-full.jar Producer
+```
+
+or using gradle
+
+```bash
+gradle :examples:producer:run 
 ```
 
 To compile `Consumer.java`
 
+```java
+javac -classpath  .:okafka-0.8-full.jar Consumer.java
 ```
-javac -classpath  .:okafka.jar Consumer.java
+
+or gradle
+
+```bash
+gradle :examples:consumer:build -x test 
 ```
+
 To run `Consumer.java`
 
 ```
-java -classpath  .:okafka.jar Consumer 10
+java -classpath  .:okafka-0.8-full.jar Consumer 10
+```
+
+or gradle
+
+```bash
+gradle :examples:consumer:run
 ```
 
 ## Build javadoc
@@ -202,10 +248,11 @@ This command generates javadoc in `okafka_source_dir/clients/build/docs/javadoc`
 ./gradlew javadoc
 ```
     
-    
+Bellow, there is a sample code for the Producer and one for the Consumer. Both are available in examples folder, to use fill the properties externalized on application.properties to point to your Oracle Database. 
+
 **Producer.java - A simple Producer application that uses okafka.jar**
 
-```
+```java
 import java.util.Properties;
 import org.oracle.okafka.clients.producer.*;
 
@@ -223,8 +270,8 @@ public static void main(String[] args) {
    props.put("oracle.net.tns_admin", "location of tnsnames.ora/ojdbc.properties file");	//eg: "/user/home" if ojdbc.properies file is in home
    props.put("bootstrap.servers", "host:port"); //ip address or host name where instance running : port where instance listener running
    props.put("linger.ms", 1000);
-   props.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");     
-   props.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
+   props.put("key.serializer", "org.apache.okafka.common.serialization.StringSerializer");     
+   props.put("value.serializer", "org.apache.okafka.common.serialization.StringSerializer");
 
    prod=new KafkaProducer<String, String>(props);
    try {
@@ -246,7 +293,7 @@ public static void main(String[] args) {
 
 **Consumer.java - A simple Consumer application that uses okafka.jar**
 
-```
+```java
 import java.util.Properties;
 import java.time.Duration;
 import java.util.Arrays;
@@ -265,8 +312,8 @@ public static void main(String[] args) {
    props.put("bootstrap.servers", "host:port"); //ip address or host name where instance running : port where instance listener running
    props.put("group.id", "subscriber");
    props.put("enable.auto.commit", "false");
-   props.put("key.deserializer",  "org.apache.kafka.common.serialization.StringDeserializer");
-   props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+   props.put("key.deserializer",  "org.apache.okafka.common.serialization.StringDeserializer");
+   props.put("value.deserializer", "org.apache.okafka.common.serialization.StringDeserializer");
    props.put("max.poll.records", 500);
    
    KafkaConsumer<String, String> consumer = null;

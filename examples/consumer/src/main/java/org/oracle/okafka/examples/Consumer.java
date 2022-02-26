@@ -107,7 +107,7 @@ public class Consumer {
 
         try {
             Properties prop = new Properties();
-            String propFileName = "config.properties_local";
+            String propFileName = "config.properties";
 
             inputStream = Consumer.class.getClassLoader().getResourceAsStream(propFileName);
             if (inputStream != null) {
