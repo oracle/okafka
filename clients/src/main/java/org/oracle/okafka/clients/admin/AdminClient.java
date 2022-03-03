@@ -42,7 +42,7 @@ import org.oracle.okafka.common.config.ConfigResource;
  * Topic can be created or altered with following configs. If these configs are not overriden by client then server default values are used.
  * 
  * retention.ms: Amount of time in milliseconds messages stay in topic and are available for consumption. In kafka retention time starts after
- * enqueue of a message whereas in TEQ retention starts after all subscribers(goups) of a topic consume a message. In TEQ retention.ms is rounded to seconds. This property is supported on or later 20c database.
+ * enqueue of a message whereas in TEQ retention starts after all subscribers(groups) of a topic consume a message. In TEQ retention.ms is rounded to seconds. This property is supported on or later 20c database.
  *
  */
 @InterfaceStability.Evolving
@@ -327,7 +327,7 @@ public abstract class AdminClient implements AutoCloseable {
     public abstract RenewDelegationTokenResult renewDelegationToken(byte[] hmac, RenewDelegationTokenOptions options);
 
     /**
-     * <This method is not yet supported.
+     * This method is not yet supported.
      */
     public ExpireDelegationTokenResult expireDelegationToken(byte[] hmac) {
         return expireDelegationToken(hmac, new ExpireDelegationTokenOptions());
