@@ -270,8 +270,8 @@ public static void main(String[] args) {
    props.put("oracle.net.tns_admin", "location of tnsnames.ora/ojdbc.properties file");	//eg: "/user/home" if ojdbc.properies file is in home
    props.put("bootstrap.servers", "host:port"); //ip address or host name where instance running : port where instance listener running
    props.put("linger.ms", 1000);
-   props.put("key.serializer", "org.apache.okafka.common.serialization.StringSerializer");     
-   props.put("value.serializer", "org.apache.okafka.common.serialization.StringSerializer");
+   props.put("key.serializer", "org.oracle.okafka.common.serialization.StringSerializer");     
+   props.put("value.serializer", "org.oracle.okafka.common.serialization.StringSerializer");
 
    prod=new KafkaProducer<String, String>(props);
    try {
@@ -312,8 +312,8 @@ public static void main(String[] args) {
    props.put("bootstrap.servers", "host:port"); //ip address or host name where instance running : port where instance listener running
    props.put("group.id", "subscriber");
    props.put("enable.auto.commit", "false");
-   props.put("key.deserializer",  "org.apache.okafka.common.serialization.StringDeserializer");
-   props.put("value.deserializer", "org.apache.okafka.common.serialization.StringDeserializer");
+   props.put("key.deserializer",  "org.oracle.okafka.common.serialization.StringDeserializer");
+   props.put("value.deserializer", "org.oracle.okafka.common.serialization.StringDeserializer");
    props.put("max.poll.records", 500);
    
    KafkaConsumer<String, String> consumer = null;
