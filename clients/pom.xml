@@ -2,13 +2,28 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>org.oracle.okafka</groupId>
+    <groupId>com.oracle.database.messaging</groupId>
     <artifactId>okafka</artifactId>
     <version>0.8</version>
+    
     <packaging>jar</packaging>
 
+    <!-- Start of fields requiring product specific values -->
     <name>okafka</name>
-    <description>Kafka Java Client for Oracle Transactional Event Queues.</description>
+    <description>Oracle's implementation of Kafka Java Client for Oracle Transactional Event Queues.</description>
+    <url>https://docs.oracle.com/en/database/oracle/oracle-database/21/okjdc/index.html</url>
+    <!-- End of fields requiring product specific values -->
+
+    <licenses>
+        <license>
+            <name>Oracle Free Use Terms and Conditions (FUTC)</name>
+            <comments>
+        https://www.oracle.com/downloads/licenses/oracle-free-license.html
+      </comments>
+        </license>
+    </licenses>
+
+    <!-- End elements that need to be inserted -->
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -133,6 +148,17 @@
                             <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
                         </manifest>
                     </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.3.2</version>
+                <configuration>
+                    <bottom>
+                        <![CDATA[Copyright © 2001, 2022, Oracle and/or its affiliates. All rights reserved.]]>
+                    </bottom>
+                    <additionalJOption>-Xdoclint:none</additionalJOption>
                 </configuration>
             </plugin>
             <plugin>
