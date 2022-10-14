@@ -5,13 +5,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.oracle.database.jdbc</groupId>
-    <artifactId>ojdbc-connect</artifactId>
+    <artifactId>txeventq-connector</artifactId>
     <version>1.0</version>
 
     <packaging>jar</packaging>
 
     <!-- Start of fields requiring product specific values -->
-    <name>ojdbc-connect</name>
+    <name>TxEventQ-Connector</name>
     <description>Oracle's implementation of Kafka Connect Sink for Oracle Transactional Event Queues.</description>
     <url>https://docs.oracle.com/en/database/oracle/oracle-database/21/okjdc/index.html</url>
     <!-- End of fields requiring product specific values -->
