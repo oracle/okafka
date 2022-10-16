@@ -11,5 +11,9 @@ mvnw.cmd
 
 target/
 build/
+bin/
 
 .dccache
+.DS_Store
+
+doc/
