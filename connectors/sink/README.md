@@ -59,7 +59,6 @@ The wallet directory that will need to be specified in the connection properties
 
 - cwallet.sso
 - ewallet.p12
-- tnsnames.ora
 
 ### Setup the Connection Properties
 
