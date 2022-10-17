@@ -1,6 +1,6 @@
 # Kafka Java Client for Oracle Transactional Event Queues (Preview v0.8)
 
-## Building the Kafka Java Client for Oracle TEQ distribution
+## Building the Kafka Java Client for Oracle TxEventQ distribution
 
 This distribution contains Java source code to provide Kafka Java client compatibility to Oracle Transactional Event Queues. Some Kafka Java producer and consumer applications can migrate seamlessly to Oracle Transactional Event Queues for scalable event streaming directly built into the Oracle Database.
 
@@ -16,7 +16,7 @@ To test this distribution in free Oracle Cloud environment create [Oracle Cloud 
 
 A database user should be created and should be granted the privileges mentioned in configuration section. Then create a Transactional Event Queue to produce and consume messages.
 
-Finally, build `okafka.jar` and run [Producer.java](./examples/producer/src/main/java/org/oracle/okafka/examples/Producer.java) to produce into Oracle TEQ, [Consumer.java](./examples/consumer/src/main/java/org/oracle/okafka/examples/Consumer.java) to consume from Oracle TEQ.
+Finally, build `okafka.jar` and run [Producer.java](./examples/producer/src/main/java/org/oracle/okafka/examples/Producer.java) to produce into Oracle TxEventQ, [Consumer.java](./examples/consumer/src/main/java/org/oracle/okafka/examples/Consumer.java) to consume from Oracle TxEventQ.
  
 ### Configuration ###
 
@@ -31,15 +31,15 @@ grant execute on dbms_aqjms to user
 grant select_catalog_role to user
 ```
 
-Once user is created and above privileges are granted, connect to Oracle Database as this user and create a Transactional Event Queue using below PL/SQL script. For this preview release, upper case Topic/queue names are only allowed. Also this preview supports TEQ with only 1 partition hence, in below script `SHARD_NUM` parameter for TEQ is set to 1.
+Once user is created and above privileges are granted, connect to Oracle Database as this user and create a Transactional Event Queue using below PL/SQL script. For this preview release, upper case Topic/queue names are only allowed. Also this preview supports TxEventQ with only 1 partition hence, in below script `SHARD_NUM` parameter for TxEventQ is set to 1.
 
 ```roomsql
 begin
-    sys.dbms_aqadm.create_sharded_queue(queue_name=>"TEQ", multiple_consumers => TRUE); 
-    sys.dbms_aqadm.set_queue_parameter('TEQ', 'SHARD_NUM', 1);
-    sys.dbms_aqadm.set_queue_parameter('TEQ', 'STICKY_DEQUEUE', 1);
-    sys.dbms_aqadm.set_queue_parameter('TEQ', 'KEY_BASED_ENQUEUE', 1);
-    sys.dbms_aqadm.start_queue('TEQ');
+    sys.dbms_aqadm.create_sharded_queue(queue_name=>"TxEventQ", multiple_consumers => TRUE); 
+    sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'SHARD_NUM', 1);
+    sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'STICKY_DEQUEUE', 1);
+    sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'KEY_BASED_ENQUEUE', 1);
+    sys.dbms_aqadm.start_queue('TxEventQ');
 end;
 ```
 
@@ -345,17 +345,17 @@ public static void main(String[] args) {
 
 * `KafkaProducer`: Constructor that creates a producer object and internal AQ JMS objects. KafkaProducer class has 4 types of constructor defined which all take configuration parameters as input.
 
-* `send(ProducerRecord)`: Produces a message into Oracle Transactional Event Queue (Oracle TEQ). A message is called  'Producer Record' for Kafka application and called 'Event' for Oracle TEQ. Both the overloaded versions of send, that is, `send(ProducerRecord)` and `send(ProducerRecord, Callback)` will be supported. Records will be published into the topic using AQJMS.
+* `send(ProducerRecord)`: Produces a message into Oracle Transactional Event Queue (Oracle TxEventQ). A message is called  'Producer Record' for Kafka application and called 'Event' for Oracle TxEventQ. Both the overloaded versions of send, that is, `send(ProducerRecord)` and `send(ProducerRecord, Callback)` will be supported. Records will be published into the topic using AQJMS.
 
 * `close`: Closes the producer, its sender thread and frees the accumulator. It also closes internal AQJMS objects like connection, session JMS producer etc.
 
-* `ProducerRecord`: Class that represents a message in Kafka platform. It will be translated into an 'event' for Oracle TEQ Platform which is an AQJMS Message. Relevant fields like payload and key can be directly translated into Oracle TEQ payload and message key for Oracle TEQ.
+* `ProducerRecord`: Class that represents a message in Kafka platform. It will be translated into an 'event' for Oracle TxEventQ Platform which is an AQJMS Message. Relevant fields like payload and key can be directly translated into Oracle TxEventQ payload and message key for Oracle TxEventQ.
 
-* `RecordMetadata`: This class contains metadata of the record like offset, timestamp etc. of the Record in Kafka platform. This will be assigned value relevant for Oracle TEQ.  An event id of Oracle TEQ will be converted into an offset of RecordMetadata.
+* `RecordMetadata`: This class contains metadata of the record like offset, timestamp etc. of the Record in Kafka platform. This will be assigned value relevant for Oracle TxEventQ.  An event id of Oracle TxEventQ will be converted into an offset of RecordMetadata.
 
-* `Callback Interface`: A callback function which will be executed once a Record is successfully published into Oracle TEQ Event Stream.
+* `Callback Interface`: A callback function which will be executed once a Record is successfully published into Oracle TxEventQ Event Stream.
 
-* `Partitioner Interface`: An Interface which maps a key of the message to a partition number of the topic. A partition number is analogous to a Event Stream Id of Oracle TEQ. Application developer can implement their own Partitioner interface to map messages to a partition. The partition of a topic is analogous to a 'Event Stream' of Oracle TEQ. Thus a message is published into the assigned Event Stream of Oracle TEQ.
+* `Partitioner Interface`: An Interface which maps a key of the message to a partition number of the topic. A partition number is analogous to a Event Stream Id of Oracle TxEventQ. Application developer can implement their own Partitioner interface to map messages to a partition. The partition of a topic is analogous to a 'Event Stream' of Oracle TxEventQ. Thus a message is published into the assigned Event Stream of Oracle TxEventQ.
 
 * `Property: bootstrap.servers`: IP address and port of a machine where database instance is running. 
 
@@ -363,9 +363,9 @@ public static void main(String[] args) {
 
 * `Property: acks`: For this project, only value relevant for acks property is 'all'. Any other field set by the user is ignored.
 
-* `Property: linger.ms`: Time in milliseconds for which sender thread will wait before publishing the records in Oracle TEQ.
+* `Property: linger.ms`: Time in milliseconds for which sender thread will wait before publishing the records in Oracle TxEventQ.
 
-*  `Property: batch.size`: Size of accumulator buffer in bytes for which sender thread will wait before publishing records in  Oracle TEQ.
+*  `Property: batch.size`: Size of accumulator buffer in bytes for which sender thread will wait before publishing records in  Oracle TxEventQ.
 
 * `Property: buffer.memory`: Total memory in bytes the accumulator can hold.
 
@@ -376,15 +376,15 @@ public static void main(String[] args) {
 
 ### KafkaConsumer APIs supported
 
-* `KafkaConsumer`: Constructor that creates a consumer that allows application to consume messages from a queue of Oracle TEQ. Internal to client, Oracle AQJMS objects will be created which will not be visible to client application. All variations of the KafkaConsumer constructor are supported in this version.
+* `KafkaConsumer`: Constructor that creates a consumer that allows application to consume messages from a queue of Oracle TxEventQ. Internal to client, Oracle AQJMS objects will be created which will not be visible to client application. All variations of the KafkaConsumer constructor are supported in this version.
 
-* `Subscribe(java.util.Collection<String>)`: This method takes a list of topics to subscribe to. In this version only the first topic of the list will be subscribed to. An exception will be thrown if size of list is greater than one. This method will create a durable subscriber on Transactional Event Queue at Oracle TEQ server side with Group-Id as subscriber name.
+* `Subscribe(java.util.Collection<String>)`: This method takes a list of topics to subscribe to. In this version only the first topic of the list will be subscribed to. An exception will be thrown if size of list is greater than one. This method will create a durable subscriber on Transactional Event Queue at Oracle TxEventQ server side with Group-Id as subscriber name.
 
-* `Poll(java.time.Duration)`: Poll attempts to dequeue messages from the Oracle TEQ for the subscriber. It dequeues a batch of messages from the Oracle TEQ within a timeout provided as argument in poll. Size of the batch depends on the parameter max.poll.records set by the Kafka client application. In this preview release, when poll is invoked for the first time, Oracle TEQ assigns a single available partition to this consumer. This assignment will stay for the lifetime of the consumer and no other partition is assigned to this consumer. Each poll to this consumer returns messages belonging to the partition assigned to this consumer. It is the responsibility of the application developer to start as many consumers as number of partitions of the queue. If number of consumers are less than number of partitions then messages from unassigned partitions will never be consumed. If number of consumers are more than number of partitions then extra consumers will not be assigned any partition and hence will not be able to consume any messages. No two consumer applications will consume from same partition at the same time.
+* `Poll(java.time.Duration)`: Poll attempts to dequeue messages from the Oracle TxEventQ for the subscriber. It dequeues a batch of messages from the Oracle TxEventQ within a timeout provided as argument in poll. Size of the batch depends on the parameter max.poll.records set by the Kafka client application. In this preview release, when poll is invoked for the first time, Oracle TxEventQ assigns a single available partition to this consumer. This assignment will stay for the lifetime of the consumer and no other partition is assigned to this consumer. Each poll to this consumer returns messages belonging to the partition assigned to this consumer. It is the responsibility of the application developer to start as many consumers as number of partitions of the queue. If number of consumers are less than number of partitions then messages from unassigned partitions will never be consumed. If number of consumers are more than number of partitions then extra consumers will not be assigned any partition and hence will not be able to consume any messages. No two consumer applications will consume from same partition at the same time.
 
-* `commitSync()`: Commit all consumed messages. Commit to an offset is not supported in this version. This call will directly call commit on database which will commit all consumed messages from Oracle TEQ. `Kafka Java Client for Oracle Transactional Event Queues` maintains only a single session for a connection. And this session is transactional, calling commit on session() either succeeds or rolls back. So commit is not retried in case of commit failure. 
+* `commitSync()`: Commit all consumed messages. Commit to an offset is not supported in this version. This call will directly call commit on database which will commit all consumed messages from Oracle TxEventQ. `Kafka Java Client for Oracle Transactional Event Queues` maintains only a single session for a connection. And this session is transactional, calling commit on session() either succeeds or rolls back. So commit is not retried in case of commit failure. 
 
-* `commitSync(java.time.Duration)`: Commit all consumed messages. Commit to an offset is not supported in this preview release. This call will directly call commit on database which will commit all consumed messages from Oracle TEQ. `Kafka Java Client for Oracle Transactional Event Queues` maintains only a single session for a connection. And this session is transactional, calling commit on session() either succeeds or rolls back. commit is not retried in case of commit failure.
+* `commitSync(java.time.Duration)`: Commit all consumed messages. Commit to an offset is not supported in this preview release. This call will directly call commit on database which will commit all consumed messages from Oracle TxEventQ. `Kafka Java Client for Oracle Transactional Event Queues` maintains only a single session for a connection. And this session is transactional, calling commit on session() either succeeds or rolls back. commit is not retried in case of commit failure.
 
 * `commitAsync()`: This call is translated into `commitSync` internally.  
 
@@ -404,11 +404,11 @@ public static void main(String[] args) {
 
 * `Property: bootstrap.servers`: IP address and port of a machine where database instance is running. 
 
-* `Property: key.deserializer and value.deserialzer`: In Oracle TEQ's queue key, value are stored as byte array in user property, payload of JMS message respectively. On consuming these byte arrays are deserialized into key, value having user provided format internally by the consumer using `key.deserializer` and `value.deserializer` respectively. 
+* `Property: key.deserializer and value.deserialzer`: In Oracle TxEventQ's queue key, value are stored as byte array in user property, payload of JMS message respectively. On consuming these byte arrays are deserialized into key, value having user provided format internally by the consumer using `key.deserializer` and `value.deserializer` respectively. 
 
-* `Property: group.id:` This is a Consumer Group name for which messages are consumed from the Kafka topic. This property will be used as a durable subscriber name for Oracle TEQ's queue.
+* `Property: group.id:` This is a Consumer Group name for which messages are consumed from the Kafka topic. This property will be used as a durable subscriber name for Oracle TxEventQ's queue.
 
-* `Property: max.poll.records`: Max number of records to fetch from Oracle TEQ server in a single poll call.
+* `Property: max.poll.records`: Max number of records to fetch from Oracle TxEventQ server in a single poll call.
 
 * `Property: fetch.max.wait.ms`: Maximum amount of time in milliseconds to wait for fetching messages if not available.
 
@@ -422,9 +422,9 @@ public static void main(String[] args) {
 
 * `close`: Closes database session.
 
-* `createTopic(Collection<NewTopic>, CreateTopicsOptions)`: Create an Oracle TEQ with initial partition count (or Event Streams count) passed by the application as an argument into the function. This method is not supported in preview release.
+* `createTopic(Collection<NewTopic>, CreateTopicsOptions)`: Create an Oracle TxEventQ with initial partition count (or Event Streams count) passed by the application as an argument into the function. This method is not supported in preview release.
 
-* `deleteTopic(Collection<String>, DeleteTopicsOptions)`: Stop and Drop Oracle TEQ queue.
+* `deleteTopic(Collection<String>, DeleteTopicsOptions)`: Stop and Drop Oracle TxEventQ queue.
 
 * `Property: bootstrap.servers`: IP address and port of a machine where database instance is running. 
 
