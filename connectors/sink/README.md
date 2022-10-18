@@ -59,7 +59,6 @@ The wallet directory that will need to be specified in the connection properties
 
 - cwallet.sso
 - ewallet.p12
-- tnsnames.ora
 
 ### Setup the Connection Properties
 
@@ -178,5 +177,5 @@ In the third terminal start the connector in either standalone (connect-standalo
 The command below is connecting in standalone mode. If connecting is distributed mode replace the bat file with the connect-distributed.sh file.
 
 ```bash
-bin/connect-standalone.sh config/connect-standalone.properties config/connect-teq-sink.properties 
+bin/connect-standalone.sh config/connect-standalone.properties config/connect-TxEventQ-sink.properties 
 ```
