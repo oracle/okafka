@@ -9,6 +9,8 @@ To use the application Kafka will need to be downloaded and installed on a serve
 information on how to start Kafka. Refer to this [Confluent](https://docs.confluent.io/platform/current/kafka/authentication_ssl.html#crep-full) page
 for information on how to setup SSL connection for Kafka.
 
+The Kafaka Sink Connector requires a minimum Oracle Database version of 21c in order to create a Transaction Event Queue. 
+
 Clone the project from the repository. Open a bash window and change the directory to the location where the cloned project has been saved.
 Run the following command from the bash window to compile the source.
 
@@ -22,6 +24,33 @@ You will need to grab the following jar files from the \target\libs directory af
 - oraclepki-21.5.0.0.jar
 - osdt_core-21.5.0.0.jar
 - osdt_cert-21.5.0.0.jar
+
+### Oracle Database Setup
+To run the Kafaka Sink Connector against Oracle Database, a database user should be created and should be granted the below privileges.
+
+```roomsql
+create user <username> identified by <password>
+grant connect, resource to user
+grant execute on dbms_aqadm to use`
+grant execute on dbms_aqin to user
+grant execute on dbms_aqjms to user
+grant select_catalog_role to user
+```
+
+Once user is created and above privileges are granted, connect to Oracle Database as this user and create a Transactional Event Queue using below PL/SQL script.
+In the below script `SHARD_NUM` parameter for TxEventQ is set to 1, but this value should be modified to be less than or equal to the number of Kafaka partitions
+assigned to the Kafka topic that the Sink Connector will be consuming from.
+
+```roomsql
+begin
+    sys.dbms_aqadm.create_sharded_queue(queue_name=>"TxEventQ", multiple_consumers => TRUE); 
+    sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'SHARD_NUM', 1);
+    sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'STICKY_DEQUEUE', 1);
+    sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'KEY_BASED_ENQUEUE', 2);
+    sys.dbms_aqadm.start_queue('TxEventQ');
+	sys.dbms_aqadm.add_subscriber('TxEventQ', SYS.AQ$_AGENT('SUB1', NULL, 0)) ;
+end;
+```
 
 ### Steps to Create an Oracle Wallet
 
