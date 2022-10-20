@@ -31,7 +31,7 @@ To run the Kafka Sink Connector against Oracle Database, a database user should 
 ```roomsql
 create user <username> identified by <password>
 grant connect, resource to user
-grant execute on dbms_aqadm to use`
+grant execute on dbms_aqadm to use
 grant execute on dbms_aqin to user
 grant execute on dbms_aqjms to user
 grant select_catalog_role to user
