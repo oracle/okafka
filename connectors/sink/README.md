@@ -9,7 +9,7 @@ To use the application Kafka will need to be downloaded and installed on a serve
 information on how to start Kafka. Refer to this [Confluent](https://docs.confluent.io/platform/current/kafka/authentication_ssl.html#crep-full) page
 for information on how to setup SSL connection for Kafka.
 
-The Kafka Sink Connector requires a minimum Oracle Database version of 21c in order to create a Transaction Event Queue. 
+The Kafka Sink Connector requires a minimum Oracle Database version of 21c in order to create a Transactional Event Queue. 
 
 Clone the project from the repository. Open a bash window and change the directory to the location where the cloned project has been saved.
 Run the following command from the bash window to compile the source.
