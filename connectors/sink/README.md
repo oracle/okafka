@@ -38,7 +38,7 @@ grant select_catalog_role to user
 ```
 
 Once user is created and above privileges are granted, connect to Oracle Database as this user and create a Transactional Event Queue using below PL/SQL script.
-In the below script `SHARD_NUM` parameter for TxEventQ is set to 1, but this value should be modified to be less than or equal to the number of Kafaka partitions
+In the below script `SHARD_NUM` parameter for TxEventQ is set to 1, but this value should be modified to be less than or equal to the number of Kafka partitions
 assigned to the Kafka topic that the Sink Connector will be consuming from.
 
 ```roomsql
