@@ -29,6 +29,8 @@ import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Map;
 
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.sink.SinkRecord;
@@ -113,5 +115,23 @@ public class TxEventQSinkTask extends SinkTask{
         }
 		
 	}
+	
+	 /**
+     * Flush all records that have been {@link #put(Collection)} for the specified topic-partitions.
+     *
+     * @param currentOffsets the current offset state as of the last call to {@link #put(Collection)}},
+     *                       provided for convenience but could also be determined by tracking all offsets included in the {@link SinkRecord}s
+     *                       passed to {@link #put}.
+     */
+	@Override
+    public void flush(Map<TopicPartition, OffsetAndMetadata> currentOffsets) {
+		log.info("Entering the flush method to commit");
+		try {
+			this.producer.getConnection().commit();
+		} catch (SQLException e) {
+			 throw new ConnectException("Error committing records into TxEventQ: " + e.toString());
+		}
+    }
+	
 
 }

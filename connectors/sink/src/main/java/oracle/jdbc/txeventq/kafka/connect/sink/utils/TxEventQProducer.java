@@ -230,9 +230,9 @@ public class TxEventQProducer implements Closeable  {
     }
 
     /**
-     * Enqueues the Kafka records into TEQ.
+     * Enqueues the Kafka records into the specified TxEventQ.
      * 
-     * @param records The records to enqueue into TEQ.
+     * @param records The records to enqueue into the TxEventQ.
      */
     public void put(Collection<SinkRecord> records) {
         if (!isConnOpen()) {
@@ -245,12 +245,21 @@ public class TxEventQProducer implements Closeable  {
                 log.info("[{}:{}] Enqueuing record: {}", Thread.currentThread().getId(), this.conn, sinkRecord.value());
                 enqueueMessage(this.conn, this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME), sinkRecord);
             }
-            this.conn.commit();
 
         } catch (SQLException e) {
             throw new ConnectException("Error putting records into TxEventQ: " + e.toString());
 
         }
+    }
+    
+    /**
+     * Gets the connection being used.
+     * 
+     * @return The OracleConnection.
+     * 
+     */
+    public OracleConnection getConnection() {
+    	return this.conn;
     }
     
     /**
