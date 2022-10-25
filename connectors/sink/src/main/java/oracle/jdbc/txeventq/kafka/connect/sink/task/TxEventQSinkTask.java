@@ -105,15 +105,14 @@ public class TxEventQSinkTask extends SinkTask{
 
 	@Override
 	public void stop() {
-	    log.info("[{}] Stopping Kafka Connect for Oracle TxEventQ - Sink Task", Thread.currentThread().getId());
-        if (this.producer.isConnOpen()) {
-            try {
-                this.producer.close();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-		
+		log.info("[{}] Stopping Kafka Connect for Oracle TxEventQ - Sink Task", Thread.currentThread().getId());
+		if (this.producer.isConnOpen()) {
+			try {
+				this.producer.close();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		}
 	}
 	
 	 /**
@@ -125,13 +124,10 @@ public class TxEventQSinkTask extends SinkTask{
      */
 	@Override
     public void flush(Map<TopicPartition, OffsetAndMetadata> currentOffsets) {
-		log.info("Entering the flush method to commit");
 		try {
 			this.producer.getConnection().commit();
 		} catch (SQLException e) {
 			 throw new ConnectException("Error committing records into TxEventQ: " + e.toString());
 		}
     }
-	
-
 }
