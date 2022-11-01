@@ -27,9 +27,9 @@ package oracle.jdbc.txeventq.kafka.connect.sink.task;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.connect.errors.ConnectException;
@@ -79,15 +79,22 @@ public class TxEventQSinkTask extends SinkTask{
             throw new ConnectException("Error attempting to validate the existence of the TxEventQ queue name: " + e1.toString());
         }
        
-        try {
-            int kafkaPartitionNum = producer.getKafkaTopicPartitionSize(this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC));
-            int txEventQShardNum = producer.getNumOfShardsForQueue(this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME));
-            if (kafkaPartitionNum > txEventQShardNum) {
-                throw new ConnectException("The number of Kafka partitions " + kafkaPartitionNum + " must be less than or equal the number TxEventQ event stream " + txEventQShardNum);
-            }    
-        } catch (SQLException e) {
-           throw new ConnectException("Error attempting to validate the Kafka partition size is valid compared to the TxEventQ event stream: " + e.toString());
-        }
+		try {
+			int kafkaPartitionNum = producer
+					.getKafkaTopicPartitionSize(this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC));
+			int txEventQShardNum = producer
+					.getNumOfShardsForQueue(this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME));
+			if (kafkaPartitionNum > txEventQShardNum) {
+				throw new ConnectException("The number of Kafka partitions " + kafkaPartitionNum
+						+ " must be less than or equal the number TxEventQ event stream " + txEventQShardNum);
+			}
+		
+		} catch (SQLException e) {
+			throw new ConnectException(
+					"Error attempting to validate the Kafka partition size is valid compared to the TxEventQ event stream: "
+							+ e.toString());
+		}
+        
 	}
 
 	@Override
@@ -95,6 +102,7 @@ public class TxEventQSinkTask extends SinkTask{
 		if (records.isEmpty()) {
 			return;
 		}
+		
 		// Check if TxEventQ producer is open to produce, if not open it.
         if (!this.producer.isConnOpen()) {
             log.info("[{}] Connection is closed. Connecting...", Thread.currentThread().getId());
@@ -116,18 +124,27 @@ public class TxEventQSinkTask extends SinkTask{
 	}
 	
 	 /**
-     * Flush all records that have been {@link #put(Collection)} for the specified topic-partitions.
-     *
-     * @param currentOffsets the current offset state as of the last call to {@link #put(Collection)}},
-     *                       provided for convenience but could also be determined by tracking all offsets included in the {@link SinkRecord}s
-     *                       passed to {@link #put}.
+     * The SinkTask use this method to create writers for newly assigned partitions in case of partition
+     * rebalance. This method will be called after partition re-assignment completes and before the SinkTask starts
+     * fetching data. Note that any errors raised from this method will cause the task to stop.
+     * @param partitions The list of partitions that are now assigned to the task (may include
+     *                   partitions previously assigned to the task)
      */
 	@Override
-    public void flush(Map<TopicPartition, OffsetAndMetadata> currentOffsets) {
-		try {
-			this.producer.getConnection().commit();
-		} catch (SQLException e) {
-			 throw new ConnectException("Error committing records into TxEventQ: " + e.toString());
+	public void open(Collection<TopicPartition> partitions) {
+
+		if (this.producer.createOffsetInfoTable(this.producer.getConnection())) {
+			HashMap<TopicPartition, Long> offsetMapNew = new HashMap<>();
+			for (TopicPartition tp : partitions) // for each partition assigned
+			{
+				Long offset = this.producer.getOffsetInDatabase(this.producer.getConnection(), tp.topic(),
+						tp.partition());
+				offsetMapNew.put(tp, offset);
+			}
+			this.context.offset(offsetMapNew);
+		} else {
+			throw new ConnectException(
+					"TXEVENTQ_TRACK_OFFSETS table couldn't be created or accessed to setup offset information.");
 		}
-    }
+	}
 }
