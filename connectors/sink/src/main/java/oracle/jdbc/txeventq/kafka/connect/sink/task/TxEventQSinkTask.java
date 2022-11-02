@@ -30,6 +30,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.connect.errors.ConnectException;
@@ -122,6 +123,13 @@ public class TxEventQSinkTask extends SinkTask{
 			}
 		}
 	}
+	
+	@Override
+	public Map<TopicPartition, OffsetAndMetadata> preCommit(Map<TopicPartition, OffsetAndMetadata> currentOffsets) {
+		// Returning an empty set of offsets since the connector is going to handle all offsets in the external system.
+        currentOffsets.clear();
+        return currentOffsets;
+    }
 	
 	 /**
      * The SinkTask use this method to create writers for newly assigned partitions in case of partition
