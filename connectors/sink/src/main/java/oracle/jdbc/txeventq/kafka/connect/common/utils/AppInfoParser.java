@@ -55,12 +55,12 @@ public class AppInfoParser {
 
     static {
         Properties props = new Properties();
-        try (InputStream resourceStream = AppInfoParser.class.getResourceAsStream("/kafka-connect-oracle-version.properties")) {
+        try (InputStream resourceStream = AppInfoParser.class
+                .getResourceAsStream("/kafka-connect-oracle-version.properties")) {
             props.load(resourceStream);
         } catch (IOException e) {
             log.warn("Error while loading kafka-connect-oracle-version.properties.");
         }
-
 
         NAME = props.getProperty("name", "unknown").trim();
         VERSION = props.getProperty("version", "unknown").trim();
@@ -71,9 +71,11 @@ public class AppInfoParser {
     public static String getName() {
         return NAME;
     }
+
     public static String getVersion() {
         return VERSION;
     }
+
     public static String getCommitId() {
         return COMMIT_ID;
     }
@@ -132,6 +134,7 @@ public class AppInfoParser {
 
     public interface AppInfoMBean {
         public String getVersion();
+
         public String getCommitId();
     }
 
@@ -139,7 +142,7 @@ public class AppInfoParser {
 
         public AppInfo() {
         }
-        
+
         @Override
         public String getVersion() {
             return AppInfoParser.getVersion();

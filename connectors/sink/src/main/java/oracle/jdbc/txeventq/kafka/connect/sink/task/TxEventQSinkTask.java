@@ -43,116 +43,123 @@ import oracle.jdbc.txeventq.kafka.connect.common.utils.AppInfoParser;
 import oracle.jdbc.txeventq.kafka.connect.sink.utils.TxEventQProducer;
 import oracle.jdbc.txeventq.kafka.connect.sink.utils.TxEventQSinkConfig;
 
-public class TxEventQSinkTask extends SinkTask{
-	private static final Logger log = LoggerFactory.getLogger(TxEventQSinkTask.class);
-	private TxEventQSinkConfig config;
-	private TxEventQProducer producer; 
+public class TxEventQSinkTask extends SinkTask {
+    private static final Logger log = LoggerFactory.getLogger(TxEventQSinkTask.class);
+    private TxEventQSinkConfig config;
+    private TxEventQProducer producer;
 
-	@Override
-	public String version() {
-		return AppInfoParser.getVersion();
-	}
+    @Override
+    public String version() {
+        return AppInfoParser.getVersion();
+    }
 
-	@Override
-	public void start(Map<String, String> properties) {
-		log.info("[{}] Starting Kafka Connect for Oracle TxEventQ - Sink Task", Thread.currentThread().getId());
+    @Override
+    public void start(Map<String, String> properties) {
+        log.info("[{}] Starting Kafka Connect for Oracle TxEventQ - Sink Task", Thread.currentThread().getId());
 
         // Loading Task Configuration
         try {
             config = new TxEventQSinkConfig(properties);
         } catch (ConfigException ce) {
-            log.error("[{}] Couldn't start TxEventQSinkTask due to configuration error", Thread.currentThread().getId());
+            log.error("[{}] Couldn't start TxEventQSinkTask due to configuration error",
+                    Thread.currentThread().getId());
             throw new ConnectException("Couldn't start TxEventQSinkTask due to configuration error", ce);
         }
-        
+
         producer = new TxEventQProducer(config);
         producer.connect();
-        
-        if (!producer.kafkaTopicExists(this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC))){
-            throw new ConnectException("The Kafka topic " + this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC) + " does not exist.");
+
+        if (!producer.kafkaTopicExists(this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC))) {
+            throw new ConnectException(
+                    "The Kafka topic " + this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC) + " does not exist.");
         }
-        
+
         try {
-            if (!producer.txEventQueueExists(this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME))){
-                throw new ConnectException("The TxEventQ queue name " + this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME) + " does not exist.");
+            if (!producer.txEventQueueExists(this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME))) {
+                throw new ConnectException("The TxEventQ queue name "
+                        + this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME) + " does not exist.");
             }
         } catch (SQLException e1) {
-            throw new ConnectException("Error attempting to validate the existence of the TxEventQ queue name: " + e1.toString());
+            throw new ConnectException(
+                    "Error attempting to validate the existence of the TxEventQ queue name: " + e1.toString());
         }
-       
-		try {
-			int kafkaPartitionNum = producer
-					.getKafkaTopicPartitionSize(this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC));
-			int txEventQShardNum = producer
-					.getNumOfShardsForQueue(this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME));
-			if (kafkaPartitionNum > txEventQShardNum) {
-				throw new ConnectException("The number of Kafka partitions " + kafkaPartitionNum
-						+ " must be less than or equal the number TxEventQ event stream " + txEventQShardNum);
-			}
-		
-		} catch (SQLException e) {
-			throw new ConnectException(
-					"Error attempting to validate the Kafka partition size is valid compared to the TxEventQ event stream: "
-							+ e.toString());
-		}
-        
-	}
 
-	@Override
-	public void put(Collection<SinkRecord> records) {
-		if (records.isEmpty()) {
-			return;
-		}
-		
-		// Check if TxEventQ producer is open to produce, if not open it.
+        try {
+            int kafkaPartitionNum = producer
+                    .getKafkaTopicPartitionSize(this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC));
+            int txEventQShardNum = producer
+                    .getNumOfShardsForQueue(this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME));
+            if (kafkaPartitionNum > txEventQShardNum) {
+                throw new ConnectException("The number of Kafka partitions " + kafkaPartitionNum
+                        + " must be less than or equal the number TxEventQ event stream " + txEventQShardNum);
+            }
+
+        } catch (SQLException e) {
+            throw new ConnectException(
+                    "Error attempting to validate the Kafka partition size is valid compared to the TxEventQ event stream: "
+                            + e.toString());
+        }
+
+    }
+
+    @Override
+    public void put(Collection<SinkRecord> records) {
+        if (records.isEmpty()) {
+            return;
+        }
+
+        // Check if TxEventQ producer is open to produce, if not open it.
         if (!this.producer.isConnOpen()) {
             log.info("[{}] Connection is closed. Connecting...", Thread.currentThread().getId());
             this.producer.connect();
         }
         producer.put(records);
-	}
+    }
 
-	@Override
-	public void stop() {
-		log.info("[{}] Stopping Kafka Connect for Oracle TxEventQ - Sink Task", Thread.currentThread().getId());
-		if (this.producer.isConnOpen()) {
-			try {
-				this.producer.close();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-		}
-	}
-	
-	@Override
-	public Map<TopicPartition, OffsetAndMetadata> preCommit(Map<TopicPartition, OffsetAndMetadata> currentOffsets) {
-		// Returning an empty set of offsets since the connector is going to handle all offsets in the external system.
+    @Override
+    public void stop() {
+        log.info("[{}] Stopping Kafka Connect for Oracle TxEventQ - Sink Task", Thread.currentThread().getId());
+        if (this.producer.isConnOpen()) {
+            try {
+                this.producer.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    @Override
+    public Map<TopicPartition, OffsetAndMetadata> preCommit(Map<TopicPartition, OffsetAndMetadata> currentOffsets) {
+        // Returning an empty set of offsets since the connector is going to handle all
+        // offsets in the external system.
         currentOffsets.clear();
         return currentOffsets;
     }
-	
-	 /**
-     * The SinkTask use this method to create writers for newly assigned partitions in case of partition
-     * rebalance. This method will be called after partition re-assignment completes and before the SinkTask starts
-     * fetching data. Note that any errors raised from this method will cause the task to stop.
-     * @param partitions The list of partitions that are now assigned to the task (may include
-     *                   partitions previously assigned to the task)
-     */
-	@Override
-	public void open(Collection<TopicPartition> partitions) {
 
-		if (this.producer.createOffsetInfoTable(this.producer.getConnection())) {
-			HashMap<TopicPartition, Long> offsetMapNew = new HashMap<>();
-			for (TopicPartition tp : partitions) // for each partition assigned
-			{
-				Long offset = this.producer.getOffsetInDatabase(this.producer.getConnection(), tp.topic(),
-						tp.partition());
-				offsetMapNew.put(tp, offset);
-			}
-			this.context.offset(offsetMapNew);
-		} else {
-			throw new ConnectException(
-					"TXEVENTQ_TRACK_OFFSETS table couldn't be created or accessed to setup offset information.");
-		}
-	}
+    /**
+     * The SinkTask use this method to create writers for newly assigned partitions
+     * in case of partition rebalance. This method will be called after partition
+     * re-assignment completes and before the SinkTask starts fetching data. Note
+     * that any errors raised from this method will cause the task to stop.
+     * 
+     * @param partitions The list of partitions that are now assigned to the task
+     *                   (may include partitions previously assigned to the task)
+     */
+    @Override
+    public void open(Collection<TopicPartition> partitions) {
+
+        if (this.producer.createOffsetInfoTable(this.producer.getConnection())) {
+            HashMap<TopicPartition, Long> offsetMapNew = new HashMap<>();
+            for (TopicPartition tp : partitions) // for each partition assigned
+            {
+                Long offset = this.producer.getOffsetInDatabase(this.producer.getConnection(), tp.topic(),
+                        tp.partition());
+                offsetMapNew.put(tp, offset);
+            }
+            this.context.offset(offsetMapNew);
+        } else {
+            throw new ConnectException(
+                    "TXEVENTQ_TRACK_OFFSETS table couldn't be created or accessed to setup offset information.");
+        }
+    }
 }
