@@ -46,6 +46,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -232,7 +233,7 @@ public class TxEventQProducer implements Closeable {
         }
         jmsMesgProp.setJMSMessageType(JMSMessageProperties.JMSMessageType.BYTES_MESSAGE);
         JMSMessage mesg = JMSFactory.createJMSMessage(jmsMesgProp);
-
+        
         byte[] nullPayload = null;
 
         if (sinkRecord.value() != null) {
@@ -276,7 +277,8 @@ public class TxEventQProducer implements Closeable {
     }
 
     /**
-     * Enqueues the Kafka records into the specified TxEventQ.
+     * Enqueues the Kafka records into the specified TxEventQ. Also keeps track of
+     * the offset for a particular topic and partition in database table TXEVENTQ_TRACK_OFFSETS.
      * 
      * @param records The records to enqueue into the TxEventQ.
      */
@@ -286,12 +288,32 @@ public class TxEventQProducer implements Closeable {
         }
 
         try {
+            Map<String, Map<Integer, Long>> topicInfoMap = new HashMap<>();
             for (SinkRecord sinkRecord : records) {
                 log.info("[{}:{}] Enqueuing record: {}", Thread.currentThread().getId(), this.conn, sinkRecord.value());
                 enqueueMessage(this.conn, this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME), sinkRecord);
-                setOffsetInfoInDatabase(this.conn, sinkRecord.topic(), sinkRecord.kafkaPartition(),
-                        sinkRecord.kafkaOffset());
+                if (topicInfoMap.containsKey(sinkRecord.topic())) {
+                    Map<Integer, Long> offsetInfoMap = topicInfoMap.get(sinkRecord.topic());
+                    if (offsetInfoMap.containsKey(sinkRecord.kafkaPartition())) {
+                        offsetInfoMap.replace(sinkRecord.kafkaPartition(), sinkRecord.kafkaOffset());
+                    } else {
+                        offsetInfoMap.put(sinkRecord.kafkaPartition(), sinkRecord.kafkaOffset());
+                    }
+                } else {
+                    Map<Integer, Long> offsetInfoMap = new HashMap<>();
+                    offsetInfoMap.put(sinkRecord.kafkaPartition(), sinkRecord.kafkaOffset());
+                    topicInfoMap.put(sinkRecord.topic(), offsetInfoMap);
+                }
             }
+
+            for (Map.Entry<String, Map<Integer, Long>> topicEntry : topicInfoMap.entrySet()) {
+                String topicKey = topicEntry.getKey();
+                Map<Integer, Long> offsetInfoValue = topicEntry.getValue();
+                for (Map.Entry<Integer, Long> offsetInfoEntry : offsetInfoValue.entrySet()) {
+                    setOffsetInfoInDatabase(this.conn, topicKey, offsetInfoEntry.getKey(), offsetInfoEntry.getValue());
+                }
+            }
+
             this.conn.commit();
 
         } catch (SQLException e) {
@@ -309,7 +331,7 @@ public class TxEventQProducer implements Closeable {
      * @param partition The partition number.
      * @param offset    The offset value.
      */
-    public void setOffsetInfoInDatabase(OracleConnection conn, String topic, int partition, long offset) {
+    private void setOffsetInfoInDatabase(OracleConnection conn, String topic, int partition, long offset) {
         try (PreparedStatement statement = conn
                 .prepareStatement("SELECT * FROM " + TXEVENTQ_TRACK_OFFSETS + " where topic_name='"
                         + this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC) + "' and partition=" + partition);
