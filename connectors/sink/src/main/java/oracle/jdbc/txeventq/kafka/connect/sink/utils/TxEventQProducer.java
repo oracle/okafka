@@ -65,7 +65,7 @@ public class TxEventQProducer implements Closeable {
 
     private OracleConnection conn;
     private TxEventQSinkConfig config = null;
-    private static final String TXEVENTQ_TRACK_OFFSETS = "TXEVENTQ_TRACK_OFFSETS";
+    private static final String TXEVENTQ$_TRACK_OFFSETS = "TXEVENTQ$_TRACK_OFFSETS";
 
     public TxEventQProducer(TxEventQSinkConfig config) {
         this.config = config;
@@ -175,18 +175,18 @@ public class TxEventQProducer implements Closeable {
     public boolean createOffsetInfoTable(OracleConnection conn) {
         boolean offsetTableExist = false;
 
-        String createTableQuery = "Create table if not exists " + TXEVENTQ_TRACK_OFFSETS
-                + "(topic_name varchar(50) NOT NULL, partition int NOT NULL, offset long NOT NULL)";
+        String createTableQuery = "Create table if not exists " + TXEVENTQ$_TRACK_OFFSETS
+                + "(kafka_topic_name varchar2(128) NOT NULL, queue_name varchar2(128) NOT NULL, partition int NOT NULL, offset number NOT NULL)";
         try (PreparedStatement statement = conn.prepareStatement(createTableQuery);
                 ResultSet rs = statement.executeQuery();) {
             DatabaseMetaData meta = conn.getMetaData();
-            ResultSet resultSet = meta.getTables(null, null, TXEVENTQ_TRACK_OFFSETS, new String[] { "TABLE" });
+            ResultSet resultSet = meta.getTables(null, null, TXEVENTQ$_TRACK_OFFSETS, new String[] { "TABLE" });
             if (resultSet.next()) {
-                log.info("The TXEVENTQ_TRACK_OFFSETS table successfully created.");
+                log.info("The TXEVENTQ$_TRACK_OFFSETS table successfully created.");
                 offsetTableExist = true;
             }
         } catch (SQLException ex) {
-            throw new ConnectException("Error attempting to create TXEVENTQ_TRACK_OFFSETS table: " + ex.toString());
+            throw new ConnectException("Error attempting to create TXEVENTQ$_TRACK_OFFSETS table: " + ex.toString());
         }
         return offsetTableExist;
     }
@@ -206,7 +206,7 @@ public class TxEventQProducer implements Closeable {
         CallableStatement getnumshrdStmt = null;
         int numshard;
         getnumshrdStmt = this.conn.prepareCall("{call dbms_aqadm.get_queue_parameter(?,?,?)}");
-        getnumshrdStmt.setString(1, queue.toUpperCase());
+        getnumshrdStmt.setString(1, queue);
         getnumshrdStmt.setString(2, "SHARD_NUM");
         getnumshrdStmt.registerOutParameter(3, Types.INTEGER);
         getnumshrdStmt.execute();
@@ -278,7 +278,8 @@ public class TxEventQProducer implements Closeable {
 
     /**
      * Enqueues the Kafka records into the specified TxEventQ. Also keeps track of
-     * the offset for a particular topic and partition in database table TXEVENTQ_TRACK_OFFSETS.
+     * the offset for a particular topic and partition in database table
+     * TXEVENTQ_TRACK_OFFSETS.
      * 
      * @param records The records to enqueue into the TxEventQ.
      */
@@ -310,7 +311,7 @@ public class TxEventQProducer implements Closeable {
                 String topicKey = topicEntry.getKey();
                 Map<Integer, Long> offsetInfoValue = topicEntry.getValue();
                 for (Map.Entry<Integer, Long> offsetInfoEntry : offsetInfoValue.entrySet()) {
-                    setOffsetInfoInDatabase(this.conn, topicKey, offsetInfoEntry.getKey(), offsetInfoEntry.getValue());
+                    setOffsetInfoInDatabase(this.conn, topicKey,this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME), offsetInfoEntry.getKey(), offsetInfoEntry.getValue());
                 }
             }
 
@@ -323,86 +324,63 @@ public class TxEventQProducer implements Closeable {
     }
 
     /**
-     * Populates the TXEVENTQ_TRACK_OFFSETS table with the topic, partition, and
-     * offset information of the message that has just been enqueued.
+     * Populates the TXEVENTQ$_TRACK_OFFSETS table with the kafka topic, TxEventQ
+     * queue name, partition, and offset information of the messages that have been
+     * enqueued.
      * 
      * @param conn      The connection to the database.
-     * @param topic     The topic name.
+     * @param topic     The kafka topic name.
+     * @param queueName The TxEventQ queue name.
      * @param partition The partition number.
      * @param offset    The offset value.
      */
-    private void setOffsetInfoInDatabase(OracleConnection conn, String topic, int partition, long offset) {
-        try (PreparedStatement statement = conn
-                .prepareStatement("SELECT * FROM " + TXEVENTQ_TRACK_OFFSETS + " where topic_name='"
-                        + this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC) + "' and partition=" + partition);
-                ResultSet rs = statement.executeQuery();) {
-            if (!rs.next()) {
-                insertOffsetInfoRow(conn, topic, partition, offset);
-            } else {
-                updateOffsetInfoRow(conn, topic, partition, offset);
-            }
+    private void setOffsetInfoInDatabase(OracleConnection conn, String topic, String queueName, int partition,
+            long offset) {
+        String mergeSqlStatment = "MERGE INTO " + TXEVENTQ$_TRACK_OFFSETS
+                + " tab1 USING (SELECT ? kafka_topic_name, ? queue_name, ? partition)"
+                + " tab2 ON (tab1.kafka_topic_name = tab2.kafka_topic_name AND tab1.queue_name = tab2.queue_name AND tab1.partition = tab2.partition)"
+                + " WHEN MATCHED THEN UPDATE set offset=? WHEN NOT MATCHED THEN"
+                + " INSERT (kafka_topic_name, queue_name, partition, offset) values (?,?,?,?)";
+
+        try (PreparedStatement statement = conn.prepareStatement(mergeSqlStatment)) {
+            statement.setString(1, topic);
+            statement.setString(2, queueName);
+            statement.setInt(3, partition);
+            statement.setLong(4, offset + 1);
+            statement.setString(5, topic);
+            statement.setString(6, queueName);
+            statement.setInt(7, partition);
+            statement.setLong(8, offset + 1);
+            statement.execute();
+
         } catch (Exception e) {
-            throw new ConnectException("Error attempting to insert initial offset information: " + e.toString());
+            throw new ConnectException("Error attempting to insert or update offset information: " + e.toString());
         }
     }
 
-    /**
-     * Updates the offset value for the specified topic and partition.
-     * 
-     * @param conn      The connection to the database.
-     * @param topic     The topic name.
-     * @param partition The partition number.
-     * @param offset    The offset value.
-     */
-    private void updateOffsetInfoRow(OracleConnection conn, String topic, int partition, long offset) {
-        String updateSql = "update " + TXEVENTQ_TRACK_OFFSETS + " set offset=? where topic_name=? and partition=?";
-        try (PreparedStatement psUpdate = conn.prepareStatement(updateSql)) {
-            psUpdate.setLong(1, offset + 1);
-            psUpdate.setString(2, topic);
-            psUpdate.setInt(3, partition);
-            psUpdate.executeUpdate();
-        } catch (Exception e) {
-            throw new ConnectException("Error attempting to update offset information: " + e.toString());
-        }
-    }
 
     /**
-     * Inserts a new row in the TXEVENTQ_TRACK_OFFSETS table with the topic name,
-     * partition and offset value.
-     * 
-     * @param conn      The connection to the database.
-     * @param topic     The topic name.
-     * @param partition The partition number.
-     * @param offset    The offset value.
-     */
-    private void insertOffsetInfoRow(OracleConnection conn, String topic, int partition, long offset) {
-        String insertSql = "insert into " + TXEVENTQ_TRACK_OFFSETS + " values(?,?,?)";
-        try (PreparedStatement psInsert = conn.prepareStatement(insertSql)) {
-            psInsert.setString(1, topic);
-            psInsert.setInt(2, partition);
-            psInsert.setLong(3, offset + 1);
-            psInsert.executeUpdate();
-        } catch (Exception e) {
-            throw new ConnectException("Error attempting to insert new offset information: " + e.toString());
-        }
-    }
-
-    /**
-     * Gets the offset for the specified topic and partition. The offset will be
+     * Gets the offset for the specified kafka topic, TxEventQ queue name, and partition. The offset will be
      * used to determine which message to start consuming.
      * 
      * @param conn      The connection to the database.
-     * @param topic     The topic name.
+     * @param topic     The kafka topic name.
+     * @param queueName The TxEventQ queue name.
      * @param partition The partition number.
      * @return
      */
-    public long getOffsetInDatabase(OracleConnection conn, String topic, int partition) {
+    public long getOffsetInDatabase(OracleConnection conn, String topic, String queueName, int partition) {
         long offsetVal = 0;
-        try (PreparedStatement statement = conn.prepareStatement("SELECT offset FROM " + TXEVENTQ_TRACK_OFFSETS
-                + " where topic_name='" + topic + "' and partition=" + partition);
-                ResultSet rs = statement.executeQuery();) {
-            if (rs.next()) {
-                offsetVal = rs.getLong("offset");
+        try (PreparedStatement statement = conn.prepareStatement("SELECT offset FROM " + TXEVENTQ$_TRACK_OFFSETS
+                + " where kafka_topic_name=? and queue_name = ? and partition=?")) {
+            statement.setString(1, topic);
+            statement.setString(2, queueName);
+            statement.setInt(3, partition);
+
+            try (ResultSet rs = statement.executeQuery()) {
+                if (rs.next()) {
+                    offsetVal = rs.getLong("offset");
+                }
             }
         } catch (Exception e) {
             throw new ConnectException("Error getting the offset value: " + e.toString());
