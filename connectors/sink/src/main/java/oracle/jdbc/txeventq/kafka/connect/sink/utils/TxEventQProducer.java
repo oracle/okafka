@@ -224,16 +224,25 @@ public class TxEventQProducer implements Closeable {
      * @throws SQLException
      */
     public void enqueueMessage(OracleConnection conn, String queueName, SinkRecord sinkRecord) throws SQLException {
+        int numberOfProperties = 1;
+        int lengthOfJMSDeliveryModeProperty = 15;
+        int lengthOfAQInternalPartitionProperty = 20;
+        int stringPropertyValueType = 27;
+        int numberPropertyValueType = 24;
+        int lenthOfPersistentProperty = 10;
+        
         JMSMessageProperties jmsMesgProp = JMSFactory.createJMSMessageProperties();
-        jmsMesgProp.setHeaderProperties("1,15,JMSDeliveryMode,27,10,PERSISTENT");
+        jmsMesgProp.setHeaderProperties(numberOfProperties + "," + lengthOfJMSDeliveryModeProperty + ",JMSDeliveryMode,"
+                + stringPropertyValueType + "," + lenthOfPersistentProperty + ",PERSISTENT");
         if (sinkRecord.kafkaPartition() != null) {
             String id = "" + 2 * sinkRecord.kafkaPartition();
             jmsMesgProp.setUserProperties(
-                    "1,20,AQINTERNAL_PARTITION,24," + id.length() + "," + 2 * sinkRecord.kafkaPartition());
+                    numberOfProperties + "," + lengthOfAQInternalPartitionProperty + ",AQINTERNAL_PARTITION,"
+                            + numberPropertyValueType + "," + id.length() + "," + 2 * sinkRecord.kafkaPartition());
         }
         jmsMesgProp.setJMSMessageType(JMSMessageProperties.JMSMessageType.BYTES_MESSAGE);
         JMSMessage mesg = JMSFactory.createJMSMessage(jmsMesgProp);
-        
+
         byte[] nullPayload = null;
 
         if (sinkRecord.value() != null) {
