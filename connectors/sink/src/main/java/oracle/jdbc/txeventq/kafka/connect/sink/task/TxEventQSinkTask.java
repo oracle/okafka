@@ -153,7 +153,7 @@ public class TxEventQSinkTask extends SinkTask {
             for (TopicPartition tp : partitions) // for each partition assigned
             {
                 Long offset = this.producer.getOffsetInDatabase(this.producer.getConnection(), tp.topic(),
-                        this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME), tp.partition());
+                        this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME), this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_SCHEMA), tp.partition());
                 offsetMapNew.put(tp, offset);
             }
             this.context.offset(offsetMapNew);

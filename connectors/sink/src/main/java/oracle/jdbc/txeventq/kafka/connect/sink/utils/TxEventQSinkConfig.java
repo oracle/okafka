@@ -48,6 +48,11 @@ public class TxEventQSinkConfig extends AbstractConfig {
     public static final String TXEVENTQ_QUEUE_NAME = "txeventq.queue.name";
     public static final String TXEVENTQ_QUEUE_NAME_DOC = "The name of the TxEventQ queue where the connector writes all records that are read from the Kafka broker.";
     public static final String TXEVENTQ_QUEUE_NAME_DISPLAY = "txeventq.queue.name";
+    
+    public static final String TXEVENTQ_QUEUE_SCHEMA = "txeventq.queue.schema";
+    public static final String TXEVENTQ_QUEUE_SCHEMA_DOC = "The name of the schema for the TxEventQ queue.";
+    public static final String TXEVENTQ_QUEUE_SCHEMA_DISPLAY = "txeventq.queue.schema";
+
 
     public static final String TXEVENTQ_QUEUE_TYPE_CONFIG = "txeventq.queue.type";
     public static final String TXEVENTQ_QUEUE_TYPE_DOC = "txeventq.queue.type";
@@ -91,6 +96,10 @@ public class TxEventQSinkConfig extends AbstractConfig {
         groupName = "TxEventQ";
         orderInGroup = 0;
 
+        configDef.define(TXEVENTQ_QUEUE_SCHEMA, ConfigDef.Type.STRING, "", ConfigDef.Importance.HIGH,
+                TXEVENTQ_QUEUE_SCHEMA_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM,
+                TXEVENTQ_QUEUE_SCHEMA_DISPLAY);
+        
         configDef.define(TXEVENTQ_QUEUE_NAME, ConfigDef.Type.STRING, "", ConfigDef.Importance.HIGH,
                 TXEVENTQ_QUEUE_NAME_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM,
                 TXEVENTQ_QUEUE_NAME_DISPLAY);

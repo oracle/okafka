@@ -176,7 +176,7 @@ public class TxEventQProducer implements Closeable {
         boolean offsetTableExist = false;
 
         String createTableQuery = "Create table if not exists " + TXEVENTQ$_TRACK_OFFSETS
-                + "(kafka_topic_name varchar2(128) NOT NULL, queue_name varchar2(128) NOT NULL, partition int NOT NULL, offset number NOT NULL)";
+                + "(kafka_topic_name varchar2(128) NOT NULL, queue_name varchar2(128) NOT NULL, queue_schema varchar2(128) NOT NULL, partition int NOT NULL, offset number NOT NULL)";
         try (PreparedStatement statement = conn.prepareStatement(createTableQuery);
                 ResultSet rs = statement.executeQuery();) {
             DatabaseMetaData meta = conn.getMetaData();
@@ -320,7 +320,7 @@ public class TxEventQProducer implements Closeable {
                 String topicKey = topicEntry.getKey();
                 Map<Integer, Long> offsetInfoValue = topicEntry.getValue();
                 for (Map.Entry<Integer, Long> offsetInfoEntry : offsetInfoValue.entrySet()) {
-                    setOffsetInfoInDatabase(this.conn, topicKey,this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME), offsetInfoEntry.getKey(), offsetInfoEntry.getValue());
+                    setOffsetInfoInDatabase(this.conn, topicKey,this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME), this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_SCHEMA), offsetInfoEntry.getKey(), offsetInfoEntry.getValue());
                 }
             }
 
@@ -334,32 +334,35 @@ public class TxEventQProducer implements Closeable {
 
     /**
      * Populates the TXEVENTQ$_TRACK_OFFSETS table with the kafka topic, TxEventQ
-     * queue name, partition, and offset information of the messages that have been
-     * enqueued.
+     * queue name, schema for the queue, partition, and offset information of the
+     * messages that have been enqueued.
      * 
-     * @param conn      The connection to the database.
-     * @param topic     The kafka topic name.
-     * @param queueName The TxEventQ queue name.
-     * @param partition The partition number.
-     * @param offset    The offset value.
+     * @param conn        The connection to the database.
+     * @param topic       The kafka topic name.
+     * @param queueName   The TxEventQ queue name.
+     * @param queueSchema The schema for the queue.
+     * @param partition   The partition number.
+     * @param offset      The offset value.
      */
-    private void setOffsetInfoInDatabase(OracleConnection conn, String topic, String queueName, int partition,
-            long offset) {
+    private void setOffsetInfoInDatabase(OracleConnection conn, String topic, String queueName, String queueSchema,
+            int partition, long offset) {
         String mergeSqlStatment = "MERGE INTO " + TXEVENTQ$_TRACK_OFFSETS
-                + " tab1 USING (SELECT ? kafka_topic_name, ? queue_name, ? partition)"
-                + " tab2 ON (tab1.kafka_topic_name = tab2.kafka_topic_name AND tab1.queue_name = tab2.queue_name AND tab1.partition = tab2.partition)"
+                + " tab1 USING (SELECT ? kafka_topic_name, ? queue_name, ? queue_schema, ? partition)"
+                + " tab2 ON (tab1.kafka_topic_name = tab2.kafka_topic_name AND tab1.queue_name = tab2.queue_name AND tab1.queue_schema = tab2.queue_schema AND tab1.partition = tab2.partition)"
                 + " WHEN MATCHED THEN UPDATE set offset=? WHEN NOT MATCHED THEN"
-                + " INSERT (kafka_topic_name, queue_name, partition, offset) values (?,?,?,?)";
+                + " INSERT (kafka_topic_name, queue_name, queue_schema, partition, offset) values (?,?,?,?,?)";
 
         try (PreparedStatement statement = conn.prepareStatement(mergeSqlStatment)) {
             statement.setString(1, topic);
             statement.setString(2, queueName);
-            statement.setInt(3, partition);
-            statement.setLong(4, offset + 1);
-            statement.setString(5, topic);
-            statement.setString(6, queueName);
-            statement.setInt(7, partition);
-            statement.setLong(8, offset + 1);
+            statement.setString(3, queueSchema);
+            statement.setInt(4, partition);
+            statement.setLong(5, offset + 1);
+            statement.setString(6, topic);
+            statement.setString(7, queueName);
+            statement.setString(8, queueSchema);
+            statement.setInt(9, partition);
+            statement.setLong(10, offset + 1);
             statement.execute();
 
         } catch (Exception e) {
@@ -367,24 +370,27 @@ public class TxEventQProducer implements Closeable {
         }
     }
 
-
     /**
-     * Gets the offset for the specified kafka topic, TxEventQ queue name, and partition. The offset will be
-     * used to determine which message to start consuming.
+     * Gets the offset for the specified kafka topic, TxEventQ queue name, schema,
+     * and partition. The offset will be used to determine which message to start
+     * consuming.
      * 
-     * @param conn      The connection to the database.
-     * @param topic     The kafka topic name.
-     * @param queueName The TxEventQ queue name.
-     * @param partition The partition number.
+     * @param conn        The connection to the database.
+     * @param topic       The kafka topic name.
+     * @param queueName   The TxEventQ queue name.
+     * @param queueSchema The schema for the queue.
+     * @param partition   The partition number.
      * @return
      */
-    public long getOffsetInDatabase(OracleConnection conn, String topic, String queueName, int partition) {
+    public long getOffsetInDatabase(OracleConnection conn, String topic, String queueName, String queueSchema,
+            int partition) {
         long offsetVal = 0;
         try (PreparedStatement statement = conn.prepareStatement("SELECT offset FROM " + TXEVENTQ$_TRACK_OFFSETS
-                + " where kafka_topic_name=? and queue_name = ? and partition=?")) {
+                + " where kafka_topic_name=? and queue_name = ? and queue_schema = ? and partition=?")) {
             statement.setString(1, topic);
             statement.setString(2, queueName);
-            statement.setInt(3, partition);
+            statement.setString(3, queueSchema);
+            statement.setInt(4, partition);
 
             try (ResultSet rs = statement.executeQuery()) {
                 if (rs.next()) {
