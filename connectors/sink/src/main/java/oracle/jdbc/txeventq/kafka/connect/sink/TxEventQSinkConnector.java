@@ -39,45 +39,45 @@ import oracle.jdbc.txeventq.kafka.connect.sink.task.TxEventQSinkTask;
 import oracle.jdbc.txeventq.kafka.connect.sink.utils.TxEventQSinkConfig;
 
 public class TxEventQSinkConnector extends SinkConnector {
-	private static final Logger log = LoggerFactory.getLogger(TxEventQSinkConnector.class);
+    private static final Logger log = LoggerFactory.getLogger(TxEventQSinkConnector.class);
 
     private Map<String, String> configProperties;
-    
-	@Override
-	public String version() {
-		return AppInfoParser.getVersion();
-	}
 
-	@Override
-	public void start(Map<String, String> originalProps) {
-		log.info("[{}] Starting Oracle TxEventQ Sink Connector", Thread.currentThread().getId());
-		this.configProperties = originalProps;
-	}
+    @Override
+    public String version() {
+        return AppInfoParser.getVersion();
+    }
 
-	@Override
-	public Class<? extends Task> taskClass() {
-		return (Class) TxEventQSinkTask.class;
-	}
+    @Override
+    public void start(Map<String, String> originalProps) {
+        log.info("[{}] Starting Oracle TxEventQ Sink Connector", Thread.currentThread().getId());
+        this.configProperties = originalProps;
+    }
 
-	@Override
-	public List<Map<String, String>> taskConfigs(int maxTasks) {
-		log.info("Setting task configurations for {} workers.", maxTasks);
-	    final List<Map<String, String>> configs = new ArrayList<>(maxTasks);
-	    for (int i = 0; i < maxTasks; ++i) {
-	      configs.add(configProperties);
-	    }
-	    return configs;
-	}
+    @Override
+    public Class<? extends Task> taskClass() {
+        return (Class) TxEventQSinkTask.class;
+    }
 
-	@Override
-	public void stop() {
-		 log.info("[{}] Stopping Oracle TxEventQ Sink Connector", Thread.currentThread().getId());
-		
-	}
+    @Override
+    public List<Map<String, String>> taskConfigs(int maxTasks) {
+        log.info("Setting task configurations for {} workers.", maxTasks);
+        final List<Map<String, String>> configs = new ArrayList<>(maxTasks);
+        for (int i = 0; i < maxTasks; ++i) {
+            configs.add(configProperties);
+        }
+        return configs;
+    }
 
-	@Override
-	public ConfigDef config() {
-		return TxEventQSinkConfig.getConfig();
-	}
+    @Override
+    public void stop() {
+        log.info("[{}] Stopping Oracle TxEventQ Sink Connector", Thread.currentThread().getId());
+
+    }
+
+    @Override
+    public ConfigDef config() {
+        return TxEventQSinkConfig.getConfig();
+    }
 
 }
