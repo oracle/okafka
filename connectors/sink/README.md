@@ -5,7 +5,7 @@ The repository contains an application for a Sink Connector that reads from Kafk
 
 ## Getting started
 
-To use the application Kafka will need to be downloaded and installed on a server. Refer to [Kafka Apache](https://kafka.apache.org/) for
+To use the application Kafka with a minimum version number of 3.1.0 will need to be downloaded and installed on a server. Refer to [Kafka Apache](https://kafka.apache.org/) for
 information on how to start Kafka. Refer to this [Confluent](https://docs.confluent.io/platform/current/kafka/authentication_ssl.html#crep-full) page
 for information on how to setup SSL connection for Kafka.
 
