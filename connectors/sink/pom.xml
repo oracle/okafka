@@ -72,8 +72,7 @@
             <artifactId>connect-runtime</artifactId>
             <version>3.2.0</version>
         </dependency>
-
-
+  
         <!-- Oracle Database Dependencies -->
         <dependency>
             <groupId>com.oracle.database.jdbc</groupId>
