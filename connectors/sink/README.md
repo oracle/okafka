@@ -138,11 +138,6 @@ txeventq.queue.schema=<schema for the txEventQ queue>
 # Note: This property will need to be updated before the Sink Connector can connect.
 bootstrap.servers=<broker i.e localhost:9092>
 
-# The name of the type of TxEvent queue.
-# For example, it can be "RAW", "SYS.ANYDATA" or "SCOTT.MY_OBJECT_TYPE".
-# Types: JMS, ANYDATA, RAW, STRUCT, XMLType, JSON
-txeventq.queue.type=JMS
-
 # Converter class used to convert between Kafka Connect format and the serialized form that is written to Kafka.
 # This controls the format of the keys in messages written to or read from Kafka, and since this is independent
 # of connectors it allows any connector to work with any serialization format.

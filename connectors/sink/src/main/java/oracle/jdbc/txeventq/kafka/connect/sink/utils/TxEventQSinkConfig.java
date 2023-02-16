@@ -53,11 +53,6 @@ public class TxEventQSinkConfig extends AbstractConfig {
     public static final String TXEVENTQ_QUEUE_SCHEMA_DOC = "The name of the schema for the TxEventQ queue.";
     public static final String TXEVENTQ_QUEUE_SCHEMA_DISPLAY = "txeventq.queue.schema";
 
-
-    public static final String TXEVENTQ_QUEUE_TYPE_CONFIG = "txeventq.queue.type";
-    public static final String TXEVENTQ_QUEUE_TYPE_DOC = "txeventq.queue.type";
-    public static final String TXEVENTQ_QUEUE_TYPE_DISPLAY = "txeventq.queue.type";
-
     // Kafka Configuration
     public static final String KAFKA_TOPIC = "topics";
     public static final String KAFKA_TOPIC_DOC = "The name of the Kafka topics where the connector reads all records from.";
@@ -103,10 +98,6 @@ public class TxEventQSinkConfig extends AbstractConfig {
         configDef.define(TXEVENTQ_QUEUE_NAME, ConfigDef.Type.STRING, "", ConfigDef.Importance.HIGH,
                 TXEVENTQ_QUEUE_NAME_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM,
                 TXEVENTQ_QUEUE_NAME_DISPLAY);
-
-        configDef.define(TXEVENTQ_QUEUE_TYPE_CONFIG, ConfigDef.Type.STRING, "", ConfigDef.Importance.HIGH,
-                TXEVENTQ_QUEUE_TYPE_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM,
-                TXEVENTQ_QUEUE_TYPE_DISPLAY);
 
         // KAFKA Group Configurations
         groupName = "kafka";
