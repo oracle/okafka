@@ -44,7 +44,6 @@ assigned to the Kafka topic that the Sink Connector will be consuming from.
 ```roomsql
 exec sys.dbms_aqadm.create_sharded_queue(queue_name=>"TxEventQ", multiple_consumers => TRUE); 
 exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'SHARD_NUM', 1);
-exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'STICKY_DEQUEUE', 1);
 exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'KEY_BASED_ENQUEUE', 2);
 exec sys.dbms_aqadm.start_queue('TxEventQ');
 exec sys.dbms_aqadm.add_subscriber('TxEventQ', SYS.AQ$_AGENT('SUB1', NULL, 0));
@@ -138,11 +137,6 @@ txeventq.queue.schema=<schema for the txEventQ queue>
 # format: host1:port1,host2:port2 ...
 # Note: This property will need to be updated before the Sink Connector can connect.
 bootstrap.servers=<broker i.e localhost:9092>
-
-# The name of the type of TxEvent queue.
-# For example, it can be "RAW", "SYS.ANYDATA" or "SCOTT.MY_OBJECT_TYPE".
-# Types: JMS, ANYDATA, RAW, STRUCT, XMLType, JSON
-txeventq.queue.type=JMS
 
 # Converter class used to convert between Kafka Connect format and the serialized form that is written to Kafka.
 # This controls the format of the keys in messages written to or read from Kafka, and since this is independent
