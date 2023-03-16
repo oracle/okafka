@@ -54,8 +54,8 @@ public class TxEventQSinkConfig extends AbstractConfig {
     public static final String TXEVENTQ_QUEUE_SCHEMA_DISPLAY = "txeventq.queue.schema";
 
     // Kafka Configuration
-    public static final String KAFKA_TOPIC = "topics";
-    public static final String KAFKA_TOPIC_DOC = "The name of the Kafka topics where the connector reads all records from.";
+    public static final String KAFKA_TOPIC = "topic";
+    public static final String KAFKA_TOPIC_DOC = "The name of the Kafka topic where the connector reads all records from.";
     public static final String KAFKA_TOPIC_DISPLAY = "Kafka topic";
 
     public static final String KAFKA_CONNECT_NAME = "name";

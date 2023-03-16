@@ -102,7 +102,7 @@ tasks.max=1
 
 # The Kafka topic to read the data from.
 # Note: This property will need to be updated before the Sink Connector can connect.
-topics=<Kafka topic>
+topic=<Kafka topic>
 
 # Indicate the directory location of where the Oracle wallet is place i.e. C:/tmp/wallet.
 # The cwallet.sso and ewallet.p12 files should be placed into this directory.
