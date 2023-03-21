@@ -39,6 +39,7 @@ import org.apache.kafka.connect.sink.SinkTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import oracle.jdbc.OracleConnection;
 import oracle.jdbc.txeventq.kafka.connect.common.utils.AppInfoParser;
 import oracle.jdbc.txeventq.kafka.connect.sink.utils.TxEventQProducer;
 import oracle.jdbc.txeventq.kafka.connect.sink.utils.TxEventQSinkConfig;
@@ -47,6 +48,7 @@ public class TxEventQSinkTask extends SinkTask {
     private static final Logger log = LoggerFactory.getLogger(TxEventQSinkTask.class);
     private TxEventQSinkConfig config;
     private TxEventQProducer producer;
+    private OracleConnection conn;
 
     @Override
     public String version() {
@@ -67,7 +69,16 @@ public class TxEventQSinkTask extends SinkTask {
         }
 
         producer = new TxEventQProducer(config);
-        producer.connect();
+    	try {
+			if (!this.producer.isConnOpen(this.conn)) {
+				this.conn = this.producer.connect();
+			}else {
+				log.debug("[{}] Connection [{}] is already open.", Thread.currentThread().getId(), this.conn);
+			}
+		} catch (SQLException e) {
+			log.error("Database connection error occurred attempting to start task.", e);
+			throw new ConnectException(e);
+		}
 
         if (!producer.kafkaTopicExists(this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC))) {
             throw new ConnectException(
@@ -75,7 +86,7 @@ public class TxEventQSinkTask extends SinkTask {
         }
 
         try {
-            if (!producer.txEventQueueExists(this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME))) {
+            if (!producer.txEventQueueExists(this.conn,this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME))) {
                 throw new ConnectException("The TxEventQ queue name "
                         + this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME) + " does not exist.");
             }
@@ -88,7 +99,7 @@ public class TxEventQSinkTask extends SinkTask {
             int kafkaPartitionNum = producer
                     .getKafkaTopicPartitionSize(this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC));
             int txEventQShardNum = producer
-                    .getNumOfShardsForQueue(this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME));
+                    .getNumOfShardsForQueue(this.conn, this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME));
             if (kafkaPartitionNum > txEventQShardNum) {
                 throw new ConnectException("The number of Kafka partitions " + kafkaPartitionNum
                         + " must be less than or equal the number TxEventQ event stream " + txEventQShardNum);
@@ -109,24 +120,45 @@ public class TxEventQSinkTask extends SinkTask {
         }
 
         // Check if TxEventQ producer is open to produce, if not open it.
-        if (!this.producer.isConnOpen()) {
-            log.info("[{}] Connection is closed. Connecting...", Thread.currentThread().getId());
-            this.producer.connect();
-        }
+        try {
+			if (!this.producer.isConnOpen(this.conn)) {
+				this.conn = this.producer.connect();
+			}else {
+				log.debug("[{}] Connection [{}] is already open.", Thread.currentThread().getId(), this.conn);
+			}
+		} catch (SQLException e) {
+			log.error("Database connection error occurred attempting to start task.", e);
+			throw new ConnectException(e);
+		}
+
         producer.put(records);
     }
 
     @Override
     public void stop() {
         log.info("[{}] Stopping Kafka Connect for Oracle TxEventQ - Sink Task", Thread.currentThread().getId());
-        if (this.producer.isConnOpen()) {
-            try {
-                this.producer.close();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
+
+		try {
+			if (this.producer.isConnOpen(this.conn)) {
+				closeDatabaseConnection();
+			}
+		} catch (SQLException e) {
+			log.error("Error occurred attempting to stop Sink Task.", e);
+			throw new ConnectException(e);
+		}
+	}
+	
+	/**
+	 * Calls the producer's close method to close the database connection.
+	 */
+	private void closeDatabaseConnection() {
+		try {
+			this.producer.close();
+		} catch (IOException e) {
+			log.error("Exception thrown while closing connection.", e);
+		}
+	}
+
 
     @Override
     public Map<TopicPartition, OffsetAndMetadata> preCommit(Map<TopicPartition, OffsetAndMetadata> currentOffsets) {

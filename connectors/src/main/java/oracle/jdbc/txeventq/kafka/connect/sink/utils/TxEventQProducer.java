@@ -74,12 +74,7 @@ public class TxEventQProducer implements Closeable {
     /**
      * Uses the Oracle wallet to connect to the database.
      */
-    public void connect() {
-        if (this.isConnOpen()) {
-            log.info("[{}] Connection is already open.", Thread.currentThread().getId());
-            return;
-        }
-
+    public OracleConnection connect() {
         try {
             System.setProperty("oracle.net.wallet_location",
                     this.config.getString(TxEventQSinkConfig.DATABASE_WALLET_CONFIG));
@@ -90,6 +85,7 @@ public class TxEventQProducer implements Closeable {
             this.conn = (OracleConnection) DriverManager.getConnection(url);
             this.conn.setAutoCommit(false);
             log.info("[{}:{}] Oracle TxEventQ connection opened!", Thread.currentThread().getId(), this.conn);
+            return this.conn;
         } catch (SQLException sqlex) {
             throw new ConnectException("Couldn't establish a connection to the database: " + sqlex.toString());
         }
@@ -151,15 +147,12 @@ public class TxEventQProducer implements Closeable {
     /**
      * Checks if the specified queue name exists in the database.
      * 
+     * @param conn The database connection.
      * @param queueName The name of the queue to check existence for.
      * @return True if the queue exists otherwise false.
      * @throws SQLException
      */
-    public boolean txEventQueueExists(String queueName) throws SQLException {
-        if (!isConnOpen()) {
-            connect();
-        }
-
+    public boolean txEventQueueExists(OracleConnection conn, String queueName) throws SQLException {
         DatabaseMetaData meta = this.conn.getMetaData();
         ResultSet resultSet = meta.getTables(null, null, queueName, new String[] { "TABLE" });
 
@@ -194,18 +187,15 @@ public class TxEventQProducer implements Closeable {
     /**
      * Gets the number of shards for the specified queue.
      * 
+     * @param conn The database connection.
      * @param queue The queue to get the number of shards for.
      * @return The number of shards.
      * @throws java.sql.SQLException
      */
-    public int getNumOfShardsForQueue(String queue) throws java.sql.SQLException {
-        if (!isConnOpen()) {
-            connect();
-        }
-
+    public int getNumOfShardsForQueue(OracleConnection conn, String queue) throws java.sql.SQLException {
         CallableStatement getnumshrdStmt = null;
         int numshard;
-        getnumshrdStmt = this.conn.prepareCall("{call dbms_aqadm.get_queue_parameter(?,?,?)}");
+        getnumshrdStmt = conn.prepareCall("{call dbms_aqadm.get_queue_parameter(?,?,?)}");
         getnumshrdStmt.setString(1, queue);
         getnumshrdStmt.setString(2, "SHARD_NUM");
         getnumshrdStmt.registerOutParameter(3, Types.INTEGER);
@@ -293,10 +283,6 @@ public class TxEventQProducer implements Closeable {
      * @param records The records to enqueue into the TxEventQ.
      */
     public void put(Collection<SinkRecord> records) {
-        if (!isConnOpen()) {
-            connect();
-        }
-
         try {
             Map<String, Map<Integer, Long>> topicInfoMap = new HashMap<>();
             for (SinkRecord sinkRecord : records) {
@@ -414,21 +400,14 @@ public class TxEventQProducer implements Closeable {
     }
 
     /**
-     * Checks if the database connection is open and valid.
-     * 
-     * @return True if the database is open and valid, otherwise false.
-     */
-    public boolean isConnOpen() {
-        boolean isConnValid = false;
-        try {
-            if (this.conn != null) {
-                isConnValid = this.conn.isValid(5);
-            }
-        } catch (SQLException e) {
-            throw new ConnectException("Error checking if the database connection is valid: " + e.toString());
-        }
-        return isConnValid;
-    }
+	 * Checks if the database connection is open and valid.
+	 * 
+	 * @return True if the database is open and valid, otherwise false.
+	 * @throws SQLException 
+	 */
+	public boolean isConnOpen(OracleConnection conn) throws SQLException {
+		return conn != null && !conn.isClosed();
+	}
 
     @Override
     public void close() throws IOException {

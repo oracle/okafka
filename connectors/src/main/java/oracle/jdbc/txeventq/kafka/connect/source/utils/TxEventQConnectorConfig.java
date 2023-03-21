@@ -57,11 +57,6 @@ public class TxEventQConnectorConfig extends AbstractConfig {
     private static final String TXEVENTQ_SUBSCRIBER_DOC = "txeventq.subscriber";
     private static final String TXEVENTQ_SUBSCRIBER_DISPLAY = "txeventq.subscriber";
 
-
-    public static final String TXEVENTQ_QUEUE_TYPE_CONFIG = "txeventq.queue.type";
-    public static final String TXEVENTQ_QUEUE_TYPE_DOC = "txeventq.queue.type";
-    public static final String TXEVENTQ_QUEUE_TYPE_DISPLAY = "txeventq.queue.type";
-
     // Kafka Configuration
     public static final String KAFKA_TOPIC = "kafka.topic";
     public static final String KAFKA_TOPIC_DOC = "The name of the Kafka topic where the connector writes all records that were read from the JMS broker.";
@@ -128,11 +123,6 @@ public class TxEventQConnectorConfig extends AbstractConfig {
         configDef.define(TXEVENTQ_SUBSCRIBER_CONFIG, ConfigDef.Type.STRING, "",
                 ConfigDef.Importance.HIGH, TXEVENTQ_SUBSCRIBER_DOC,
                 groupName, ++orderInGroup, ConfigDef.Width.MEDIUM, TXEVENTQ_SUBSCRIBER_DISPLAY);
-
-        configDef.define(TXEVENTQ_QUEUE_TYPE_CONFIG, ConfigDef.Type.STRING, "",
-                ConfigDef.Importance.HIGH, TXEVENTQ_QUEUE_TYPE_DOC,
-                groupName, ++orderInGroup, ConfigDef.Width.MEDIUM, TXEVENTQ_QUEUE_TYPE_DISPLAY);
-
 
         // KAFKA Group Configurations
         groupName = "kafka";

@@ -1,7 +1,8 @@
 # Kafka Connectors for TxEventQ
 
-Repository for the Kafka Sink Connector for Oracle Transactional Event Queues application.
+Repository for the Kafka Sink Connector and Kafka Source Connector for Oracle Transactional Event Queues application.
 The repository contains an application for a Sink Connector that reads from Kafka and stores into Oracle's TxEventQ.
+The repository also contains an application for a Source Connector that reads from an Oracle TxEventQ and stores into a Kafka topic.
 
 ## Getting started
 
@@ -9,7 +10,7 @@ To use the application Kafka with a minimum version number of 3.1.0 will need to
 information on how to start Kafka. Refer to this [Confluent](https://docs.confluent.io/platform/current/kafka/authentication_ssl.html#crep-full) page
 for information on how to setup SSL connection for Kafka.
 
-The Kafka Sink Connector requires a minimum Oracle Database version of 21c in order to create a Transactional Event Queue. 
+The Kafka Sink and Source Connector requires a minimum Oracle Database version of 21c in order to create a Transactional Event Queue. 
 
 Clone the project from the repository. Open a bash window and change the directory to the location where the cloned project has been saved.
 Run the following command from the bash window to compile the source.
@@ -26,7 +27,7 @@ You will need to grab the following jar files from the \target\libs directory af
 - osdt_cert-21.5.0.0.jar
 
 ### Oracle Database Setup
-To run the Kafka Sink Connector against Oracle Database, a database user should be created and should be granted the below privileges.
+To run the Kafka Sink and Source Connector against Oracle Database, a database user should be created and should be granted the below privileges.
 
 ```roomsql
 create user <username> identified by <password>
@@ -39,11 +40,23 @@ grant select_catalog_role to user
 
 Once user is created and above privileges are granted, connect to Oracle Database as this user and create a Transactional Event Queue using below PL/SQL script.
 In the below script `SHARD_NUM` parameter for TxEventQ is set to 1, but this value should be modified to be less than or equal to the number of Kafka partitions
-assigned to the Kafka topic that the Sink Connector will be consuming from.
+assigned to the Kafka topic that the Sink Connector will be consuming from. The Sink Connector supports a JMS type Transactional Event Queue.
 
 ```roomsql
 exec sys.dbms_aqadm.create_sharded_queue(queue_name=>"TxEventQ", multiple_consumers => TRUE); 
 exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'SHARD_NUM', 1);
+exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'KEY_BASED_ENQUEUE', 2);
+exec sys.dbms_aqadm.start_queue('TxEventQ');
+exec sys.dbms_aqadm.add_subscriber('TxEventQ', SYS.AQ$_AGENT('SUB1', NULL, 0));
+```
+
+If using the Source Connector and ordering of the events are important then the Transactional Event Queue that the Kakfa Source connector will be pulling from should have
+the `STICKY_DEQUEUE` parameter set. The `tasks.max` property should also correspond to the number of `SHARD_NUM` assigned to the queue. 
+
+```roomsql
+exec sys.dbms_aqadm.create_sharded_queue(queue_name=>"TxEventQ", multiple_consumers => TRUE); 
+exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'SHARD_NUM', 1);
+exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'STICKY_DEQUEUE', 1);
 exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'KEY_BASED_ENQUEUE', 2);
 exec sys.dbms_aqadm.start_queue('TxEventQ');
 exec sys.dbms_aqadm.add_subscriber('TxEventQ', SYS.AQ$_AGENT('SUB1', NULL, 0));
@@ -88,8 +101,8 @@ The wallet directory that will need to be specified in the connection properties
 
 ### Setup the Connection Properties
 
-Copy the example properties file below into a text editor and update all the required fields as noted below and save the properties file as any file name, for example `connect-txeventq-sink.properties`
-and place the properites file in the Kafka config directory.
+Copy the example properties files for the sink connector or the source connector below into a text editor and update all the required fields as noted below and save the properties
+file as any file name, for example `connect-txeventq-sink.properties` or `connect-txeventq-source.properties` and place the properites file in the Kafka config directory.
 
 Here is the full `connect-txeventq-sink.properties` file below.
 
@@ -102,7 +115,7 @@ tasks.max=1
 
 # The Kafka topic to read the data from.
 # Note: This property will need to be updated before the Sink Connector can connect.
-topic=<Kafka topic>
+topics=<Kafka topic>
 
 # Indicate the directory location of where the Oracle wallet is place i.e. C:/tmp/wallet.
 # The cwallet.sso and ewallet.p12 files should be placed into this directory.
@@ -150,6 +163,63 @@ value.converter=org.apache.kafka.connect.storage.StringConverter
 
 ```
 
+Here is the full `connect-txeventq-source.properties` file below.
+
+```text
+name=TxEventQ-source
+connector.class=oracle.jdbc.txeventq.kafka.connect.source.TxEventQSourceConnector
+
+# If using event streams and ordering of the events is important the number of tasks
+# set for this property should be same number of event streams used for the transactional
+# event queue.
+tasks.max=1
+
+# Batch size for version 1 is always going to be one.
+batch.size=1
+
+# The name of the Kafka topic where the connector writes all records that were read from the JMS broker.
+# Note: This property will need to be updated before the Source Connector can connect.
+kafka.topic=<Kafka topic>
+
+# Converter class used to convert between Kafka Connect format and the serialized form that is written to Kafka.
+# This controls the format of the keys in messages written to or read from Kafka, and since this is independent
+# of connectors it allows any connector to work with any serialization format.
+key.converter=org.apache.kafka.connect.storage.StringConverter
+
+# Converter class used to convert between Kafka Connect format and the serialized form that is written to Kafka.
+# This controls the format of the values in messages written to or read from Kafka, and since this is independent
+# of connectors it allows any connector to work with any serialization format.
+value.converter=org.apache.kafka.connect.converters.ByteArrayConverter
+
+# Indicate the directory location of where the Oracle wallet is placed i.e. C:/tmp/wallet.
+# The cwallet.sso, ewallet.p12, and tnsnames.ora files should be placed into this directory.
+# Oracle Wallet provides a simple and easy method to manage database credentials across multiple domains.
+# We will be using the Oracle TNS (Transport Network Substrate) administrative file to hide the details
+# of the database connection string (host name, port number, and service name) from the datasource definition
+# and instead us an alias.
+# Note: This property will need to be updated before the Source Connector can connect.
+wallet.path=<wallet directory>
+
+# The TNS alias name for the database to connect to stored in the tnsnames.ora.
+# An Oracle Wallet must be created and will be used to connect to the database.
+# Note: This property will need to be updated before the Source Connector can connect.
+db_tns_alias=<tns alias>
+
+# The TxEventQ to pull data from to put into the specified Kafka topic.
+# Note: This property will need to be updated before the Source Connector can connect.
+txeventq.queue.name=<txEventQ queue name>
+
+# The subscriber for the TxEventQ that data will be pulled from to put into the specified Kafka topic.
+# Note: This property will need to be updated before the Source Connector can connect.
+txeventq.subscriber=<txEventQ subscriber>
+
+# List of Kafka brokers used for bootstrapping
+# format: host1:port1,host2:port2 ...
+# Note: This property will need to be updated before the Source Connector can connect.
+bootstrap.servers=<broker i.e localhost:9092>
+
+```
+
 ### Running TxnEventQ Kafka connect sink connector
 
 Update Kafka's `connect-standalone.properties` or `connect-distributed.properties` configuration file located in Kafka's config directory `plugin.path=` property with the 
@@ -178,7 +248,8 @@ In another command prompt start the Kafka server by running the following comman
 ```
 
 In the third command prompt start the connector in either standalone (connect-standalone.bat) or distributed (connect-distributed.bat) mode by running the following command.
-The command below is connecting in standalone mode. If connecting is distributed mode replace the bat file with the connect-distributed.bat file.
+The command below is connecting in standalone mode. If connecting is distributed mode replace the bat file with the connect-distributed.bat file. If you want to run the source
+connector replace the properties file below with the properties file for the source connector.
 
 ```bash
 .\bin\windows\connect-standalone.bat .\config\connect-standalone.properties .\config\connect-txeventq-sink.properties
@@ -199,7 +270,8 @@ bin/kafka-server-start.sh config/server.properties
 ```
 
 In the third terminal start the connector in either standalone (connect-standalone.sh) or distributed (connect-distributed.sh) mode by running the following command.
-The command below is connecting in standalone mode. If connecting is distributed mode replace the bat file with the connect-distributed.sh file.
+The command below is connecting in standalone mode. If connecting is distributed mode replace the bat file with the connect-distributed.sh file. If you want to run the source
+connector replace the properties file below with the properties file for the source connector.
 
 ```bash
 bin/connect-standalone.sh config/connect-standalone.properties config/connect-TxEventQ-sink.properties 
