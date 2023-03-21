@@ -220,7 +220,7 @@ bootstrap.servers=<broker i.e localhost:9092>
 
 ```
 
-### Running TxnEventQ Kafka connect sink connector
+### Running TxEventQ Kafka connect sink or source connectors
 
 Update Kafka's `connect-standalone.properties` or `connect-distributed.properties` configuration file located in Kafka's config directory `plugin.path=` property with the 
 directory path to where the jar file for the Sink Connector is located.
