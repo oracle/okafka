@@ -205,7 +205,7 @@ public class TxEventQConsumer implements Closeable {
 			}
 
 		} catch (SQLException e) {
-			log.error("Error attempting to retreive messages: {}", e.toString());
+			log.error("Error attempting to dequeue message.", e);
 			return null;
 		}
 
