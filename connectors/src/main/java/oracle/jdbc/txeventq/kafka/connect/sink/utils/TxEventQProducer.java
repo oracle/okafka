@@ -257,24 +257,6 @@ public class TxEventQProducer implements Closeable {
         ((oracle.jdbc.internal.OracleConnection) conn).jmsEnqueue(queueName, opt, mesg, aqProp);
     }
 
-    public OracleConnection getNewconnect() {
-        OracleConnection newConn = null;
-
-        try {
-            System.setProperty("oracle.net.wallet_location",
-                    this.config.getString(TxEventQSinkConfig.DATABASE_WALLET_CONFIG));
-            System.setProperty("oracle.net.tns_admin",
-                    this.config.getString(TxEventQSinkConfig.DATABASE_TNSNAMES_CONFIG));
-            DriverManager.registerDriver(new oracle.jdbc.OracleDriver());
-            String url = "jdbc:oracle:thin:@" + this.config.getString(TxEventQSinkConfig.DATABASE_TNS_ALIAS_CONFIG);
-            newConn = (OracleConnection) DriverManager.getConnection(url);
-            newConn.setAutoCommit(false);
-        } catch (SQLException sqlex) {
-            throw new ConnectException("Couldn't establish a connection to the database: " + sqlex.toString());
-        }
-        return newConn;
-    }
-
     /**
      * Enqueues the Kafka records into the specified TxEventQ. Also keeps track of
      * the offset for a particular topic and partition in database table
