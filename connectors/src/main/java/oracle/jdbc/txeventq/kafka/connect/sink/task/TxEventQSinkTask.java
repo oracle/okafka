@@ -86,7 +86,7 @@ public class TxEventQSinkTask extends SinkTask {
         }
 
         try {
-            if (!producer.txEventQueueExists(this.conn,this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME))) {
+            if (!producer.txEventQueueExists(this.conn,this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME).toUpperCase())) {
                 throw new ConnectException("The TxEventQ queue name "
                         + this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME) + " does not exist.");
             }
