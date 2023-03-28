@@ -76,7 +76,7 @@ public class TxEventQSinkTask extends SinkTask {
 				log.debug("[{}] Connection [{}] is already open.", Thread.currentThread().getId(), this.conn);
 			}
 		} catch (SQLException e) {
-			log.error("Database connection error occurred attempting to start task.", e);
+			log.error("Database connection error occurred attempting to start task.");
 			throw new ConnectException(e);
 		}
 
@@ -127,7 +127,7 @@ public class TxEventQSinkTask extends SinkTask {
 				log.debug("[{}] Connection [{}] is already open.", Thread.currentThread().getId(), this.conn);
 			}
 		} catch (SQLException e) {
-			log.error("Database connection error occurred attempting to start task.", e);
+			log.error("Database connection error occurred attempting to start task.");
 			throw new ConnectException(e);
 		}
 
@@ -143,7 +143,7 @@ public class TxEventQSinkTask extends SinkTask {
 				closeDatabaseConnection();
 			}
 		} catch (SQLException e) {
-			log.error("Error occurred attempting to stop Sink Task.", e);
+			log.error("Error occurred attempting to stop Sink Task.");
 			throw new ConnectException(e);
 		}
 	}
@@ -155,7 +155,7 @@ public class TxEventQSinkTask extends SinkTask {
 		try {
 			this.producer.close();
 		} catch (IOException e) {
-			log.error("Exception thrown while closing connection.", e);
+			log.error("Exception thrown while closing connection: {}", e.getMessage());
 		}
 	}
 

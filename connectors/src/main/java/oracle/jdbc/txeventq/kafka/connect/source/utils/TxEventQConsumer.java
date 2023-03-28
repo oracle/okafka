@@ -148,14 +148,14 @@ public class TxEventQConsumer implements Closeable {
 	public SourceRecord receive(OracleConnection conn) {
 		String getQueueType = getQueueTableType(conn,
 				this.config.getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME));
-		log.debug("[{}] Queue table {} is a {} type table.", Thread.currentThread().getId(),
+		log.debug("[{}]:[{}] Queue table {} is a {} type table.", Thread.currentThread().getId(), conn,
 				this.config.getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME), getQueueType);
 		if (getQueueType.equalsIgnoreCase("JMS_BYTES")) {
 			return receiveJmsMessage(conn);
 		} else if (getQueueType.equalsIgnoreCase("RAW") || getQueueType.equalsIgnoreCase("JSON")) {
 			return receiveAQMessage(conn, getQueueType);
 		} else {
-			log.error("Queue type of {} is not supported.", getQueueType);
+			log.error("Supported queue types are: JMS_BYTES, RAW, and JSON");
 			return null;
 		}
 	}
@@ -205,7 +205,7 @@ public class TxEventQConsumer implements Closeable {
 			}
 
 		} catch (SQLException e) {
-			log.error("Error attempting to dequeue message.", e);
+			log.error("Error attempting to dequeue message:{}", e.getMessage());
 			return null;
 		}
 

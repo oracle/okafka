@@ -90,7 +90,7 @@ public class TxEventQSourceTask extends SourceTask {
 				log.debug("[{}] Connection [{}] is already open.", Thread.currentThread().getId(), this.conn);
 			}
 		} catch (SQLException e) {
-			log.error("Database connection error occurred attempting to start task.", e);
+			log.error("Database connection error occurred attempting to start task.");
 			throw new ConnectException(e);
 		}
 
@@ -142,7 +142,7 @@ public class TxEventQSourceTask extends SourceTask {
 					log.debug("[{}] Connection [{}] is already open.", Thread.currentThread().getId(), this.conn);
 				}
 			} catch (SQLException e) {
-				log.error("Database connection error occurred attempting to poll records.", e);
+				log.error("Database connection error occurred attempting to poll records.");
 				throw new ConnectException(e);
 			}
 			
@@ -200,7 +200,7 @@ public class TxEventQSourceTask extends SourceTask {
 				this.conn.commit();
 			}
 		} catch (SQLException e) {
-			log.error("Error occurred attempting to commit record.", e);
+			log.error("Error occurred attempting to commit record.");
 			throw new ConnectException(e);
 		}
 	}
@@ -222,7 +222,7 @@ public class TxEventQSourceTask extends SourceTask {
 				closeDatabaseConnection();
 			}
 		} catch (SQLException e) {
-			log.error("Error occurred attempting to stop SourceTask.", e);
+			log.error("Error occurred attempting to stop SourceTask.");
 			throw new ConnectException(e);
 		}
 	}
@@ -234,7 +234,7 @@ public class TxEventQSourceTask extends SourceTask {
 		try {
 			this.consumer.close();
 		} catch (IOException e) {
-			log.error("Exception thrown while closing connection.", e);
+			log.error("Exception thrown while closing connection: {}", e.getMessage());
 		}
 	}
 
