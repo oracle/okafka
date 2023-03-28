@@ -155,7 +155,7 @@ public class TxEventQSinkTask extends SinkTask {
 		try {
 			this.producer.close();
 		} catch (IOException e) {
-			log.error("Exception thrown while closing connection: {}", e.getMessage());
+			log.error("Exception occurred while closing database connection.");
 		}
 	}
 

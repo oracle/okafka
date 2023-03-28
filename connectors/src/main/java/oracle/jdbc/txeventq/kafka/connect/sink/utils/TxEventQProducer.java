@@ -268,7 +268,7 @@ public class TxEventQProducer implements Closeable {
         try {
             Map<String, Map<Integer, Long>> topicInfoMap = new HashMap<>();
             for (SinkRecord sinkRecord : records) {
-                log.debug("[{}:{}] Enqueuing record: {}", Thread.currentThread().getId(), this.conn, sinkRecord.value());
+            	log.debug("[{}:{}] Enqueuing record from partition {} at offset {}.", Thread.currentThread().getId(), this.conn, sinkRecord.kafkaPartition(), sinkRecord.kafkaOffset());
                 enqueueMessage(this.conn, this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME), sinkRecord);
                 if (topicInfoMap.containsKey(sinkRecord.topic())) {
                     Map<Integer, Long> offsetInfoMap = topicInfoMap.get(sinkRecord.topic());

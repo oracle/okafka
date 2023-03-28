@@ -234,7 +234,7 @@ public class TxEventQSourceTask extends SourceTask {
 		try {
 			this.consumer.close();
 		} catch (IOException e) {
-			log.error("Exception thrown while closing connection: {}", e.getMessage());
+			log.error("Exception occurred while closing database connection.");
 		}
 	}
 
