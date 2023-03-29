@@ -147,7 +147,7 @@ public class TxEventQConsumer implements Closeable {
 	 */
 	public SourceRecord receive(OracleConnection conn) {
 		String getQueueType = getQueueTableType(conn,
-				this.config.getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME));
+				this.config.getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME).toUpperCase());
 		log.debug("[{}]:[{}] Queue table {} is a {} type table.", Thread.currentThread().getId(), conn,
 				this.config.getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME), getQueueType);
 		if (getQueueType.equalsIgnoreCase("JMS_BYTES")) {
@@ -242,27 +242,23 @@ public class TxEventQConsumer implements Closeable {
 	 * @return The shard number the message is being stored at.
 	 */
 	private static int getShardId(String messageId) {
-		int shardId = -1;
 		if (messageId == null || messageId.length() != 32)
 			return -1;
 		String shardIdStr = messageId.substring(16, 24);
 		String endian = messageId.substring(26, 28);
 		if (endian.equals("66")) {
-			char sId[] = shardIdStr.toCharArray();
-			shardId = 0;
+			char[] sId = shardIdStr.toCharArray();
 			char swap = 0;
 			// Pair wise reverse
-			for (int i = 0; i < sId.length;) {
+			for (int i = 0; i < sId.length; i = i + 2) {
 				swap = sId[i];
 				sId[i] = sId[i + 1];
 				sId[i + 1] = swap;
-				i = i + 2;
 			}
 			// Reverse the String
 			shardIdStr = new StringBuilder(new String(sId)).reverse().toString();
 		}
-		shardId = Integer.parseInt(shardIdStr, 16);
-		return shardId;
+		return Integer.parseInt(shardIdStr, 16);
 	}
 
 	/**
