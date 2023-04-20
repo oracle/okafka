@@ -12,7 +12,7 @@
 
     <!-- Start of fields requiring product specific values -->
     <name>TxEventQ-Connector</name>
-    <description>Oracle's implementation of Kafka Connect Sink for Oracle Transactional Event Queues.</description>
+    <description>Oracle's implementation of Kafka Sink and Source Connect for Oracle Transactional Event Queues.</description>
     <url>https://docs.oracle.com/en/database/oracle/oracle-database/21/okjdc/index.html</url>
     <!-- End of fields requiring product specific values -->
 
