@@ -17,3 +17,4 @@ bin/
 .DS_Store
 
 doc/
+/.metadata/
