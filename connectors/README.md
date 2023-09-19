@@ -26,6 +26,9 @@ You will need to grab the following jar files from the \target\libs directory af
 - osdt_core-21.5.0.0.jar
 - osdt_cert-21.5.0.0.jar
 
+**Note:** The TxEventQ Connector jar file can be downloaded from this [maven repository](https://mvnrepository.com/artifact/com.oracle.database.messaging/txeventq-connector) if you don't want
+to build the jar. You will still need to get the additional jar files mentioned above and place in the required location.
+
 ### Oracle Database Setup
 To run the Kafka Sink and Source Connector against Oracle Database, a database user should be created and should be granted the below privileges.
 
