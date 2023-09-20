@@ -26,6 +26,9 @@ You will need to grab the following jar files from the \target\libs directory af
 - osdt_core-21.5.0.0.jar
 - osdt_cert-21.5.0.0.jar
 
+**Note:** The TxEventQ Connector jar file can be downloaded from this [maven repository](https://mvnrepository.com/artifact/com.oracle.database.messaging/txeventq-connector) if you don't want
+to build the jar. You will still need to get the additional jar files mentioned above and place in the required location.
+
 ### Oracle Database Setup
 To run the Kafka Sink and Source Connector against Oracle Database, a database user should be created and should be granted the below privileges.
 
@@ -61,6 +64,10 @@ exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'KEY_BASED_ENQUEUE', 2);
 exec sys.dbms_aqadm.start_queue('TxEventQ');
 exec sys.dbms_aqadm.add_subscriber('TxEventQ', SYS.AQ$_AGENT('SUB1', NULL, 0));
 ```
+### Setup Oracle RAC Cluster for Cross Instance Enqueues
+If running an Oracle RAC cluster read the instructions here for [User Event Streaming](https://docs.oracle.com/en/database/oracle/oracle-database/23/adque/aq-performance-scalability.html#GUID-423633E9-9B72-45B5-9C3E-95386BBEDBA0)
+to properly configure the **REMOTE_LISTENER** parameter. The **REMOTE_LISTENER** configuration is necessary to produce messages to the event stream mapped to the respective Kafka partition. If the
+**REMOTE_LISTENER** parameter is not configured, the sink connector will fail with `ORA-25348`.
 
 ### Steps to Create an Oracle Wallet
 
