@@ -21,10 +21,13 @@ mvn clean package
 
 You will need to grab the following jar files from the \target\libs directory after performing the build command above and place them into Kafka's libs directory.
 
-- ojdbc8-21.5.0.0.jar
-- oraclepki-21.5.0.0.jar
-- osdt_core-21.5.0.0.jar
-- osdt_cert-21.5.0.0.jar
+* `ojdbc8-<version>.jar`
+* `oraclepki-<version>.jar`
+* `osdt_core-<version>.jar`
+* `osdt_cert-<version>.jar`
+* `aqapi-<version>.jar`
+* `javax.jms-api-<version>.jar`
+* `jta-<version>.jar`
 
 **Note:** The TxEventQ Connector jar file can be downloaded from this [maven repository](https://mvnrepository.com/artifact/com.oracle.database.messaging/txeventq-connector) if you don't want
 to build the jar. You will still need to get the additional jar files mentioned above and place in the required location.
