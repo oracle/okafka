@@ -50,7 +50,7 @@ public class TxEventQSinkConnector extends SinkConnector {
 
     @Override
     public void start(Map<String, String> originalProps) {
-        log.info("[{}] Starting Oracle TxEventQ Sink Connector", Thread.currentThread().getId());
+        log.debug("[{}] Starting Oracle TxEventQ Sink Connector", Thread.currentThread().getId());
         this.configProperties = originalProps;
     }
 
@@ -61,7 +61,7 @@ public class TxEventQSinkConnector extends SinkConnector {
 
     @Override
     public List<Map<String, String>> taskConfigs(int maxTasks) {
-        log.info("Setting task configurations for {} workers.", maxTasks);
+        log.debug("Setting task configurations for {} workers.", maxTasks);
         final List<Map<String, String>> configs = new ArrayList<>(maxTasks);
         for (int i = 0; i < maxTasks; ++i) {
             configs.add(configProperties);
@@ -71,7 +71,7 @@ public class TxEventQSinkConnector extends SinkConnector {
 
     @Override
     public void stop() {
-        log.info("[{}] Stopping Oracle TxEventQ Sink Connector", Thread.currentThread().getId());
+        log.debug("[{}] Stopping Oracle TxEventQ Sink Connector", Thread.currentThread().getId());
 
     }
 
