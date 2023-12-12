@@ -194,7 +194,7 @@
                 <version>3.3.2</version>
                 <configuration>
                     <bottom>
-                        <![CDATA[Copyright © 2001, 2022, Oracle and/or its affiliates. All rights reserved.]]>
+                        <![CDATA[Copyright © 2023, Oracle and/or its affiliates. All rights reserved.]]>
                     </bottom>
                     <additionalJOption>-Xdoclint:none</additionalJOption>
                 </configuration>

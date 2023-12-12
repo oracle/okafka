@@ -360,7 +360,9 @@ public class TxEventQConsumer implements Closeable {
      * Checks the type of TxEventQ that the dequeue will be performed on and calls the appropriate
      * method to perform the dequeue.
      * 
-     * @return A SourceRecord object containing the message that has been dequeued.
+     * @param batchSize The maximum number of messages to dequeue.
+     * 
+     * @return A list of SourceRecords containing the message that has been dequeued.
      */
     public List<SourceRecord> receive(int batchSize) {
         if (!connectConnectionInternal()) {
@@ -449,7 +451,6 @@ public class TxEventQConsumer implements Closeable {
             handleException(ex);
             records.clear();
         } catch (final ConnectException exc) {
-            log.error("Connect exception {}", exc);
             attemptRollback();
             throw exc;
         }
@@ -462,7 +463,7 @@ public class TxEventQConsumer implements Closeable {
     }
 
     /**
-     * Dequeues either JSON messages from the TxEventQ.
+     * Dequeues JSON messages from the TxEventQ.
      * 
      * @param queueType A String indicating the type of queue that the dequeue will be performed on.
      * @param batchSize The maximum number of messages to dequeue.
@@ -517,7 +518,6 @@ public class TxEventQConsumer implements Closeable {
             handleException(ex);
             records.clear();
         } catch (final ConnectException exc) {
-            log.error("Connect exception {}", exc);
             attemptRollback();
             throw exc;
         }
@@ -658,6 +658,7 @@ public class TxEventQConsumer implements Closeable {
      * Dequeues a specified number if JMS bytes messages from the TxEventQ and creates a list of
      * SourceRecords that will be used by Kafka to populate the specified Kafka topic.
      * 
+     * @param batchSize The maximum number of messages to dequeue.
      * @return A list of SourceRecords to be used by Kafka.
      */
     public List<SourceRecord> receiveJmsMessages(int batchSize) {
@@ -687,7 +688,6 @@ public class TxEventQConsumer implements Closeable {
             handleException(e);
             records.clear();
         } catch (final ConnectException exc) {
-            log.error("Connect exception {}", exc);
             attemptRollback();
             throw exc;
         }
@@ -824,7 +824,6 @@ public class TxEventQConsumer implements Closeable {
                 }
             }
         } catch (SQLException e) {
-            log.error("SQLException [{}]:{}", e.getErrorCode(), e.getMessage());
             handleException(e);
         }
 
@@ -896,7 +895,6 @@ public class TxEventQConsumer implements Closeable {
         } catch (JMSException e) {
             handleException(e);
         } catch (final ConnectException exc) {
-            log.error("Connect exception {}", exc);
             attemptRollback();
             throw exc;
         }
