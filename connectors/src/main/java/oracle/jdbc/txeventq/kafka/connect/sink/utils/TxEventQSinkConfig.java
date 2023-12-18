@@ -48,7 +48,7 @@ public class TxEventQSinkConfig extends AbstractConfig {
     public static final String TXEVENTQ_QUEUE_NAME = "txeventq.queue.name";
     public static final String TXEVENTQ_QUEUE_NAME_DOC = "The name of the TxEventQ queue where the connector writes all records that are read from the Kafka broker.";
     public static final String TXEVENTQ_QUEUE_NAME_DISPLAY = "txeventq.queue.name";
-    
+
     public static final String TXEVENTQ_QUEUE_SCHEMA = "txeventq.queue.schema";
     public static final String TXEVENTQ_QUEUE_SCHEMA_DOC = "The name of the schema for the TxEventQ queue.";
     public static final String TXEVENTQ_QUEUE_SCHEMA_DISPLAY = "txeventq.queue.schema";
@@ -78,23 +78,26 @@ public class TxEventQSinkConfig extends AbstractConfig {
         // Database Group Configurations
         String groupName = "Database";
 
-        configDef.define(DATABASE_TNS_ALIAS_CONFIG, ConfigDef.Type.STRING, "", ConfigDef.Importance.HIGH,
-                DATABASE_TNS_ALIAS_DOC, groupName, ++orderInGroup, ConfigDef.Width.LONG, DATABASE_TNS_ALIAS_DISPLAY);
+        configDef.define(DATABASE_TNS_ALIAS_CONFIG, ConfigDef.Type.STRING, "",
+                ConfigDef.Importance.HIGH, DATABASE_TNS_ALIAS_DOC, groupName, ++orderInGroup,
+                ConfigDef.Width.LONG, DATABASE_TNS_ALIAS_DISPLAY);
 
-        configDef.define(DATABASE_WALLET_CONFIG, ConfigDef.Type.STRING, "", ConfigDef.Importance.HIGH,
-                DATABASE_WALLET_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM, DATABASE_WALLET_DISPLAY);
+        configDef.define(DATABASE_WALLET_CONFIG, ConfigDef.Type.STRING, "",
+                ConfigDef.Importance.HIGH, DATABASE_WALLET_DOC, groupName, ++orderInGroup,
+                ConfigDef.Width.MEDIUM, DATABASE_WALLET_DISPLAY);
 
-        configDef.define(DATABASE_TNSNAMES_CONFIG, ConfigDef.Type.STRING, "", ConfigDef.Importance.HIGH,
-                DATABASE_TNSNAMES_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM, DATABASE_TNSNAMES_DISPLAY);
+        configDef.define(DATABASE_TNSNAMES_CONFIG, ConfigDef.Type.STRING, "",
+                ConfigDef.Importance.HIGH, DATABASE_TNSNAMES_DOC, groupName, ++orderInGroup,
+                ConfigDef.Width.MEDIUM, DATABASE_TNSNAMES_DISPLAY);
 
         // TxEventQ Group Configurations
         groupName = "TxEventQ";
         orderInGroup = 0;
 
-        configDef.define(TXEVENTQ_QUEUE_SCHEMA, ConfigDef.Type.STRING, "", ConfigDef.Importance.HIGH,
-                TXEVENTQ_QUEUE_SCHEMA_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM,
-                TXEVENTQ_QUEUE_SCHEMA_DISPLAY);
-        
+        configDef.define(TXEVENTQ_QUEUE_SCHEMA, ConfigDef.Type.STRING, "",
+                ConfigDef.Importance.HIGH, TXEVENTQ_QUEUE_SCHEMA_DOC, groupName, ++orderInGroup,
+                ConfigDef.Width.MEDIUM, TXEVENTQ_QUEUE_SCHEMA_DISPLAY);
+
         configDef.define(TXEVENTQ_QUEUE_NAME, ConfigDef.Type.STRING, "", ConfigDef.Importance.HIGH,
                 TXEVENTQ_QUEUE_NAME_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM,
                 TXEVENTQ_QUEUE_NAME_DISPLAY);
@@ -103,12 +106,15 @@ public class TxEventQSinkConfig extends AbstractConfig {
         groupName = "kafka";
         orderInGroup = 0;
 
-        configDef.define(KAFKA_TOPIC, ConfigDef.Type.STRING, "", ConfigDef.Importance.HIGH, KAFKA_TOPIC_DOC, groupName,
-                ++orderInGroup, ConfigDef.Width.LONG, KAFKA_TOPIC_DISPLAY);
+        configDef.define(KAFKA_TOPIC, ConfigDef.Type.STRING, "", ConfigDef.Importance.HIGH,
+                KAFKA_TOPIC_DOC, groupName, ++orderInGroup, ConfigDef.Width.LONG,
+                KAFKA_TOPIC_DISPLAY);
         configDef.define(KAFKA_CONNECT_NAME, ConfigDef.Type.STRING, "", ConfigDef.Importance.HIGH,
-                KAFKA_CONNECT_NAME_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM, KAFKA_CONNECT_NAME_DISPLAY);
+                KAFKA_CONNECT_NAME_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM,
+                KAFKA_CONNECT_NAME_DISPLAY);
         configDef.define(BOOTSTRAP_SERVERS_CONFIG, ConfigDef.Type.LIST, ConfigDef.Importance.HIGH,
-                BOOTSTRAP_SERVERS_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM, BOOTSTRAP_SERVERS_DISPLAY);
+                BOOTSTRAP_SERVERS_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM,
+                BOOTSTRAP_SERVERS_DISPLAY);
 
         return configDef;
     }

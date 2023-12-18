@@ -21,7 +21,7 @@ mvn clean package
 
 You will need to grab the following jar files from the \target\libs directory after performing the build command above and place them into Kafka's libs directory.
 
-* `ojdbc8-<version>.jar`
+* `ojdbc11-<version>.jar`
 * `oraclepki-<version>.jar`
 * `osdt_core-<version>.jar`
 * `osdt_cert-<version>.jar`
@@ -67,10 +67,11 @@ exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'KEY_BASED_ENQUEUE', 2);
 exec sys.dbms_aqadm.start_queue('TxEventQ');
 exec sys.dbms_aqadm.add_subscriber('TxEventQ', SYS.AQ$_AGENT('SUB1', NULL, 0));
 ```
+
 ### Setup Oracle RAC Cluster for Cross Instance Enqueues
 If running an Oracle RAC cluster read the instructions here for [User Event Streaming](https://docs.oracle.com/en/database/oracle/oracle-database/23/adque/aq-performance-scalability.html#GUID-423633E9-9B72-45B5-9C3E-95386BBEDBA0)
 to properly configure the **REMOTE_LISTENER** parameter. The **REMOTE_LISTENER** configuration is necessary to produce messages to the event stream mapped to the respective Kafka partition. If the
-**REMOTE_LISTENER** parameter is not configured, the sink connector will fail with `ORA-25348`.
+**REMOTE_LISTENER** parameter is not configured, the sink connector will fail with `ORA-25348`. **Note:** Also set the isRac property to true in the `connect-txeventq-sink.properties` file.
 
 ### Steps to Create an Oracle Wallet
 
@@ -184,8 +185,8 @@ connector.class=oracle.jdbc.txeventq.kafka.connect.source.TxEventQSourceConnecto
 # event queue.
 tasks.max=1
 
-# Batch size for version 1 is always going to be one.
-batch.size=1
+# The maximum number of messages in a batch. The default batch size is 1024.
+batch.size=1024
 
 # The name of the Kafka topic where the connector writes all records that were read from the JMS broker.
 # Note: This property will need to be updated before the Source Connector can connect.
