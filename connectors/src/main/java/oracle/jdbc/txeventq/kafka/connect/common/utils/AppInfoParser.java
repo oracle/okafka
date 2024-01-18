@@ -1,7 +1,7 @@
 /*
-** Kafka Connect for TxEventQ version 1.0.
+** Kafka Connect for TxEventQ.
 **
-** Copyright (c) 2019, 2022 Oracle and/or its affiliates.
+** Copyright (c) 2023, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -24,14 +24,10 @@
 
 package oracle.jdbc.txeventq.kafka.connect.common.utils;
 
-import org.apache.kafka.common.MetricName;
-import org.apache.kafka.common.metrics.Gauge;
-import org.apache.kafka.common.metrics.MetricConfig;
-import org.apache.kafka.common.metrics.Metrics;
-import org.apache.kafka.common.utils.Sanitizer;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.io.IOException;
+import java.io.InputStream;
+import java.lang.management.ManagementFactory;
+import java.util.Properties;
 
 import javax.management.InstanceAlreadyExistsException;
 import javax.management.InstanceNotFoundException;
@@ -41,10 +37,13 @@ import javax.management.MalformedObjectNameException;
 import javax.management.NotCompliantMBeanException;
 import javax.management.ObjectName;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.lang.management.ManagementFactory;
-import java.util.Properties;
+import org.apache.kafka.common.MetricName;
+import org.apache.kafka.common.metrics.Gauge;
+import org.apache.kafka.common.metrics.MetricConfig;
+import org.apache.kafka.common.metrics.Metrics;
+import org.apache.kafka.common.utils.Sanitizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class AppInfoParser {
     private static final Logger log = LoggerFactory.getLogger(AppInfoParser.class);
@@ -55,12 +54,12 @@ public class AppInfoParser {
 
     static {
         Properties props = new Properties();
-        try (InputStream resourceStream = AppInfoParser.class.getResourceAsStream("/kafka-connect-oracle-version.properties")) {
+        try (InputStream resourceStream = AppInfoParser.class
+                .getResourceAsStream("/kafka-connect-oracle-version.properties")) {
             props.load(resourceStream);
         } catch (IOException e) {
             log.warn("Error while loading kafka-connect-oracle-version.properties.");
         }
-
 
         NAME = props.getProperty("name", "unknown").trim();
         VERSION = props.getProperty("version", "unknown").trim();
@@ -71,16 +70,19 @@ public class AppInfoParser {
     public static String getName() {
         return NAME;
     }
+
     public static String getVersion() {
         return VERSION;
     }
+
     public static String getCommitId() {
         return COMMIT_ID;
     }
 
     public static synchronized void registerAppInfo(String prefix, String id, Metrics metrics) {
         try {
-            ObjectName name = new ObjectName(prefix + ":type=app-info,id=" + Sanitizer.jmxSanitize(id));
+            ObjectName name = new ObjectName(
+                    prefix + ":type=app-info,id=" + Sanitizer.jmxSanitize(id));
             AppInfoParser.AppInfo mBean = new AppInfoParser.AppInfo();
             ManagementFactory.getPlatformMBeanServer().registerMBean(mBean, name);
             registerMetrics(metrics); // prefix will be added later by JmxReporter
@@ -98,7 +100,8 @@ public class AppInfoParser {
     public static synchronized void unregisterAppInfo(String prefix, String id, Metrics metrics) {
         MBeanServer server = ManagementFactory.getPlatformMBeanServer();
         try {
-            ObjectName name = new ObjectName(prefix + ":type=app-info,id=" + Sanitizer.jmxSanitize(id));
+            ObjectName name = new ObjectName(
+                    prefix + ":type=app-info,id=" + Sanitizer.jmxSanitize(id));
             if (server.isRegistered(name))
                 server.unregisterMBean(name);
 
@@ -118,8 +121,10 @@ public class AppInfoParser {
 
     private static void registerMetrics(Metrics metrics) {
         if (metrics != null) {
-            metrics.addMetric(metricName(metrics, "version"), new AppInfoParser.ImmutableValue<>(VERSION));
-            metrics.addMetric(metricName(metrics, "commit-id"), new AppInfoParser.ImmutableValue<>(COMMIT_ID));
+            metrics.addMetric(metricName(metrics, "version"),
+                    new AppInfoParser.ImmutableValue<>(VERSION));
+            metrics.addMetric(metricName(metrics, "commit-id"),
+                    new AppInfoParser.ImmutableValue<>(COMMIT_ID));
         }
     }
 
@@ -132,6 +137,7 @@ public class AppInfoParser {
 
     public interface AppInfoMBean {
         public String getVersion();
+
         public String getCommitId();
     }
 
@@ -139,7 +145,7 @@ public class AppInfoParser {
 
         public AppInfo() {
         }
-        
+
         @Override
         public String getVersion() {
             return AppInfoParser.getVersion();
