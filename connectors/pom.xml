@@ -6,14 +6,13 @@
 
     <groupId>com.oracle.database.messaging</groupId>
     <artifactId>txeventq-connector</artifactId>
-    <version>1.1</version>
+    <version>23.4.0.24.06</version>
 
     <packaging>jar</packaging>
 
     <!-- Start of fields requiring product specific values -->
     <name>TxEventQ-Connector</name>
     <description>Oracle's implementation of Kafka Sink and Source Connect for Oracle Transactional Event Queues.</description>
-    <url>https://docs.oracle.com/en/database/oracle/oracle-database/21/okjdc/index.html</url>
     <!-- End of fields requiring product specific values -->
 
     <licenses>

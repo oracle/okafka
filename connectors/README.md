@@ -56,8 +56,11 @@ exec sys.dbms_aqadm.start_queue('TxEventQ');
 exec sys.dbms_aqadm.add_subscriber('TxEventQ', SYS.AQ$_AGENT('SUB1', NULL, 0));
 ```
 
-If using the Source Connector and ordering of the events are important then the Transactional Event Queue that the Kakfa Source connector will be pulling from should have
-the `STICKY_DEQUEUE` parameter set. The `tasks.max` property should also correspond to the number of `SHARD_NUM` assigned to the queue. 
+** If using the Source Connector and ordering of the events are important then the Transactional Event Queue that the Kakfa Source connector will be pulling from should have**
+** the `STICKY_DEQUEUE` parameter set. The `SHARD_NUM` assigned to the queue should be less than or equal to the number of Kafka partitions assigned to the Kafka topic.**
+
+**Note: If running on a database version less than 23.4 with `STICKY_DEQUEUE` the `tasks.max` value must be equal to the `SHARD_NUM` specified. If the `tasks.max` is not** 
+** equal to the `SHARD_NUM` dequeue from all event streams will not be performed.**
 
 ```roomsql
 exec sys.dbms_aqadm.create_sharded_queue(queue_name=>"TxEventQ", multiple_consumers => TRUE); 
@@ -180,9 +183,10 @@ Here is the full `connect-txeventq-source.properties` file below.
 name=TxEventQ-source
 connector.class=oracle.jdbc.txeventq.kafka.connect.source.TxEventQSourceConnector
 
-# If using event streams and ordering of the events is important the number of tasks
-# set for this property should be same number of event streams used for the transactional
-# event queue.
+# If the transactional event queue has STICKY_DEQUEUE set and running on a database version less than 23.4
+# the tasks.max number specified must be equal to the number of event streams (SHARD_NUM) for the queue.
+# If the `tasks.max` is not equal to the event streams (SHARD_NUM) dequeue from all event streams will not be performed when
+# using a database with a version less than 23.4.
 tasks.max=1
 
 # The maximum number of messages in a batch. The default batch size is 1024.
@@ -259,11 +263,16 @@ In another command prompt start the Kafka server by running the following comman
 ```
 
 In the third command prompt start the connector in either standalone (connect-standalone.bat) or distributed (connect-distributed.bat) mode by running the following command.
-The command below is connecting in standalone mode. If connecting is distributed mode replace the bat file with the connect-distributed.bat file. If you want to run the source
-connector replace the properties file below with the properties file for the source connector.
+The command below is connecting in standalone mode. If you want to run the source connector replace the properties file below with the properties file for the source connector.
 
 ```bash
 .\bin\windows\connect-standalone.bat .\config\connect-standalone.properties .\config\connect-txeventq-sink.properties
+```
+
+If connecting in distributed mode on a Windows environment enter the following command in a command prompt.
+
+```bash
+.\bin\windows\connect-distributed.bat .\config\connect-distributed.properties 
 ```
 
 If running Kafka in a Linux environment open 3 different terminals and change to the directory where Kafka has been installed.
@@ -281,9 +290,31 @@ bin/kafka-server-start.sh config/server.properties
 ```
 
 In the third terminal start the connector in either standalone (connect-standalone.sh) or distributed (connect-distributed.sh) mode by running the following command.
-The command below is connecting in standalone mode. If connecting is distributed mode replace the bat file with the connect-distributed.sh file. If you want to run the source
-connector replace the properties file below with the properties file for the source connector.
+The command below is connecting in standalone mode. If you want to run the source connector replace the properties file below with the properties file for the source connector.
 
 ```bash
 bin/connect-standalone.sh config/connect-standalone.properties config/connect-TxEventQ-sink.properties 
+```
+
+If connecting in distributed mode on a Linux environment enter the following command in a command prompt.
+
+```bash
+bin/connect-distributed.sh config/connect-distributed.properties
+```
+
+Use REST calls to post configuration properties when running in distributed mode. An example of a JSON configuration is shown below.
+
+```bash
+{
+        "connector.class": "oracle.jdbc.txeventq.kafka.connect.source.TxEventQSourceConnector",
+        "tasks.max": "5",
+        "kafka.topic": <Kafka topic>,
+        "value.converter": "org.apache.kafka.connect.converters.ByteArrayConverter",
+        "db_tns_alias": <tns alias>,
+        "wallet.path": <specify wallet path>,
+        "tnsnames.path": <specify tnsnames path>,
+        "txeventq.queue.name": <txEventQ queue name>,
+        "txeventq.subscriber": <txEventQ subscriber>,
+        "bootstrap.servers": <broker i.e localhost:9092>
+}
 ```

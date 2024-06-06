@@ -98,6 +98,8 @@ public class TxEventQConsumer implements Closeable {
     private String getQueueType;
 
     private static final int MINIMUM_VERSION = 21;
+    private int databaseMajorVersion = 0;
+    private int databaseMinorVersion = 0;
 
     public TxEventQConsumer(TxEventQConnectorConfig config) {
         this.config = config;
@@ -146,27 +148,47 @@ public class TxEventQConsumer implements Closeable {
     }
 
     /**
-     * Check whether the database is version 21 or later
+     * Check whether the database version is 21 or later
      * 
      * @throws ConnectException If we cannot get the database metadata or if the database version is
      *                          less than 21
      */
     private void versionCheck() {
         DatabaseMetaData md = null;
-        int version = 0;
         try {
             md = this.conn.getMetaData();
-            version = md.getDatabaseMajorVersion();
-            log.debug("DB Version: {}", version);
+            this.databaseMajorVersion = md.getDatabaseMajorVersion();
+            this.databaseMinorVersion = md.getDatabaseMinorVersion();
+
+            log.debug("Database major version: {}", this.databaseMajorVersion);
+            log.debug("Database minor version: [{}]", this.databaseMinorVersion);
 
         } catch (SQLException e) {
             throw new ConnectException("Unable to obtain a database connection");
         }
 
-        if (version < MINIMUM_VERSION) {
+        if (this.databaseMajorVersion < MINIMUM_VERSION) {
             throw new ConnectException(
                     "TxEventQ Connector requires Oracle Database 21c or greater");
         }
+    }
+
+    /**
+     * Gets the database major version that is being using.
+     * 
+     * @return The database major version that is being used.
+     */
+    public int getDatabaseMajorVersion() {
+        return this.databaseMajorVersion;
+    }
+
+    /**
+     * Gets the database minor version that is being using.
+     * 
+     * @return The database minor version that is being used.
+     */
+    public int getDatabaseMinorVersion() {
+        return this.databaseMinorVersion;
     }
 
     /**
@@ -619,6 +641,37 @@ public class TxEventQConsumer implements Closeable {
         log.trace("[{}]:[{}] Exit {}.getNumOfShardsForQueue", Thread.currentThread().getId(),
                 this.conn, this.getClass().getName());
         return numShard;
+    }
+
+    /**
+     * Determines whether the queue is using sticky dequeue or not.
+     * 
+     * @param queue The queue to get the sticky dequeue for.
+     * @return True if the queue is using sticky dequeue, otherwise false.
+     */
+    public boolean isStickyDequeue(String queue) {
+        log.trace("[{}]:[{}] Entry {}.isStickyDequeue", Thread.currentThread().getId(), this.conn,
+                this.getClass().getName());
+
+        int stickyDequeue;
+        try (CallableStatement getnumshrdStmt = this.conn
+                .prepareCall("{call dbms_aqadm.get_queue_parameter(?,?,?)}")) {
+            getnumshrdStmt.setString(1, queue);
+            getnumshrdStmt.setString(2, "STICKY_DEQUEUE");
+            getnumshrdStmt.registerOutParameter(3, Types.INTEGER);
+            getnumshrdStmt.execute();
+            stickyDequeue = getnumshrdStmt.getInt(3);
+        } catch (SQLException e) {
+            throw new ConnectException(
+                    "Error attempting to get sticky dequeue value for the specified queue: "
+                            + e.getMessage());
+        }
+
+        log.debug("Sticky dequeue for {}: {}", queue, stickyDequeue);
+        log.trace("[{}]:[{}] Exit {}.isStickyDequeue", Thread.currentThread().getId(), this.conn,
+                this.getClass().getName());
+
+        return stickyDequeue == 1;
     }
 
     /**

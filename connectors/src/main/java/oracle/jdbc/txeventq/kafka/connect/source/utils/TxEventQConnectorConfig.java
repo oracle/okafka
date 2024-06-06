@@ -79,6 +79,11 @@ public class TxEventQConnectorConfig extends AbstractConfig {
     private static final String TASK_BATCH_SIZE_DOC = "The maximum number of records that a connector task may read from the Oracle TxEventQ broker before writing to Kafka. The task holds these records until they are acknowledged in Kafka, so this may affect memory usage.";
     public static final int TASK_BATCH_SIZE_DEFAULT = 1024;
 
+    public static final String TASK_MAX_CONFIG = "tasks.max";
+    private static final String TASK_MAX_DISPLAY = "Tasks Max";
+    private static final String TASK_MAX_DOC = "Maximum number of tasks to use for this connector.";
+    public static final int TASK_MAX_DEFAULT = 1;
+
     public final String topic;
 
     public TxEventQConnectorConfig(Map<String, String> originals) {
@@ -152,6 +157,10 @@ public class TxEventQConnectorConfig extends AbstractConfig {
         configDef.define(TASK_BATCH_SIZE_CONFIG, ConfigDef.Type.INT, TASK_BATCH_SIZE_DEFAULT,
                 ConfigDef.Importance.MEDIUM, TASK_BATCH_SIZE_DOC, groupName, ++orderInGroup,
                 ConfigDef.Width.MEDIUM, TASK_BATCH_SIZE_DISPLAY);
+
+        configDef.define(TASK_MAX_CONFIG, ConfigDef.Type.INT, TASK_MAX_DEFAULT,
+                ConfigDef.Importance.HIGH, TASK_MAX_DOC, groupName, ++orderInGroup,
+                ConfigDef.Width.MEDIUM, TASK_MAX_DISPLAY);
 
         return configDef;
     }
