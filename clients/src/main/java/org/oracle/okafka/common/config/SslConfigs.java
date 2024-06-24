@@ -1,5 +1,5 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
 ** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
@@ -29,14 +29,10 @@
 
 package org.oracle.okafka.common.config;
 
-import org.oracle.okafka.common.config.ConfigDef.Importance;
-import org.oracle.okafka.common.utils.Utils;
+import org.apache.kafka.common.config.ConfigDef;
+import org.apache.kafka.common.config.ConfigDef.Importance;
 
-import javax.net.ssl.KeyManagerFactory;
-import javax.net.ssl.TrustManagerFactory;
-import java.util.Set;
-
-public class SslConfigs {
+public class SslConfigs extends org.apache.kafka.common.config.SslConfigs {
     /*
      * NOTE: DO NOT CHANGE EITHER CONFIG NAMES AS THESE ARE PART OF THE PUBLIC API AND CHANGE WILL BREAK USER CODE.
      */
@@ -45,6 +41,7 @@ public class SslConfigs {
 	public static final String TNS_ALIAS_DOC = "alias of connection string in tnsnames.ora. This connection is used for connecting to database instance";
    
     public static void addClientSslSupport(ConfigDef config) {
+    	org.apache.kafka.common.config.SslConfigs.addClientSslSupport(config);
         config.define(SslConfigs.TNS_ALIAS, ConfigDef.Type.STRING, null, Importance.MEDIUM, SslConfigs.TNS_ALIAS_DOC);    
         }
 }

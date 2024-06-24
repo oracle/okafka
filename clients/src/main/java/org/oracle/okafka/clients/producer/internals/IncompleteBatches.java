@@ -1,11 +1,4 @@
 /*
-** OKafka Java Client version 0.8.
-**
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
-** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
-*/
-
-/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.

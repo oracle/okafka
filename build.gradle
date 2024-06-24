@@ -5,198 +5,53 @@
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-}
+repositories {
+	mavenCentral()	
+} 
 
-allprojects {
+apply plugin: 'java'
+apply plugin: 'eclipse'
 
-    repositories {
-        mavenCentral()
-    }
-
-    group = 'org.oracle.okafka'
-    version = '0.8'
-
-    tasks.withType(Javadoc) {
-        // disable the crazy super-strict doclint tool in Java 8
-        // noinspection SpellCheckingInspection
-        options.addStringOption('Xdoclint:none', '-quiet')
-        options.windowTitle = "Oracle Database Transactional Event Queues Java API Reference"
-        options.header = """<b>Oracle&reg; Database Transactional Event Queues Java API Reference<br>20c</b><br>F30355-02<br>"""
-        options.bottom = """<center><small>Copyright &copy; 2001, 2020, Oracle and/or its affiliates. All rights reserved.<small></center><p><small><br></small></p>"""
-    }
-}
-
-ext {
-    gradleVersion = '7.3'
-    minJavaVersion = JavaVersion.VERSION_1_8
-
-    mavenUrl = project.hasProperty('mavenUrl') ? project.mavenUrl : ''
-    mavenUsername = project.hasProperty('mavenUsername') ? project.mavenUsername : ''
-    mavenPassword = project.hasProperty('mavenPassword') ? project.mavenPassword : ''
-}
-
-project(':clients') {
-    apply plugin : 'java-library'
-
-    sourceCompatibility = minJavaVersion
-    targetCompatibility = minJavaVersion
-
-    println 'project okafka client lib'
-
-    dependencies {
-        // Test dependencies
-        testImplementation group: 'org.easymock', name: 'easymock', version: '4.3'
-        testImplementation group: 'org.powermock', name: 'powermock-api-support', version: '2.0.9'
-        testImplementation group: 'org.powermock', name: 'powermock-api-easymock', version: '2.0.9'
-        testImplementation group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.9'
-        testImplementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.36'
-
-        // These dependencies are used by the application.
-        implementation group: 'com.oracle.database.jdbc', name: 'ojdbc11', version: '21.5.0.0'
-        implementation group: 'com.oracle.database.messaging', name: 'aqapi', version: '19.3.0.0'
-        implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '21.5.0.0'
-        implementation group: 'com.oracle.database.security', name: 'osdt_core', version: '21.5.0.0'
-        implementation group: 'com.oracle.database.security', name: 'osdt_cert', version: '21.5.0.0'
-        implementation group: 'javax.jms', name: 'javax.jms-api', version: '2.0.1'
-        implementation group: 'javax.transaction', name: 'jta', version: '1.1'
-        implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.7.36'
-        implementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.7.36'
-    }
-
-    javadoc {
-        include "**/org/oracle/okafka/clients/admin/*"
-        include "**/org/oracle/okafka/clients/consumer/*"
-        include "**/org/oracle/okafka/clients/producer/*"
-        include "**/org/oracle/okafka/common/*"
-        include "**/org/oracle/okafka/common/annotation/*"
-        include "**/org/oracle/okafka/common/errors/*"
-        include "**/org/oracle/okafka/common/resource/*"
-        include "**/org/oracle/okafka/common/serialization/*"
-        include "**/org/oracle/okafka/common/config/*"
-    }
-
-    tasks.named('jar') {
-        description('Generates okafka client jar ')
-        archiveBaseName = 'okafka'
-
-        from "${rootProject.projectDir}/LICENSE.txt"
-        from "${rootProject.projectDir}/NOTICE"
-
-        manifest {
-            attributes( 'Implementation-Title'  : 'okafka',
-                        'Implementation-Version': project.version)
-        }
-    }
-
-    tasks.register('fullJar', Jar) {
-        archiveBaseName = 'okafka'
-        archiveClassifier = 'full'
-
-        manifest {
-            attributes( 'Implementation-Title'  : 'okafka',
-                        'Implementation-Version': project.version)
-        }
-
-        from "${rootProject.projectDir}/LICENSE.txt"
-        from "${rootProject.projectDir}/NOTICE"
-
-        from sourceSets.main.output
-
-        dependsOn configurations.runtimeClasspath
-        from {
-            configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
-        }
-
-        duplicatesStrategy 'exclude'
-    }
-}
-
-project(':examples:consumer') {
-    apply plugin : 'java'
-    apply plugin : 'application'
-
-    sourceCompatibility = minJavaVersion
-    targetCompatibility = minJavaVersion
-
-    dependencies {
-        // These dependencies are used by the application.
-        implementation project(':clients')
-        implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '21.5.0.0'
-    }
+println 'Creating okafka-23.4.0.0.jar'
 
 
-    tasks.named('jar') {
-        description('Generates okafka client consumer jar ')
-        archiveBaseName = 'okafka'
-        archiveClassifier = 'consumer'
-
-        from "${rootProject.projectDir}/LICENSE.txt"
-        from "${rootProject.projectDir}/NOTICE"
-
-        manifest {
-            attributes( 'Implementation-Title'  : 'okafka consumer',
-                        'Implementation-Version': project.version)
-        }
-    }
-
-    tasks.named('run') {
-        description('Run okafka client consumer')
-        application {
-            mainClass = 'org.oracle.okafka.examples.Consumer'
-        }
-    }
-}
-
-project(':examples:producer') {
-    apply plugin : 'java'
-    apply plugin : 'application'
-
-    sourceCompatibility = minJavaVersion
-    targetCompatibility = minJavaVersion
-
-    dependencies {
-        // These dependencies are used by the application.
-        implementation project(':clients')
-        implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '21.5.0.0'
-    }
-
-    tasks.named('jar') {
-        description('Generates okafka client producer jar ')
-        archiveBaseName = 'okafka'
-        archiveClassifier = 'producer'
-
-        from "${rootProject.projectDir}/LICENSE.txt"
-        from "${rootProject.projectDir}/NOTICE"
-
-        manifest {
-            attributes( 'Implementation-Title'  : 'okafka producer',
-                        'Implementation-Version': project.version)
-        }
-    }
-
-    tasks.named('run') {
-        description('Run okafka client producer')
-        application {
-            mainClass = 'org.oracle.okafka.examples.Producer'
-        }
-    }
-}
-
-configurations {
-    childJar
-}
-
+sourceSets {
+   		main {
+      		java {
+         		srcDir 'src'         		
+         		exclude 'tests/**'
+         		exclude 'test/**'
+      		}
+   		}
+	}
+	
 dependencies {
-    subprojects.each {
-        childJar project(it.path)
-    }
-}
+     
+      implementation group: 'com.oracle.database.messaging', name: 'aqapi', version: '23.3.0.0'
+	  implementation group: 'com.oracle.database.jdbc', name: 'ojdbc8', version: '23.4.0.24.05'
+      implementation group: 'javax.transaction', name: 'jta', version: '1.1'
+      implementation group: 'javax.jms', name: 'javax.jms-api', version: '2.0'
+      implementation group: 'org.slf4j', name: 'slf4j-api', version: '2.0.0-alpha0'          
+      implementation 'org.apache.kafka:kafka-clients:2.8.1'
+      // Use JUnit test framework
+      implementation group: 'junit', name: 'junit', version: '4.12'
 
-task multiProjectJar (type: Jar,  dependsOn: configurations.childJar) {
-    description 'Generates a jar containing okafka client, all its dependencies and examples for okafka demo'
-    from { configurations.childJar.collect { zipTree(it) } }
+      testImplementation group: 'org.easymock', name: 'easymock', version: '3.6'
+      testImplementation group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.0-beta.5'
+      testImplementation group: 'org.powermock', name: 'powermock-api-support', version: '2.0.5'
+      testImplementation group: 'org.powermock', name: 'powermock-api-easymock', version: '2.0.0-beta.5'
+      
+      implementation fileTree(dir: 'libs', include: ['*.jar'])
+}
+	
+jar {
+      description 'Generates okafka client jar without dependencies' 
+      archiveBaseName = 'okafka'
+      archiveVersion = '23.4.0.0'
+      manifest {
+        attributes (
+        'Version': '23.4.0.0',
+      	'Build-Time-ISO-8601':new Date().format("yyyy-MM-dd HH:mm:ss")
+      	)
+  	  }
 }

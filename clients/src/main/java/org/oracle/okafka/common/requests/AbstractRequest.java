@@ -1,5 +1,5 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
 ** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
@@ -31,16 +31,24 @@ package org.oracle.okafka.common.requests;
 
 import org.oracle.okafka.common.protocol.ApiKeys;
 
-public abstract class AbstractRequest {
+public abstract class AbstractRequest extends org.apache.kafka.common.requests.AbstractRequest{
 
-    public static abstract class Builder<T extends AbstractRequest> {
+	public AbstractRequest(ApiKeys apiKey, short version)
+	{
+		super(ApiKeys.convertToApacheKafkaKey(apiKey), version);
+	}
+	
+    public static abstract class Builder<T extends AbstractRequest> extends org.apache.kafka.common.requests.AbstractRequest.Builder<T> 
+    {
         private final ApiKeys apiKey;
 
-        public Builder(ApiKeys apiKey) {
+        
+        public Builder(ApiKeys apiKey) { 
+        	super(ApiKeys.convertToApacheKafkaKey(apiKey), (short)1);
             this.apiKey = apiKey;
         }
 
-        public ApiKeys apiKey() {
+        public ApiKeys apiKeyOKafka() {
             return apiKey;
         }
 

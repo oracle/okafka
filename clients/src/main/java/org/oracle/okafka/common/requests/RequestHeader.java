@@ -1,5 +1,5 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
 ** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
@@ -31,21 +31,26 @@ package org.oracle.okafka.common.requests;
 
 import static java.util.Objects.requireNonNull;
 
+import org.apache.kafka.common.message.RequestHeaderData;
 import org.oracle.okafka.common.protocol.ApiKeys;
 
 /**
  * The header for a request in the Kafka protocol
  */
-public class RequestHeader {
- 
+public class RequestHeader {// extends org.apache.kafka.common.requests.RequestHeader{
+	
+	private final RequestHeaderData data; 
     private final ApiKeys apiKey;
     private final String clientId;
     private final int correlationId;
+    
     public RequestHeader(ApiKeys apiKey, String clientId, int correlation) {
+    	data = new RequestHeaderData().setClientId(clientId).setCorrelationId(correlation).setRequestApiKey(apiKey.id);
         this.apiKey = requireNonNull(apiKey);
         this.clientId = clientId;
         this.correlationId = correlation;
     }
+  
     public ApiKeys apiKey() {
         return apiKey;
     }

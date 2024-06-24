@@ -1,5 +1,5 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
 ** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
@@ -34,6 +34,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.kafka.common.protocol.ApiMessage;
+import org.apache.kafka.common.requests.AbstractResponse;
 import org.oracle.okafka.common.protocol.ApiKeys;
 
 public class CreateTopicsRequest extends AbstractRequest {
@@ -116,6 +118,11 @@ public class CreateTopicsRequest extends AbstractRequest {
                 append(")");
             return bld.toString();
         }
+
+		@Override
+		public CreateTopicsRequest build(short version) {
+			return new CreateTopicsRequest(topics, timeout, validateOnly);
+		}
     }
 
     private final Map<String, TopicDetails> topics;
@@ -130,6 +137,7 @@ public class CreateTopicsRequest extends AbstractRequest {
     public static final short NO_REPLICATION_FACTOR = -1;
 
     private CreateTopicsRequest(Map<String, TopicDetails> topics, Integer timeout, boolean validateOnly) {
+    	super(ApiKeys.CREATE_TOPICS,(short)1);
         this.topics = topics;
         this.timeout = timeout;
         this.validateOnly = validateOnly;
@@ -151,4 +159,16 @@ public class CreateTopicsRequest extends AbstractRequest {
     public Set<String> duplicateTopics() {
         return this.duplicateTopics;
     }
+
+	@Override
+	public ApiMessage data() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public AbstractResponse getErrorResponse(int throttleTimeMs, Throwable e) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 }

@@ -1,5 +1,5 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
 ** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
@@ -29,12 +29,63 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import org.oracle.okafka.common.TopicPartition;
-import org.oracle.okafka.common.TopicPartitionReplica;
-import org.oracle.okafka.common.acl.AclBinding;
-import org.oracle.okafka.common.acl.AclBindingFilter;
-import org.oracle.okafka.common.annotation.InterfaceStability;
-import org.oracle.okafka.common.config.ConfigResource;
+//import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.clients.admin.AlterConfigsOptions;
+import org.apache.kafka.clients.admin.AlterConfigsResult;
+import org.apache.kafka.clients.admin.AlterReplicaLogDirsOptions;
+import org.apache.kafka.clients.admin.AlterReplicaLogDirsResult;
+import org.apache.kafka.clients.admin.Config;
+import org.apache.kafka.clients.admin.CreateAclsOptions;
+import org.apache.kafka.clients.admin.CreateAclsResult;
+import org.apache.kafka.clients.admin.CreateDelegationTokenOptions;
+import org.apache.kafka.clients.admin.CreateDelegationTokenResult;
+import org.apache.kafka.clients.admin.CreatePartitionsOptions;
+import org.apache.kafka.clients.admin.CreatePartitionsResult;
+import org.apache.kafka.clients.admin.CreateTopicsOptions;
+import org.apache.kafka.clients.admin.CreateTopicsResult;
+import org.apache.kafka.clients.admin.DeleteAclsOptions;
+import org.apache.kafka.clients.admin.DeleteAclsResult;
+import org.apache.kafka.clients.admin.DeleteConsumerGroupsOptions;
+import org.apache.kafka.clients.admin.DeleteConsumerGroupsResult;
+import org.apache.kafka.clients.admin.DeleteRecordsOptions;
+import org.apache.kafka.clients.admin.DeleteRecordsResult;
+import org.apache.kafka.clients.admin.DeleteTopicsOptions;
+import org.apache.kafka.clients.admin.DeleteTopicsResult;
+import org.apache.kafka.clients.admin.DescribeAclsOptions;
+import org.apache.kafka.clients.admin.DescribeAclsResult;
+import org.apache.kafka.clients.admin.DescribeClusterOptions;
+import org.apache.kafka.clients.admin.DescribeClusterResult;
+import org.apache.kafka.clients.admin.DescribeConfigsOptions;
+import org.apache.kafka.clients.admin.DescribeConfigsResult;
+import org.apache.kafka.clients.admin.DescribeConsumerGroupsOptions;
+import org.apache.kafka.clients.admin.DescribeConsumerGroupsResult;
+import org.apache.kafka.clients.admin.DescribeDelegationTokenOptions;
+import org.apache.kafka.clients.admin.DescribeDelegationTokenResult;
+import org.apache.kafka.clients.admin.DescribeLogDirsOptions;
+import org.apache.kafka.clients.admin.DescribeLogDirsResult;
+import org.apache.kafka.clients.admin.DescribeReplicaLogDirsOptions;
+import org.apache.kafka.clients.admin.DescribeReplicaLogDirsResult;
+import org.apache.kafka.clients.admin.DescribeTopicsOptions;
+import org.apache.kafka.clients.admin.DescribeTopicsResult;
+import org.apache.kafka.clients.admin.ExpireDelegationTokenOptions;
+import org.apache.kafka.clients.admin.ExpireDelegationTokenResult;
+import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsOptions;
+import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsResult;
+import org.apache.kafka.clients.admin.ListConsumerGroupsOptions;
+import org.apache.kafka.clients.admin.ListConsumerGroupsResult;
+import org.apache.kafka.clients.admin.ListTopicsOptions;
+import org.apache.kafka.clients.admin.ListTopicsResult;
+import org.apache.kafka.clients.admin.NewPartitions;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.RecordsToDelete;
+import org.apache.kafka.clients.admin.RenewDelegationTokenOptions;
+import org.apache.kafka.clients.admin.RenewDelegationTokenResult;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.TopicPartitionReplica;
+import org.apache.kafka.common.acl.AclBinding;
+import org.apache.kafka.common.acl.AclBindingFilter;
+import org.apache.kafka.common.annotation.InterfaceStability;
+import org.apache.kafka.common.config.ConfigResource;
 
 /**
  * The administrative client for Transactional Event Queues(TEQ), which supports managing and inspecting topics.
@@ -42,11 +93,11 @@ import org.oracle.okafka.common.config.ConfigResource;
  * Topic can be created or altered with following configs. If these configs are not overriden by client then server default values are used.
  * 
  * retention.ms: Amount of time in milliseconds messages stay in topic and are available for consumption. In kafka retention time starts after
- * enqueue of a message whereas in TEQ retention starts after all subscribers(groups) of a topic consume a message. In TEQ retention.ms is rounded to seconds. This property is supported on or later 20c database.
+ * enqueue of a message whereas in TEQ retention starts after all subscribers(goups) of a topic consume a message. In TEQ retention.ms is rounded to seconds. This property is supported on or later 20c database.
  *
  */
 @InterfaceStability.Evolving
-public abstract class AdminClient implements AutoCloseable {
+public abstract class AdminClient  implements Admin {
 
     /**
      * Create a new AdminClient with the given configuration.
@@ -54,8 +105,19 @@ public abstract class AdminClient implements AutoCloseable {
      * @param props The configuration.
      * @return The new KafkaAdminClient.
      */
+	final static String DUMMY_BOOTSTRAP ="localhost:1521";
     public static AdminClient create(Properties props) {
-        return KafkaAdminClient.createInternal(new AdminClientConfig(props), null);
+    	String bootStrap = (String)props.get(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG);
+    	if(bootStrap== null)
+    	{
+    		String secProtocol = props.getProperty(AdminClientConfig.SECURITY_PROTOCOL_CONFIG);
+    		if(secProtocol != null && secProtocol.equalsIgnoreCase("SSL")) {
+    			// Connect using Oracle Wallet and tnsnames.ora. 
+    			// User does not need to know the database host ip and port.
+    			props.setProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, DUMMY_BOOTSTRAP);
+    		}
+    	}
+        return KafkaAdminClient.createInternal(new org.oracle.okafka.clients.admin.AdminClientConfig(props), new KafkaAdminClient.TimeoutProcessorFactory());
     }
 
     /**
@@ -65,6 +127,18 @@ public abstract class AdminClient implements AutoCloseable {
      * @return The new KafkaAdminClient.
      */
     public static AdminClient create(Map<String, Object> conf) {
+    	
+    	String bootStrap = (String)conf.get(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG);
+    	if(bootStrap == null)
+    	{
+    		String setSecProtocol = (String)conf.get(AdminClientConfig.SECURITY_PROTOCOL_CONFIG);
+    		if(setSecProtocol != null && setSecProtocol.equalsIgnoreCase("SSL")) 
+    		{
+    			// Connect using Wallet and TNSNAMES.ora. 
+    			// User does not need to know the database host ip and port.
+    			conf.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, DUMMY_BOOTSTRAP);
+    		}
+    	}
         return KafkaAdminClient.createInternal(new AdminClientConfig(conf), null);
     }
 
@@ -327,7 +401,7 @@ public abstract class AdminClient implements AutoCloseable {
     public abstract RenewDelegationTokenResult renewDelegationToken(byte[] hmac, RenewDelegationTokenOptions options);
 
     /**
-     * This method is not yet supported.
+     * <This method is not yet supported.
      */
     public ExpireDelegationTokenResult expireDelegationToken(byte[] hmac) {
         return expireDelegationToken(hmac, new ExpireDelegationTokenOptions());

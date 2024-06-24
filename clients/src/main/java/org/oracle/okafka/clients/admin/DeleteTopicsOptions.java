@@ -1,11 +1,4 @@
 /*
-** OKafka Java Client version 0.8.
-**
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
-** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
-*/
-
-/*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -24,28 +17,16 @@
 
 package org.oracle.okafka.clients.admin;
 
+import org.apache.kafka.common.annotation.InterfaceStability;
+
 import java.util.Collection;
 
-import org.oracle.okafka.common.annotation.InterfaceStability;
-
 /**
- * This feature is not yet supported.
- * Options for {@link AdminClient#deleteTopics(Collection)}.
+ * Options for {@link Admin#deleteTopics(Collection)}.
  *
- * The API of this class is evolving, see {@link AdminClient} for details.
+ * The API of this class is evolving, see {@link Admin} for details.
  */
 @InterfaceStability.Evolving
-public class DeleteTopicsOptions extends AbstractOptions<DeleteTopicsOptions> {
-
-    /**
-     * Set the request timeout in milliseconds for this operation or {@code null} if the default request timeout for the
-     * AdminClient should be used.
-     *
-     */
-    // This method is retained to keep binary compatibility with 0.11
-    public DeleteTopicsOptions timeoutMs(Integer timeoutMs) {
-        this.timeoutMs = timeoutMs;
-        return this;
-    }
+public class DeleteTopicsOptions extends org.apache.kafka.clients.admin.DeleteTopicsOptions {
 
 }

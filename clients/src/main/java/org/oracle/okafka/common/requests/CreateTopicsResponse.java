@@ -1,5 +1,5 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
 ** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
@@ -31,11 +31,16 @@ package org.oracle.okafka.common.requests;
 
 import java.util.Map;
 
+import org.apache.kafka.common.protocol.ApiMessage;
+import org.apache.kafka.common.protocol.Errors;
+import org.oracle.okafka.common.protocol.ApiKeys;
+
 public class CreateTopicsResponse extends AbstractResponse {
     final Map<String, Exception> errors;
     private Exception requestResult;
 
     public CreateTopicsResponse(Map<String, Exception> errors) {
+    	super(ApiKeys.CREATE_TOPICS);
         this.errors = errors;
         this.requestResult = null;
     }
@@ -53,5 +58,23 @@ public class CreateTopicsResponse extends AbstractResponse {
     public Exception getResult() {
     	return requestResult;
     }
+
+	@Override
+	public ApiMessage data() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Map<Errors, Integer> errorCounts() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public int throttleTimeMs() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
 
 }

@@ -1,5 +1,5 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
 ** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
@@ -29,6 +29,8 @@
 
 package org.oracle.okafka.common.requests;
 
+import org.apache.kafka.common.protocol.ApiMessage;
+import org.apache.kafka.common.requests.AbstractResponse;
 import org.oracle.okafka.common.protocol.ApiKeys;
 
 public class FetchRequest extends AbstractRequest {
@@ -57,11 +59,17 @@ public class FetchRequest extends AbstractRequest {
                 append(")");
             return bld.toString();
         }
+
+		@Override
+		public FetchRequest build(short version) {
+			return build();
+		}
 	}
 	
 	private final String topic;
 	private final long pollTimeoutMs;
 	private FetchRequest(String topic, long pollTimeoutMs) {
+		super(ApiKeys.FETCH, (short)1);
 		this.topic = topic;
 		this.pollTimeoutMs = pollTimeoutMs;
 	}
@@ -72,5 +80,17 @@ public class FetchRequest extends AbstractRequest {
 	
 	public long pollTimeout() {
 		return this.pollTimeoutMs;
+	}
+
+	@Override
+	public ApiMessage data() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public AbstractResponse getErrorResponse(int throttleTimeMs, Throwable e) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }
