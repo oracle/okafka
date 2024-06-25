@@ -50,6 +50,8 @@ public class TxEventQSourceTask extends SourceTask {
 
     private int batchSize;
 
+    private int tasksMax;
+
     // Used to indicate when a batch has completed.
     private CountDownLatch batchCompleteIndicator = null;
 
@@ -87,8 +89,10 @@ public class TxEventQSourceTask extends SourceTask {
         this.connectorName = this.config.name();
 
         this.batchSize = this.config.getInt(TxEventQConnectorConfig.TASK_BATCH_SIZE_CONFIG);
-
         log.debug("The batch size is: {}", this.batchSize);
+
+        this.tasksMax = this.config.getInt(TxEventQConnectorConfig.TASK_MAX_CONFIG);
+        log.debug("The tasks.max is: {}", this.tasksMax);
 
         this.consumer.connect();
 
@@ -96,6 +100,7 @@ public class TxEventQSourceTask extends SourceTask {
                 this.config.getString(TxEventQConnectorConfig.KAFKA_TOPIC));
         int txEventQShardNum = this.consumer.getNumOfShardsForQueue(
                 this.config.getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME));
+
         if (kafkaPartitionNum < txEventQShardNum) {
             throw new ConnectException("The number of Kafka partitions " + kafkaPartitionNum
                     + " must be greater than or equal to " + txEventQShardNum);
