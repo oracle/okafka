@@ -1,4 +1,4 @@
-# Kafka Java Client for Oracle Transactional Event Queues (Preview v0.8)
+# Kafka Java Client for Oracle Transactional Event Queues
 
 ## Building the Kafka Java Client for Oracle TxEventQ distribution
 
