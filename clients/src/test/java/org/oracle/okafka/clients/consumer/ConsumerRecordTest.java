@@ -29,8 +29,9 @@
 
 package org.oracle.okafka.clients.consumer;
 
-import org.oracle.okafka.common.header.internals.RecordHeaders;
-import org.oracle.okafka.common.record.TimestampType;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.header.internals.RecordHeaders;
+import org.apache.kafka.common.record.TimestampType;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

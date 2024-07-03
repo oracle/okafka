@@ -30,6 +30,7 @@
 package org.oracle.okafka.clients.consumer;
 
 import org.oracle.okafka.common.utils.Serializer;
+import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.junit.Test;
 
 import java.io.IOException;

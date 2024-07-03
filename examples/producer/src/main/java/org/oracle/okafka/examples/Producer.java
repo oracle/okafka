@@ -15,7 +15,7 @@ import java.security.Security;
 import java.util.Properties;
 
 import org.oracle.okafka.clients.producer.KafkaProducer;
-import org.oracle.okafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.ProducerRecord;
 
 
 public class Producer {

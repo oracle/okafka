@@ -29,16 +29,16 @@
 
 package org.oracle.okafka.clients;
 
-import org.oracle.okafka.clients.producer.internals.ProduceResponse;
-import org.oracle.okafka.clients.producer.internals.ProduceRequest;
-import org.oracle.okafka.common.Cluster;
+//import org.apache.kafka.clients.producer.internals.ProduceResponse;
+//import org.apache.kafka.clients.producer.internals.ProduceRequest;
+import org.apache.kafka.common.Cluster;
 import org.oracle.okafka.common.Node;
-import org.oracle.okafka.common.errors.AuthenticationException;
-import org.oracle.okafka.common.errors.InvalidTopicException;
+import org.apache.kafka.common.errors.AuthenticationException;
+import org.apache.kafka.common.errors.InvalidTopicException;
 import org.oracle.okafka.common.protocol.ApiKeys;
 import org.oracle.okafka.common.requests.AbstractRequest;
 import org.oracle.okafka.common.requests.AbstractResponse;
-import org.oracle.okafka.common.utils.Time;
+import org.apache.kafka.common.utils.Time;
 import org.oracle.okafka.test.TestCondition;
 import org.oracle.okafka.test.TestUtils;
 

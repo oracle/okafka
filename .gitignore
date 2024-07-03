@@ -18,3 +18,19 @@ bin/
 
 doc/
 /.metadata/
+
+.classpath
+.project
+.settings/
+clients/.classpath
+clients/.project
+clients/.settings/
+examples/.project
+examples/.settings/
+examples/consumer/.classpath
+examples/consumer/.project
+examples/consumer/.settings/
+examples/producer/.classpath
+examples/producer/.project
+examples/producer/.settings/
+okafka-github/

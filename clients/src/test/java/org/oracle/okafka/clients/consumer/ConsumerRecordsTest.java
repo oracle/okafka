@@ -37,8 +37,11 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.oracle.okafka.common.TopicPartition;
-import org.oracle.okafka.common.record.TimestampType;
+
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.record.TimestampType;
 import org.junit.Test;
 
 public class ConsumerRecordsTest {

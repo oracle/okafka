@@ -29,9 +29,9 @@
 
 package org.oracle.okafka.clients.consumer;
 
-import org.oracle.okafka.common.serialization.ByteArrayDeserializer;
-import org.oracle.okafka.common.serialization.Deserializer;
-import org.oracle.okafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.ByteArrayDeserializer;
+import org.apache.kafka.common.serialization.Deserializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.Test;
 
 import java.util.HashMap;
