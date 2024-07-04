@@ -1,3 +1,10 @@
+/*
+** OKafka Java Client version 23.4.
+**
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
+** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
+*/
+
 package org.oracle.okafka.clients.consumer.internals;
 
 import java.util.Arrays;
