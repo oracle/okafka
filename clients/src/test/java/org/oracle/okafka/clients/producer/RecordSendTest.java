@@ -1,7 +1,7 @@
 /*
 ** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -44,9 +44,10 @@ import java.util.concurrent.TimeoutException;
 
 import org.oracle.okafka.clients.producer.internals.FutureRecordMetadata;
 import org.oracle.okafka.clients.producer.internals.ProduceRequestResult;
-import org.oracle.okafka.common.TopicPartition;
-import org.oracle.okafka.common.errors.CorruptRecordException;
-import org.oracle.okafka.common.record.RecordBatch;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.CorruptRecordException;
+import org.apache.kafka.common.record.RecordBatch;
+import org.apache.kafka.common.utils.Time;
 import org.junit.Test;
 
 public class RecordSendTest {
@@ -64,7 +65,7 @@ public class RecordSendTest {
     public void testTimeout() throws Exception {
         ProduceRequestResult request = new ProduceRequestResult(topicPartition);
         FutureRecordMetadata future = new FutureRecordMetadata(request, relOffset,
-                RecordBatch.NO_TIMESTAMP, 0L, 0, 0);
+                RecordBatch.NO_TIMESTAMP, 0L, 0, 0,Time.SYSTEM);
         assertFalse("Request is not completed", future.isDone());
         try {
             future.get(5, TimeUnit.MILLISECONDS);
@@ -85,7 +86,7 @@ public class RecordSendTest {
     @Test(expected = ExecutionException.class)
     public void testError() throws Exception {
         FutureRecordMetadata future = new FutureRecordMetadata(asyncRequest(msgIds, new CorruptRecordException(), 50L),
-                relOffset, RecordBatch.NO_TIMESTAMP, 0L, 0, 0);
+                relOffset, RecordBatch.NO_TIMESTAMP, 0L, 0, 0,Time.SYSTEM);
         future.get();
     }
 
@@ -95,7 +96,7 @@ public class RecordSendTest {
     @Test
     public void testBlocking() throws Exception {
         FutureRecordMetadata future = new FutureRecordMetadata(asyncRequest(msgIds, null, 50L),
-                relOffset, RecordBatch.NO_TIMESTAMP, 0L, 0, 0);
+                relOffset, RecordBatch.NO_TIMESTAMP, 0L, 0, 0,Time.SYSTEM);
         assertEquals((baseOffset << 16) + relOffset, future.get().offset());
     }
 

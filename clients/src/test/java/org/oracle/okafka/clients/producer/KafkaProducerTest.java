@@ -1,7 +1,7 @@
 /*
 ** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -30,9 +30,13 @@
 package org.oracle.okafka.clients.producer;
 
 import org.oracle.okafka.clients.CommonClientConfigs;
+import org.oracle.okafka.clients.KafkaClient;
 import org.oracle.okafka.clients.Metadata;
+import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerRecord;
 //import org.oracle.okafka.clients.MockClient;
 import org.apache.kafka.clients.producer.internals.ProducerInterceptors;
+import org.apache.kafka.clients.producer.internals.ProducerMetadata;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaException;
 import org.oracle.okafka.common.Node;
@@ -46,9 +50,12 @@ import org.apache.kafka.common.internals.ClusterResourceListeners;
 import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
 import org.apache.kafka.common.serialization.ExtendedSerializer;
+import org.apache.kafka.common.serialization.Serializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.oracle.okafka.common.utils.MockTime;
+import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.Time;
+import org.apache.kafka.common.utils.Utils;
 import org.oracle.okafka.test.MockMetricsReporter;
 import org.oracle.okafka.test.MockPartitioner;
 import org.oracle.okafka.test.MockProducerInterceptor;
@@ -85,6 +92,24 @@ import static org.junit.Assert.fail;
 @RunWith(PowerMockRunner.class)
 @PowerMockIgnore("javax.management.*")
 public class KafkaProducerTest {
+	
+	private static final int DEFAULT_METADATA_IDLE_MS = 5 * 60 * 1000;
+	
+	private static <K, V> KafkaProducer<K, V> kafkaProducer(Map<String, Object> configs,
+            Serializer<K> keySerializer,
+            Serializer<V> valueSerializer,
+            ProducerMetadata metadata,
+            KafkaClient kafkaClient,
+            ProducerInterceptors<K, V> interceptors,
+            Time time) {
+  return new KafkaProducer<>(new ProducerConfig(ProducerConfig.appendSerializerToConfig(configs, keySerializer, valueSerializer)),
+          keySerializer, valueSerializer, metadata, kafkaClient, interceptors, time);
+}
+	
+	private static ProducerMetadata newMetadata(long refreshBackoffMs, long expirationMs) {
+        return new ProducerMetadata(refreshBackoffMs, expirationMs, DEFAULT_METADATA_IDLE_MS,
+                new LogContext(), new ClusterResourceListeners(), Time.SYSTEM);
+    }
 
     @Test
     public void testConstructorWithSerializers() {
@@ -206,27 +231,27 @@ public class KafkaProducerTest {
 
     @Test
     public void shouldCloseProperlyAndThrowIfInterrupted() throws Exception {
-        Properties props = new Properties();
-        props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9999");
-        props.put(ProducerConfig.ORACLE_INSTANCE_NAME, "instancename");
-        props.put(ProducerConfig.ORACLE_SERVICE_NAME, "servicename");
-            props.put(ProducerConfig.ORACLE_NET_TNS_ADMIN, "/temp");
-        props.setProperty(ProducerConfig.PARTITIONER_CLASS_CONFIG, MockPartitioner.class.getName());
-        props.setProperty(ProducerConfig.BATCH_SIZE_CONFIG, "1");
+    	Map<String, Object> configs = new HashMap<>();
+    	configs.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9999");
+    	configs.put(ProducerConfig.ORACLE_INSTANCE_NAME, "instancename");
+    	configs.put(ProducerConfig.ORACLE_SERVICE_NAME, "servicename");
+    	configs.put(ProducerConfig.ORACLE_NET_TNS_ADMIN, "/temp");
+    	configs.put(ProducerConfig.PARTITIONER_CLASS_CONFIG, MockPartitioner.class.getName());
+    	configs.put(ProducerConfig.BATCH_SIZE_CONFIG, "1");
 
         Time time = new MockTime();
         Cluster cluster = TestUtils.singletonCluster("topic", 1);
-        Node node = cluster.nodes().get(0);
+        
+        Node node = (Node) cluster.nodes().get(0);
 
-        Metadata metadata = new Metadata(0, Long.MAX_VALUE, true, null);
+        ProducerMetadata metadata = newMetadata(0, Long.MAX_VALUE);
         metadata.update(cluster, Collections.<String>emptySet(), time.milliseconds());
         
-        MockClient client = new MockClient(time, metadata);
+        MockClient client = new MockClient(time,metadata);
         client.setNode(node);
 
-        final Producer<String, String> producer = new KafkaProducer<>(
-            new ProducerConfig(ProducerConfig.addSerializerToConfig(props, new StringSerializer(), new StringSerializer())),
-            new StringSerializer(), new StringSerializer(), metadata, client);
+        final Producer<String, String> producer = kafkaProducer(
+            configs,new StringSerializer(), new StringSerializer(), metadata, client,null,time);
 
         ExecutorService executor = Executors.newSingleThreadExecutor();
         final AtomicReference<Exception> closeException = new AtomicReference<>();

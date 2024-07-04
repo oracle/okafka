@@ -1,7 +1,7 @@
 /*
 ** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -29,27 +29,27 @@
 
 package org.oracle.okafka.clients.producer.internals;
 
-import org.oracle.okafka.clients.producer.Callback;
-import org.oracle.okafka.clients.producer.RecordMetadata;
-import org.oracle.okafka.common.Cluster;
-import org.oracle.okafka.common.KafkaException;
+import org.apache.kafka.clients.producer.Callback;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.Cluster;
+import org.apache.kafka.common.KafkaException;
 import org.oracle.okafka.common.Node;
-import org.oracle.okafka.common.PartitionInfo;
-import org.oracle.okafka.common.TopicPartition;
-import org.oracle.okafka.common.metrics.Metrics;
+import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.metrics.Metrics;
 import org.oracle.okafka.common.protocol.ApiKeys;
-import org.oracle.okafka.common.record.CompressionRatioEstimator;
-import org.oracle.okafka.common.record.CompressionType;
-import org.oracle.okafka.common.record.DefaultRecord;
-import org.oracle.okafka.common.record.DefaultRecordBatch;
-import org.oracle.okafka.common.record.MemoryRecords;
-import org.oracle.okafka.common.record.MemoryRecordsBuilder;
-import org.oracle.okafka.common.record.MutableRecordBatch;
-import org.oracle.okafka.common.record.Record;
-import org.oracle.okafka.common.record.TimestampType;
-import org.oracle.okafka.common.utils.LogContext;
+import org.apache.kafka.common.record.CompressionRatioEstimator;
+import org.apache.kafka.common.record.CompressionType;
+import org.apache.kafka.common.record.DefaultRecord;
+import org.apache.kafka.common.record.DefaultRecordBatch;
+import org.apache.kafka.common.record.MemoryRecords;
+import org.apache.kafka.common.record.MemoryRecordsBuilder;
+import org.apache.kafka.common.record.MutableRecordBatch;
+import org.apache.kafka.common.record.Record;
+import org.apache.kafka.common.record.TimestampType;
+import org.apache.kafka.common.utils.LogContext;
 import org.oracle.okafka.common.utils.MockTime;
-import org.oracle.okafka.common.utils.Time;
+import org.apache.kafka.common.utils.Time;
 import org.oracle.okafka.test.TestUtils;
 import org.junit.After;
 import org.junit.Test;
@@ -117,7 +117,7 @@ public class RecordAccumulatorTest {
         int appends = expectedNumAppends(batchSize);
         for (int i = 0; i < appends; i++) {
             // append to the first batch
-            accum.append(tp1, 0L, key, value, Record.EMPTY_HEADERS, null, maxBlockTimeMs);
+            accum.append(tp1, 0L, key, value, Record.EMPTY_HEADERS, null, maxBlockTimeMs,true,time.milliseconds());
             Deque<ProducerBatch> partitionBatches = accum.batches().get(tp1);
             assertEquals(1, partitionBatches.size());
 

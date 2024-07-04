@@ -1,7 +1,7 @@
 /*
 ** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -29,8 +29,10 @@
 
 package org.oracle.okafka.clients;
 
-//import org.apache.kafka.clients.producer.internals.ProduceResponse;
-//import org.apache.kafka.clients.producer.internals.ProduceRequest;
+import org.apache.kafka.clients.ClientRequest;
+import org.apache.kafka.clients.ClientResponse;
+import org.apache.kafka.clients.RequestCompletionHandler;
+import org.apache.kafka.clients.producer.internals.ProducerMetadata;
 import org.apache.kafka.common.Cluster;
 import org.oracle.okafka.common.Node;
 import org.apache.kafka.common.errors.AuthenticationException;
@@ -38,6 +40,8 @@ import org.apache.kafka.common.errors.InvalidTopicException;
 import org.oracle.okafka.common.protocol.ApiKeys;
 import org.oracle.okafka.common.requests.AbstractRequest;
 import org.oracle.okafka.common.requests.AbstractResponse;
+import org.oracle.okafka.common.requests.ProduceRequest;
+import org.oracle.okafka.common.requests.ProduceResponse;
 import org.apache.kafka.common.utils.Time;
 import org.oracle.okafka.test.TestCondition;
 import org.oracle.okafka.test.TestUtils;
@@ -57,7 +61,7 @@ public class MockClient implements KafkaClient {
 
     private int correlation;
     private final Time time;
-    private final Metadata metadata;
+    private final ProducerMetadata metadata;
     private Set<String> unavailableTopics;
     private Cluster cluster;
     private Node node = null;
@@ -80,7 +84,7 @@ public class MockClient implements KafkaClient {
         this(time, null);
     }
 
-    public MockClient(Time time, Metadata metadata) {
+    public MockClient(Time time, ProducerMetadata metadata) {
         this.time = time;
         this.metadata = metadata;
         this.unavailableTopics = Collections.emptySet();
@@ -181,7 +185,7 @@ public class MockClient implements KafkaClient {
     	if(request.apiKey() == ApiKeys.PRODUCE ) {
     		ProduceRequest.Builder builder = (ProduceRequest.Builder)request.requestBuilder();
     		ProduceRequest produceRequest = builder.build();
-    		return new ClientResponse(request.makeHeader(), request.callback(), request.destination(), 
+    		return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
 	                   request.createdTimeMs(), time.milliseconds(), true, 
 	                   new ProduceResponse(produceRequest.getTopicpartition(), new ProduceResponse.PartitionResponse(new InvalidTopicException("This exception can be retried"))));
     	}
@@ -269,7 +273,7 @@ public class MockClient implements KafkaClient {
                                           boolean expectResponse,
                                           int requestTimeoutMs,
                                           RequestCompletionHandler callback) {
-        return new ClientRequest(node, requestBuilder, correlation++, "mockClientId", createdTimeMs,
+        return new ClientRequest(""+node.id(), requestBuilder, correlation++, "mockClientId", createdTimeMs,
                 expectResponse, requestTimeoutMs, callback);
     }
 
