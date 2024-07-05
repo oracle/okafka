@@ -1,7 +1,7 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -29,10 +29,11 @@
 
 package org.oracle.okafka.clients.producer.internals;
 
-import org.oracle.okafka.clients.producer.Partitioner;
-import org.oracle.okafka.common.Cluster;
+import org.apache.kafka.clients.producer.Partitioner;
+import org.apache.kafka.clients.producer.internals.DefaultPartitioner;
+import org.apache.kafka.common.Cluster;
 import org.oracle.okafka.common.Node;
-import org.oracle.okafka.common.PartitionInfo;
+import org.apache.kafka.common.PartitionInfo;
 import org.junit.Test;
 
 import java.util.Collections;

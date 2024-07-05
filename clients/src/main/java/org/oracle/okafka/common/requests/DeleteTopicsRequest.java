@@ -1,7 +1,7 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -32,11 +32,12 @@ package org.oracle.okafka.common.requests;
 import java.util.Set;
 
 import org.oracle.okafka.common.protocol.ApiKeys;
-import org.oracle.okafka.common.utils.Utils;
+import org.apache.kafka.common.protocol.ApiMessage;
+import org.apache.kafka.common.requests.AbstractResponse;
+import org.apache.kafka.common.utils.Utils;
 
 public class DeleteTopicsRequest extends AbstractRequest {
    
-
     private final Set<String> topics;
     private final Integer timeout;
 
@@ -54,7 +55,12 @@ public class DeleteTopicsRequest extends AbstractRequest {
         public DeleteTopicsRequest build() {
             return new DeleteTopicsRequest(topics, timeout);
         }
-
+        
+    	@Override
+		public DeleteTopicsRequest build(short version) {
+			 return new DeleteTopicsRequest(topics, timeout);
+		}
+    	
         @Override
         public String toString() {
             StringBuilder bld = new StringBuilder();
@@ -64,9 +70,12 @@ public class DeleteTopicsRequest extends AbstractRequest {
                 append(")");
             return bld.toString();
         }
+
+	
     }
 
     private DeleteTopicsRequest(Set<String> topics, Integer timeout) {
+    	super(ApiKeys.DELETE_TOPICS, (short)1);
         this.topics = topics;
         this.timeout = timeout;
     }
@@ -78,5 +87,17 @@ public class DeleteTopicsRequest extends AbstractRequest {
     public Integer timeout() {
         return this.timeout;
     }
+
+	@Override
+	public ApiMessage data() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public AbstractResponse getErrorResponse(int throttleTimeMs, Throwable e) {
+		// TODO Auto-generated method stub
+		return null;
+	}
 
 }

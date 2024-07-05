@@ -1,7 +1,7 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -34,8 +34,10 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import org.oracle.okafka.clients.producer.RecordMetadata;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.utils.Time;
 import org.oracle.okafka.common.utils.MessageIdConverter;
+import org.oracle.okafka.common.utils.MessageIdConverter.OKafkaOffset;
 
 /**
  * The future result of a record send
@@ -43,21 +45,29 @@ import org.oracle.okafka.common.utils.MessageIdConverter;
 public final class FutureRecordMetadata implements Future<RecordMetadata> {
 
     private final ProduceRequestResult result;
-    private final int relativeOffset;
+    // Removed final here. relativeOffset will be decided after the publish only
+    private final long relativeOffset;
     private final long createTimestamp;
     private final Long checksum;
     private final int serializedKeySize;
     private final int serializedValueSize;
+    private final Time time;
     private volatile FutureRecordMetadata nextRecordMetadata = null;
 
-    public FutureRecordMetadata(ProduceRequestResult result, int relativeOffset, long createTimestamp,
-                                Long checksum, int serializedKeySize, int serializedValueSize) {
+    public FutureRecordMetadata(ProduceRequestResult result, long relativeOffset, long createTimestamp,
+                                Long checksum, int serializedKeySize, int serializedValueSize, Time _time) {
         this.result = result;
         this.relativeOffset = relativeOffset;
         this.createTimestamp = createTimestamp;
         this.checksum = checksum;
         this.serializedKeySize = serializedKeySize;
         this.serializedValueSize = serializedValueSize;
+        time = _time;
+    }
+    
+    public ProduceRequestResult requestResult()
+    {
+    	return this.result;
     }
 
     @Override
@@ -74,14 +84,16 @@ public final class FutureRecordMetadata implements Future<RecordMetadata> {
     public RecordMetadata get() throws InterruptedException, ExecutionException {
         this.result.await();
         if (nextRecordMetadata != null)
+        {
             return nextRecordMetadata.get();
+        }
         return valueOrError();
     }
 
     @Override
     public RecordMetadata get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
         // Handle overflow.
-        long now = System.currentTimeMillis();
+        long now = time.milliseconds();
         long deadline = Long.MAX_VALUE - timeout < now ? Long.MAX_VALUE : now + timeout;
         boolean occurred = this.result.await(timeout, unit);
         if (nextRecordMetadata != null)
@@ -107,7 +119,9 @@ public final class FutureRecordMetadata implements Future<RecordMetadata> {
         if (this.result.error() != null)
             throw new ExecutionException(this.result.error());
         else
+        {
             return value();
+        }
     }
 
     Long checksumOrNull() {
@@ -125,23 +139,33 @@ public final class FutureRecordMetadata implements Future<RecordMetadata> {
         long relOffset = -1;
         if(this.result.msgIds() != null) {
         	try {
-        		
-        		String msgId = this.result.msgIds().get(relativeOffset); 
-            	long offset = MessageIdConverter.getOffset(msgId);    
-            	
-            	baseOffset = offset >>> 16;
-            	relOffset = offset & 65535;
+        		// Changes for 2.8.1
+        		if (this.result.msgIds().size() > relativeOffset)
+        		{
+        			OKafkaOffset okOffset = this.result.msgIds().get((int)relativeOffset); 
+        			//OKafkaOffset okOffset =  MessageIdConverter.getOKafkaOffset(msgId, true, true);
+        			baseOffset = okOffset.subPartitionId();
+        			relOffset = okOffset.sequenceNo();
+        		}
         	} catch(RuntimeException exception) {
         		baseOffset = -1;
         		relOffset = -1;
         	} 
         } 
-        return new RecordMetadata(result.topicPartition(), baseOffset, relOffset,
+        
+        RecordMetadata rm =  new RecordMetadata(result.topicPartition(), baseOffset, relOffset,
                                   timestamp(), this.checksum, this.serializedKeySize, this.serializedValueSize);
+        return rm;
+    }
+    
+    RuntimeException error() 
+    {
+    	return result.error();
     }
 
     private long timestamp() {
-        return result.hasLogAppendTime() ? result.logAppendTime().get(relativeOffset) : createTimestamp;
+        //return result.hasLogAppendTime() ? result.logAppendTime().get((int)relativeOffset) : createTimestamp;
+    	return result.hasLogAppendTime() ? result.logAppendTime() : createTimestamp;
     }
 
     @Override

@@ -1,7 +1,7 @@
 /*
- ** OKafka Java Client version 0.8.
+ ** OKafka Java Client version 23.4.
  **
- ** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+ ** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
  ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
  */
 package org.oracle.okafka.examples;
@@ -15,8 +15,8 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Properties;
 
-import org.oracle.okafka.clients.consumer.ConsumerRecord;
-import org.oracle.okafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.oracle.okafka.clients.consumer.KafkaConsumer;
 
 public class Consumer {

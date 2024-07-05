@@ -1,7 +1,7 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -23,7 +23,7 @@
  */
 
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
 ** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
@@ -43,8 +43,11 @@ public enum ApiKeys {
 	FETCH(4, "Consume"),
 	COMMIT(5, "Commit"),
 	SUBSCRIBE(6, "Subscribe"),
-	OFFSETRESET(7, "offsetreset"),
-	UNSUBSCRIBE(8, "unsubscribe");
+	OFFSETRESET(7, "OffsetReset"),
+	UNSUBSCRIBE(8, "Unsubscribe"),
+	JOIN_GROUP(9, "JoinGroup"),
+	SYNC_GROUP(10, "SyncGroup"),
+	CONNECT_ME(11,"ConnectMe");
     private static final ApiKeys[] ID_TO_TYPE;
     private static final int MIN_API_KEY = 0;
     public static final int MAX_API_KEY;
@@ -107,5 +110,79 @@ public enum ApiKeys {
 
     public static void main(String[] args) {
         System.out.println(toHtml());
+    }
+    
+    public static org.apache.kafka.common.protocol.ApiKeys convertToApacheKafkaKey(ApiKeys apiKey)
+    {
+    	switch(apiKey)
+    	{
+    	case CREATE_TOPICS:
+    		return org.apache.kafka.common.protocol.ApiKeys.CREATE_TOPICS;
+    	case DELETE_TOPICS:
+    		return org.apache.kafka.common.protocol.ApiKeys.DELETE_TOPICS;
+    	case METADATA:
+    		return org.apache.kafka.common.protocol.ApiKeys.METADATA;
+    	case PRODUCE:
+    		return org.apache.kafka.common.protocol.ApiKeys.PRODUCE;
+    	case FETCH:
+    		return org.apache.kafka.common.protocol.ApiKeys.FETCH;
+    	case COMMIT:
+    		return org.apache.kafka.common.protocol.ApiKeys.OFFSET_COMMIT;
+    	case SUBSCRIBE:
+    		//Not present in Apache Kafka. Dummy set to DESCRIBE_GROUPS
+    		return org.apache.kafka.common.protocol.ApiKeys.DESCRIBE_GROUPS;
+    	case OFFSETRESET:
+    		//Seek operation. 
+    		return org.apache.kafka.common.protocol.ApiKeys.OFFSET_FETCH;
+    	case UNSUBSCRIBE:
+    		return org.apache.kafka.common.protocol.ApiKeys.DELETE_GROUPS;
+    	case JOIN_GROUP:
+    		return org.apache.kafka.common.protocol.ApiKeys.JOIN_GROUP;
+    	case SYNC_GROUP:
+    		return org.apache.kafka.common.protocol.ApiKeys.SYNC_GROUP;
+    	case CONNECT_ME:
+    		//Operation to find Oracle RAC Node to connect to. Not exactly a FIND_CORRDINATOR call.
+    		return org.apache.kafka.common.protocol.ApiKeys.FIND_COORDINATOR;
+    	default: 
+    		// Default to HEARTBEAT. No SUpport for HEARTBEAT for oKafka.
+    		return org.apache.kafka.common.protocol.ApiKeys.HEARTBEAT;
+    	}
+    }
+    
+    public static ApiKeys convertToOracleApiKey(org.apache.kafka.common.protocol.ApiKeys apiKey)
+    {
+    	switch(apiKey)
+    	{
+    	case CREATE_TOPICS:
+    		return ApiKeys.CREATE_TOPICS;
+    	case DELETE_TOPICS:
+    		return ApiKeys.DELETE_TOPICS;
+    	case METADATA:
+    		return ApiKeys.METADATA;
+    	case PRODUCE:
+    		return ApiKeys.PRODUCE;
+    	case FETCH:
+    		return ApiKeys.FETCH;
+    	case OFFSET_COMMIT:
+    		return COMMIT;
+    	case DESCRIBE_GROUPS:
+    		//Not present in Apache Kafka. Dummy set to DESCRIBE_GROUPS
+    		return SUBSCRIBE;
+    	case OFFSET_FETCH:
+    		//Seek operation. 
+    		return OFFSETRESET;
+    	case DELETE_GROUPS:
+    		return UNSUBSCRIBE;
+    	case JOIN_GROUP:
+    		return JOIN_GROUP;
+    	case SYNC_GROUP:
+    		return SYNC_GROUP;
+    	case FIND_COORDINATOR:
+    		//Operation to find Oracle RAC Node to connect to. Not exactly a FIND_CORRDINATOR call.
+    		return CONNECT_ME;
+    	default: 
+    		// Default to FETCH.
+    		return FETCH;
+    	}
     }
 }

@@ -1,14 +1,14 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
 package org.oracle.okafka.common.utils;
 
 import org.oracle.okafka.clients.CommonClientConfigs;
-import org.oracle.okafka.common.config.AbstractConfig;
+import org.apache.kafka.common.config.AbstractConfig;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -26,7 +26,7 @@ public class TNSParser {
 		this.configs = configs;
 	}
 
-	public String getProperty(String connStr, String property) {
+	public static String getProperty(String connStr, String property) {
 		int index = connStr.indexOf(property);
 		if(index == -1)
 			return null;

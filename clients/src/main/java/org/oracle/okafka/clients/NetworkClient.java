@@ -1,9 +1,9 @@
 /*
-** OKafka Java Client version 0.8.
-**
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
-** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
-*/
+ ** OKafka Java Client version 23.4.
+ **
+ ** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
+ ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
+ */
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -29,23 +29,31 @@
 
 package org.oracle.okafka.clients;
 
-import org.oracle.okafka.common.Cluster;
+//import org.apache.kafka.clients.unused.ClusterConnectionStates;
+import org.apache.kafka.clients.admin.internals.AdminMetadataManager;
 import org.oracle.okafka.common.Node;
-import org.oracle.okafka.common.errors.AuthenticationException;
+import org.apache.kafka.clients.ClientRequest;
+import org.apache.kafka.clients.ClientResponse;
+import org.apache.kafka.clients.MetadataUpdater;
+import org.apache.kafka.clients.RequestCompletionHandler;
+import org.apache.kafka.common.Cluster;
+import org.apache.kafka.common.KafkaException;
+import org.apache.kafka.common.errors.AuthenticationException;
 import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
-import org.oracle.okafka.common.metrics.Sensor;
+import org.apache.kafka.common.metrics.Sensor;
 import org.oracle.okafka.common.network.AQClient;
 import org.oracle.okafka.common.requests.AbstractRequest;
 import org.oracle.okafka.common.requests.MetadataRequest;
 import org.oracle.okafka.common.requests.MetadataResponse;
-import org.oracle.okafka.common.requests.RequestHeader;
-import org.oracle.okafka.common.utils.LogContext;
-import org.oracle.okafka.common.utils.Time;
+import org.apache.kafka.common.utils.LogContext;
+import org.apache.kafka.common.utils.Time;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 
 import javax.jms.JMSException;
@@ -59,549 +67,721 @@ import javax.jms.JMSSecurityException;
  */
 public class NetworkClient implements KafkaClient {
 
-    private final Logger log;
+	private final Logger log;
 
-    /* the selector used to perform network i/o */
-    private final AQClient aqClient;
+	/* the selector used to perform network i/o */
+	private final AQClient aqClient;
 
-    private final MetadataUpdater metadataUpdater;
+	private Metadata metadata;
+	private AdminMetadataManager metadataManager;
+	private MetadataUpdater metadataUpdater;
 
-    private final Random randOffset;
+	private final Random randOffset;
 
-    /* the state of each node's connection */
-    private final ClusterConnectionStates connectionStates;
+	/* the state of each node's connection */
+	private final ClusterConnectionStates connectionStates;
 
-    /* the socket send buffer size in bytes */
-    private final int socketSendBuffer;
+	/* the socket send buffer size in bytes */
+	private final int socketSendBuffer;
 
-    /* the socket receive size buffer in bytes */
-    private final int socketReceiveBuffer;
+	/* the socket receive size buffer in bytes */
+	private final int socketReceiveBuffer;
 
-    /* the client id used to identify this client in requests to the server */
-    private final String clientId;
+	/* the client id used to identify this client in requests to the server */
+	private final String clientId;
 
-    /* the current correlation id to use when sending requests to servers */
-    private int correlation;
+	/* the current correlation id to use when sending requests to servers */
+	private int correlation;
 
-    /* default timeout for individual requests to await acknowledgement from servers */
-    private final int defaultRequestTimeoutMs;
+	/* default timeout for individual requests to await acknowledgement from servers */
+	private final int defaultRequestTimeoutMs;
 
-    /* time in ms to wait before retrying to create connection to a server */
-    private final long reconnectBackoffMs;
+	/* time in ms to wait before retrying to create connection to a server */
+	private final long reconnectBackoffMs;
 
-    private final Time time;
+	private final Time time;
 
-    private final Sensor throttleTimeSensor;
+	private final Sensor throttleTimeSensor;
 
-    public NetworkClient(AQClient aqClient,
-                         Metadata metadata,
-                         String clientId,
-                         long reconnectBackoffMs,
-                         long reconnectBackoffMax,
-                         int socketSendBuffer,
-                         int socketReceiveBuffer,
-                         int defaultRequestTimeoutMs,
-                         Time time,
-                         LogContext logContext) {
-        this(null,
-             metadata,
-             aqClient,
-             clientId,
-             reconnectBackoffMs,
-             reconnectBackoffMax,
-             socketSendBuffer,
-             socketReceiveBuffer,
-             defaultRequestTimeoutMs,
-             time,
-             null,
-             logContext);
-    }
+	// Invoked from KafkaProducer and KafkaConsumer
+	public NetworkClient(AQClient aqClient,
+			Metadata metadata,
+			String clientId,
+			long reconnectBackoffMs,
+			long reconnectBackoffMax,
+			int socketSendBuffer,
+			int socketReceiveBuffer,
+			int defaultRequestTimeoutMs,
+			Time time,
+			LogContext logContext) {
+		this(null,
+				metadata,
+				aqClient,
+				clientId,
+				reconnectBackoffMs,
+				reconnectBackoffMax,
+				socketSendBuffer,
+				socketReceiveBuffer,
+				defaultRequestTimeoutMs,
+				time,
+				null,
+				logContext);
+	}
 
-    public NetworkClient(AQClient aqClient,
-            Metadata metadata,
-            String clientId,
-            long reconnectBackoffMs,
-            long reconnectBackoffMax,
-            int socketSendBuffer,
-            int socketReceiveBuffer,
-            int defaultRequestTimeoutMs,
-            Time time,
-            Sensor throttleTimeSensor,
-            LogContext logContext) {
-        this(null,
-             metadata,
-             aqClient,
-             clientId,
-             reconnectBackoffMs,
-             reconnectBackoffMax,
-             socketSendBuffer,
-             socketReceiveBuffer,
-             defaultRequestTimeoutMs,
-             time,
-             throttleTimeSensor,
-             logContext);
-    }
+/*	public NetworkClient(AQClient aqClient,
+			Metadata metadata,
+			String clientId,
+			long reconnectBackoffMs,
+			long reconnectBackoffMax,
+			int socketSendBuffer,
+			int socketReceiveBuffer,
+			int defaultRequestTimeoutMs,
+			Time time,
+			Sensor throttleTimeSensor,
+			LogContext logContext) {
+		this(null,
+				metadata,
+				aqClient,
+				clientId,
+				reconnectBackoffMs,
+				reconnectBackoffMax,
+				socketSendBuffer,
+				socketReceiveBuffer,
+				defaultRequestTimeoutMs,
+				time,
+				throttleTimeSensor,
+				logContext);
+	}*/
 
-    public NetworkClient(AQClient aqClient,
-                         MetadataUpdater metadataUpdater,
-                         String clientId,
-                         long reconnectBackoffMs,
-                         long reconnectBackoffMax,
-                         int socketSendBuffer,
-                         int socketReceiveBuffer,
-                         int defaultRequestTimeoutMs,
-                         Time time,
-                         LogContext logContext) {
-        this(metadataUpdater,
-             null,
-             aqClient,
-             clientId,
-             reconnectBackoffMs,
-             reconnectBackoffMax,
-             socketSendBuffer,
-             socketReceiveBuffer,
-             defaultRequestTimeoutMs,
-             time,
-             null,
-             logContext);
-    }
+	//Invoked from KafkaAdmin. Passing metadataManger instead of metadata
+	//ToDo: Check if this is needed or not.
+	
+	public NetworkClient(AQClient aqClient,
+			AdminMetadataManager metadataManger,
+			String clientId,
+			long reconnectBackoffMs,
+			long reconnectBackoffMax,
+			int socketSendBuffer,
+			int socketReceiveBuffer,
+			int defaultRequestTimeoutMs,
+			Time time,
+			LogContext logContext) {
+		this(metadataManger,
+				null,
+				aqClient,
+				clientId,
+				reconnectBackoffMs,
+				reconnectBackoffMax,
+				socketSendBuffer,
+				socketReceiveBuffer,
+				defaultRequestTimeoutMs,
+				time,
+				null,
+				logContext);
+	}
 
-    private NetworkClient(MetadataUpdater metadataUpdater,
-                          Metadata metadata,
-                          AQClient aqClient,
-                          String clientId,
-                          long reconnectBackoffMs,
-                          long reconnectBackoffMax,
-                          int socketSendBuffer,
-                          int socketReceiveBuffer,
-                          int defaultRequestTimeoutMs,
-                          Time time,
-                          Sensor throttleTimeSensor,
-                          LogContext logContext) {
-        /* It would be better if we could pass `DefaultMetadataUpdater` from the public constructor, but it's not
-         * possible because `DefaultMetadataUpdater` is an inner class and it can only be instantiated after the
-         * super constructor is invoked.
-         */
-        if (metadataUpdater == null) {
-            if (metadata == null)
-                throw new IllegalArgumentException("`metadata` must not be null");
-            this.metadataUpdater = new DefaultMetadataUpdater(metadata);
-        } else {
-            this.metadataUpdater = metadataUpdater;
-        }
-        this.aqClient = aqClient;
-        this.clientId = clientId;
-        this.connectionStates = new ClusterConnectionStates(reconnectBackoffMs, reconnectBackoffMax);
-        this.socketSendBuffer = socketSendBuffer;
-        this.socketReceiveBuffer = socketReceiveBuffer;
-        this.correlation = 0;
-        this.randOffset = new Random();
-        this.defaultRequestTimeoutMs = defaultRequestTimeoutMs;
-        this.reconnectBackoffMs = reconnectBackoffMs;
-        this.time = time;
-        this.throttleTimeSensor = throttleTimeSensor;
-        this.log = logContext.logger(NetworkClient.class);
-    }
+	private NetworkClient(AdminMetadataManager metadataManager,
+			Metadata metadata,
+			AQClient aqClient,
+			String clientId,
+			long reconnectBackoffMs,
+			long reconnectBackoffMax,
+			int socketSendBuffer,
+			int socketReceiveBuffer,
+			int defaultRequestTimeoutMs,
+			Time time,
+			Sensor throttleTimeSensor,
+			LogContext logContext) {
+		/* It would be better if we could pass `DefaultMetadataUpdater` from the public constructor, but it's not
+		 * possible because `DefaultMetadataUpdater` is an inner class and it can only be instantiated after the
+		 * super constructor is invoked.
+		 */
+		this.metadata = metadata;
+		this.metadataManager = metadataManager;
 
-    /**
-     * Begin connecting to the given node, return true if we are already connected and ready to send to that node.
-     *
-     * @param node The node to check
-     * @param now The current timestamp
-     * @return True if we are ready to send to the given node
-     */
-    @Override
-    public boolean ready(Node node, long now) {
-        if (node.isEmpty())
-            throw new IllegalArgumentException("Cannot connect to empty node " + node);
+		if(metadataManager != null)
+		{
+			this.metadataUpdater = metadataManager.updater();
+		}else 
+		{
+			this.metadataManager = null;
+			this.metadataUpdater = null;
+		}
+		if (metadataUpdater == null) {
+			if (this.metadata == null)
+				throw new IllegalArgumentException("`metadata` must not be null");
 
-        if (isReady(node, now))
-            return true;
-        if (connectionStates.canConnect(node, now)) {
-            // if we are interested in sending to a node and we don't have a connection to it, initiate one
-            return initiateConnect(node, now);
-        }
+			this.metadataUpdater = new DefaultMetadataUpdater(metadata);
+		} 
+		/*else {
+			this.metadataUpdater = metadataUpdater;
+		}*/
+		this.aqClient = aqClient;
+		this.clientId = clientId;
+		this.connectionStates = new ClusterConnectionStates(reconnectBackoffMs, reconnectBackoffMax);
+		this.socketSendBuffer = socketSendBuffer;
+		this.socketReceiveBuffer = socketReceiveBuffer;
+		this.correlation = 0;
+		this.randOffset = new Random();
+		this.defaultRequestTimeoutMs = defaultRequestTimeoutMs;
+		this.reconnectBackoffMs = reconnectBackoffMs;
+		this.time = time;
+		this.throttleTimeSensor = throttleTimeSensor;
+		this.log = logContext.logger(NetworkClient.class);
+	}
 
-        return false;
-    }
+	/**
+	 * Begin connecting to the given node, return true if we are already connected and ready to send to that node.
+	 *
+	 * @param node The node to check
+	 * @param now The current timestamp
+	 * @return True if we are ready to send to the given node
+	 */
+	// @Override
+	public boolean ready(Node node, long now) {
+		if (node.isEmpty())
+			throw new IllegalArgumentException("Cannot connect to empty node " + node);
+		if (isReady(node, now))
+			return true;
+		if (connectionStates.canConnect(node, now)) {
+			// if we are interested in sending to a node and we don't have a connection to it, initiate one
+			return initiateConnect(node, now);
+		}
 
-    // Visible for testing
-    boolean canConnect(Node node, long now) {
-        return connectionStates.canConnect(node, now);
-    }
+		return false;
+	}
 
-    /**
-     * Disconnects the connection to a particular node, if there is one.
-     * Any pending ClientRequests for this connection will receive disconnections.
-     *
-     * @param nodeId The id of the node
-     */
-    @Override
-    public void disconnect(Node node) {
-       
-    }
-    
-    public ClusterConnectionStates getConnectionStates() {
-    	return this.connectionStates;
-    }
+	// Visible for testing
+	boolean canConnect(Node node, long now) {
+		return connectionStates.canConnect(node, now);
+	}
 
-    /**
-     * Closes the connection to a particular node (if there is one).
-     *
-     * @param node the node
-     */
-    @Override
-    public void close(Node node) {
-    	aqClient.close(node);
-        connectionStates.remove(node);
-    }
+	/**
+	 * Disconnects the connection to a particular node, if there is one.
+	 * Any pending ClientRequests for this connection will receive disconnections.
+	 *
+	 * @param nodeId The id of the node
+	 */
+	// @Override
+	public void disconnect(Node node) {
 
-    /**
-     * Returns the number of milliseconds to wait, based on the connection state, before attempting to send data. When
-     * disconnected, this respects the reconnect backoff time. When connecting or connected, this handles slow/stalled
-     * connections.
-     *
-     * @param node The node to check
-     * @param now The current timestamp
-     * @return The number of milliseconds to wait.
-     */
-    @Override
-    public long connectionDelay(Node node, long now) {
-        return connectionStates.connectionDelay(node, now);
-    }
+	}
 
-    /**
-     * Return the poll delay in milliseconds based on both connection and throttle delay.
-     * @param node the connection to check
-     * @param now the current time in ms
-     */
-    @Override
-    public long pollDelayMs(Node node, long now) {
-        return connectionStates.pollDelayMs(node, now);
-    }
+	public ClusterConnectionStates getConnectionStates() {
+		return this.connectionStates;
+	}
 
-    /**
-     * Check if the connection of the node has failed, based on the connection state. Such connection failure are
-     * usually transient and can be resumed in the next {@link #ready(org.oracle.okafka.common.Node, long)} }
-     * call, but there are cases where transient failures needs to be caught and re-acted upon.
-     *
-     * @param node the node to check
-     * @return true iff the connection has failed and the node is disconnected
-     */
-    @Override
-    public boolean connectionFailed(Node node) {
-        return connectionStates.isDisconnected(node);
-    }
+	/**
+	 * Closes the connection to a particular node (if there is one).
+	 *
+	 * @param node the node
+	 */
+	//@Override
+	public void close(Node node) {
+		aqClient.close(node);
+		connectionStates.remove(node);
+	}
 
-    /**
-     * Check if authentication to this node has failed, based on the connection state. Authentication failures are
-     * propagated without any retries.
-     *
-     * @param node the node to check
-     * @return an AuthenticationException iff authentication has failed, null otherwise
-     */
-    @Override
-    public AuthenticationException authenticationException(Node node) {
-        return connectionStates.authenticationException(node);
-    }
+	/**
+	 * Returns the number of milliseconds to wait, based on the connection state, before attempting to send data. When
+	 * disconnected, this respects the reconnect backoff time. When connecting or connected, this handles slow/stalled
+	 * connections.
+	 *
+	 * @param node The node to check
+	 * @param now The current timestamp
+	 * @return The number of milliseconds to wait.
+	 */
+	// @Override
+	public long connectionDelay(Node node, long now) {
+		return connectionStates.connectionDelay(node, now);
+	}
 
-    /**
-     * Check if the node  is ready to send more requests.
-     *
-     * @param node The node
-     * @param now The current time in ms
-     * @return true if the node is ready
-     */
-    @Override
-    public boolean isReady(Node node, long now) {
-        // if we need to update our metadata now declare all requests unready to make metadata requests first
-        // priority
-        return !metadataUpdater.isUpdateDue(now) && canSendRequest(node, now);
-    }
+	/**
+	 * Return the poll delay in milliseconds based on both connection and throttle delay.
+	 * @param node the connection to check
+	 * @param now the current time in ms
+	 */
+	// @Override
+	public long pollDelayMs(Node node, long now) {
+		return connectionStates.pollDelayMs(node, now);
+	}
 
-    /**
-     * Are we connected and ready and able to send more requests to the given connection?
-     *
-     * @param node The node
-     * @param now the current timestamp
-     */
-    private boolean canSendRequest(Node node, long now) {
-        return this.connectionStates.isReady(node, now);
-    
-    }
+	/**
+	 * Check if the connection of the node has failed, based on the connection state. Such connection failure are
+	 * usually transient and can be resumed in the next {@link #ready(org.oracle.okafka.common.Node, long)} }
+	 * call, but there are cases where transient failures needs to be caught and re-acted upon.
+	 *
+	 * @param node the node to check
+	 * @return true iff the connection has failed and the node is disconnected
+	 */
+	// @Override
+	public boolean connectionFailed(Node node) {
+		return connectionStates.isDisconnected(node);
+	}
 
-    /**
-     * Send the given request. Requests can only be sent out to ready nodes.
-     * @param request The request
-     * @param now The current timestamp
-     */
-    @Override
-    public ClientResponse send(ClientRequest request, long now) {
-        return doSend(request, false, now);
-    }
-    
-    private void sendInternalMetadataRequest(MetadataRequest.Builder builder, Node node, long now) {
-    	ClientRequest clientRequest = newClientRequest(node, builder, now, true);
-    	ClientResponse response = doSend(clientRequest, true, now);
-    	log.debug("Got response for metadata request {} from node {}", builder, node);
-    	metadataUpdater.handleCompletedMetadataResponse(response.requestHeader(), time.milliseconds(), (MetadataResponse)response.responseBody());
-    }
+	/**
+	 * Check if authentication to this node has failed, based on the connection state. Authentication failures are
+	 * propagated without any retries.
+	 *
+	 * @param node the node to check
+	 * @return an AuthenticationException iff authentication has failed, null otherwise
+	 */
+	//@Override
+	public AuthenticationException authenticationException(Node node) {
+		return connectionStates.authenticationException(node);
+	}
 
-    private ClientResponse doSend(ClientRequest clientRequest, boolean isInternalRequest, long now) {
-        Node node = clientRequest.destination();
+	/**
+	 * Check if the node  is ready to send more requests.
+	 *
+	 * @param node The node
+	 * @param now The current time in ms
+	 * @return true if the node is ready
+	 */
+	// @Override
+	public boolean isReady(Node node, long now) {
+		// if we need to update our metadata now declare all requests unready to make metadata requests first
+		// priority
+		// isReady will return false if metadata is due for update.  Alternative is to not check for this and handle on the caller partreturn canSendRequest(node, now);
 
-        if (node !=null && !isInternalRequest) {
-            // If this request came from outside the NetworkClient, validate
-            // that we can send data.  If the request is internal, we trust
-            // that internal code has done this validation.  Validation
-            // will be slightly different for some internal requests (for
-            // example, ApiVersionsRequests can be sent prior to being in
-            // READY state.)
-            if (!canSendRequest(node, now))
-                throw new IllegalStateException("Attempt to send a request to node " + node + " which is not ready.");
-        }
-       ClientResponse response =  aqClient.send(clientRequest);
-       handleDisconnection(node, response.wasDisconnected(), time.milliseconds());
-       return response;
-    }
+		//return !metadataUpdater.isUpdateDue(now) && canSendRequest(node, now);
+		//No Point in stopping the world if MetaData update is due. We periodically check and update it. 
+		return canSendRequest(node, now);
+	}
 
-    @Override
-    public boolean hasReadyNodes(long now) {
-        return connectionStates.hasReadyNodes(now);
-    }
-    
-    @Override 
-    public long maybeUpdateMetadata(long now) {
-    	return metadataUpdater.maybeUpdate(now);
-    }
+	/**
+	 * Are we connected and ready and able to send more requests to the given connection?
+	 *
+	 * @param node The node
+	 * @param now the current timestamp
+	 */
+	private boolean canSendRequest(Node node, long now) {
+		boolean connState = this.connectionStates.isReady(node, now);
+		return connState;
 
-    /**
-     * Close the network client
-     */
-    @Override
-    public void close() {
-        aqClient.close();
-        this.metadataUpdater.close();
-    }
+	}
 
-    /**
-     * Choose first ready node.
-     *
-     * @return The node ready.
-     */
-    @Override
-    public Node leastLoadedNode(long now) {
-    	List<Node> nodes = this.metadataUpdater.fetchNodes();
-        Node found = null;
-        int offset = this.randOffset.nextInt(nodes.size());
-        for (int i = 0; i < nodes.size(); i++) {
-            int idx = (offset + i) % nodes.size();
-            Node node = nodes.get(idx);
-            if (isReady(node, now)) {
-                // if we find an established connection with no in-flight requests we can stop right away
-                log.debug("Found least loaded node {}", node);
-                return node;
-            } else if (!this.connectionStates.isBlackedOut(node, now) ) {
-                // otherwise if this is the best we have found so far, record that
-                found = node;
-            } else if (log.isTraceEnabled()) {
-                log.debug("Removing node {} from least loaded node selection: is-blacked-out: {}",
-                        node, this.connectionStates.isBlackedOut(node, now));
-            }
-        }
+	/**
+	 * Send the given request. Requests can only be sent out to ready nodes.
+	 * @param request The request
+	 * @param now The current timestamp
+	 */
+	//@Override
+	public ClientResponse send(ClientRequest request, long now) {
+		return doSend(request, false, now);
+	}
 
-        if (found != null)
-            log.debug("Found least loaded node {}", found);
-        else
-            log.debug("Least loaded node selection failed to find an available node");
+	private void sendInternalMetadataRequest(MetadataRequest.Builder builder, Node node, long now) {
+		ClientRequest clientRequest = newClientRequest(node, builder, now, true);
+		ClientResponse response = doSend(clientRequest, true, now);
+		log.debug("Got response for metadata request {} from node {}", builder, node);
+		((DefaultMetadataUpdater)metadataUpdater).handleCompletedMetadataResponse(
+				response.requestHeader(), time.milliseconds(), (MetadataResponse)response.responseBody());
+	}
 
-        return found;
-    }
-    
-    @Override
-    public void disconnected(Node node, long now) {
-    	this.connectionStates.disconnected(node, now);
-    }
-    
-   
-    /**
-     * Initiate a connection to the given node
-     */
-    private boolean initiateConnect(Node node, long now) {
-        try {
-            log.debug("Initiating connection to node {}", node);
-            this.connectionStates.connecting(node, now);
-            aqClient.connect(node);
-            this.connectionStates.ready(node);
-            log.trace("Connection is established to node {}", node);
-        } catch(Exception e) { 
-        	if(e instanceof JMSException) {
-        	  if(((JMSException)e).getErrorCode().equals("1405")) {
-        		  log.error("create session privilege is not assigned", e.getMessage());
-        		  log.info("create session, execute on dbms_aqin, execute on dbms_aqadm privileges required for producer to work");
-        	  } else if (((JMSException)e).getErrorCode().equals("6550")) {
-        		  log.error("execute on dbms_aqin is not assigned", e.getMessage());
-        		  log.info("create session, execute on dbms_aqin, dbms_aqadm , dbms_aqjms privileges required for producer or consumer to work");
-        	  }
-      	  
-        	}
-        	/* attempt failed, we'll try again after the backoff */
-            connectionStates.disconnected(node, now);
-            /* maybe the problem is our metadata, update it */
-            metadataUpdater.requestUpdate();                     
+	private ClientResponse doSend(ClientRequest clientRequest, boolean isInternalRequest, long now) {
+		ClientResponse response = null;
+		try {
+			Node node = null;
+			if (metadata != null)
+			{
+				node = (org.oracle.okafka.common.Node)metadata.getNodeById(Integer.parseInt(clientRequest.destination()));
+			}
+			else if(metadataManager != null)
+			{
+				node = (org.oracle.okafka.common.Node)metadataManager.nodeById(Integer.parseInt(clientRequest.destination()));
+			}
 
-        	log.warn("Error connecting to node {}", node, e);
-        	if(e instanceof JMSSecurityException || ((JMSException)e).getErrorCode().equals("12505"))
-  				throw new InvalidLoginCredentialsException("Invalid login details provided:" + e.getMessage());
-        	return false;
-        }
-        return true;
-    }
-    
-    private void handleDisconnection(Node node, boolean disconnected, long now) {
-    	if(disconnected) {
-    		disconnected(node, now);
-    		metadataUpdater.requestUpdate();
-    	}	
-    }
+			if (node !=null && !isInternalRequest) {
+				// If this request came from outside the NetworkClient, validate
+				// that we can send data.  If the request is internal, we trust
+				// that internal code has done this validation.  Validation
+				// will be slightly different for some internal requests (for
+				// example, ApiVersionsRequests can be sent prior to being in
+				// READY state.)
+				if (!canSendRequest(node, now)) {
+					log.info("Attempt to send a request to node " + node + " which is not ready.");
+					throw new IllegalStateException("Attempt to send a request to node " + node + " which is not ready.");
+				}
+			}
+			log.debug("Sending Request: " + clientRequest.apiKey().name);
+			response =  aqClient.send(clientRequest);
+			log.debug("Response Received "  + clientRequest.apiKey().name);
+			handleDisconnection(node, response.wasDisconnected(), time.milliseconds());
+		} catch(Exception e)
+		{
+			log.error("Exception from NetworkClient.doSend " + e,e);
+			throw e;
+		}
+		return response;
+	}
 
-    class DefaultMetadataUpdater implements MetadataUpdater {
+	// @Override
+	public boolean hasReadyNodes(long now) {
+		return connectionStates.hasReadyNodes(now);
+	}
 
-        /* the current cluster metadata */
-        private final Metadata metadata;
+	//  @Override 
+	public long maybeUpdateMetadata(long now) {
+		return metadataUpdater.maybeUpdate(now);
+	}
 
-        /* true iff there is a metadata request that has been sent and for which we have not yet received a response */
-        private boolean metadataFetchInProgress;
+	/**
+	 * Close the network client
+	 */
+	// @Override
+	public void close() {
+		aqClient.close();
+		this.metadataUpdater.close();
+	}
 
-        DefaultMetadataUpdater(Metadata metadata) {
-            this.metadata = metadata;
-            this.metadataFetchInProgress = false;
-        }
+	/**
+	 * Choose first ready node.
+	 *
+	 * @return The node ready.
+	 */
+	//  @Override
+	public Node leastLoadedNode(long now) {
 
-        @Override
-        public List<Node> fetchNodes() {
-            return metadata.fetch().nodes();
-        }
+		List<Node> nodes = convertToOracleNodes(this.metadataUpdater.fetchNodes());
+		log.info("Available Nodes " + nodes.size());
+		for(Node n : nodes)
+		{
+			log.debug(n.toString());
+		}
+		Node found = null;
+		int offset = this.randOffset.nextInt(nodes.size());
+		for (int i = 0; i < nodes.size(); i++) {
+			int idx = (offset + i) % nodes.size();
+			Node node = nodes.get(idx);
+			/* Removed isMetadataUpdate pending check */
+			//if (isReady(node, now)) {
+			if (canSendRequest(node, now)) {
+				// if we find an established connection with no in-flight requests we can stop right away
+				log.debug("Found connected node {}", node);
+				return node;
+			}/* else if (!this.connectionStates.isBlackedOut(node, now) ) {
+				// otherwise if this is the best we have found so far, record that
+				found = node;
+			} else if (log.isTraceEnabled()) {
+				log.debug("Removing node {} from least loaded node selection: is-blacked-out: {}",
+						node, this.connectionStates.isBlackedOut(node, now));
+			} */
+		}
 
-        @Override
-        public boolean isUpdateDue(long now) {
-             return !this.metadataFetchInProgress && this.metadata.timeToNextUpdate(now) == 0;
-        }
+	/*	if (found != null)
+			log.debug("Found least loaded node {}", found);
+		else */
+		{
+			log.info("All Known nodes are disconnected. Try one time to connect.");
+			//System.out.println("All known nodes are disconnected. Try to re-connect to each node one after the other");
+			// If no node is reachable, try to connect one time
+			boolean connected = false;
+			for(Node node : nodes)
+			{
+				connected = initiateConnect(node,now);
+				if(connected)
+				{
+					log.info("Reconnect successful to node " + node);
+					found = node;
+					break;
+				}
+				/*else {
+					try 
+					{
+						//Cannot connect to Oracle Database. Retry after reconnectBackoffMs seconds
+						Thread.sleep(reconnectBackoffMs);
+					} 
+					catch(Exception ignoreE) {} 
+				} */
+			}
+			//If no known node is reachable, try without instnace_name. This is needed in case 
+			//application is using SCAN-Listener and database service which gets migrated to available instance 
+			/* if(!connected)
+			{
+				log.info("Not able to connect to any know instances.");
+				Node oldNode = nodes.get(0);
+				Node newNode = new Node(oldNode.host(), oldNode.port(), oldNode.serviceName());
+				log.info("Trying to connect to: " + newNode);
+				connected = initiateConnect(newNode,now);
+				if(connected) {
+					log.info("Connected to "+ newNode);
+					found = newNode;
+				}
+				else {
+					log.error("Not able to reach Oracle Database:" + newNode);
+				}
+			} */
+			if(found == null)
+				log.debug("Least loaded node selection failed to find an available node");
+		}
 
-        @Override
-        public long maybeUpdate(long now) {
-        	// should we update our metadata?
-            long timeToNextMetadataUpdate = metadata.timeToNextUpdate(now);
-            long waitForMetadataFetch = this.metadataFetchInProgress ? defaultRequestTimeoutMs : 0;
+		return found;
+	}
 
-            long metadataTimeout = Math.max(timeToNextMetadataUpdate, waitForMetadataFetch);
+	//  @Override
+	public void disconnected(Node node, long now) {
+		this.connectionStates.disconnected(node, now);
+	}
 
-            if (metadataTimeout > 0) {
-                return metadataTimeout;
-            }
 
-            Node node = leastLoadedNode(now);
-            if (node == null) {
-                log.debug("Give up sending metadata request since no node is available");
-                return reconnectBackoffMs;
-            }
+	/**
+	 * Initiate a connection to the given node
+	 */
+	public boolean initiateConnect(Node node, long now) {
+		try {
 
-            return maybeUpdate(now, node);
-        }
-        
-        @Override
-        public void handleCompletedMetadataResponse(RequestHeader requestHeader, long now, MetadataResponse response) {
-            this.metadataFetchInProgress = false;
-            Cluster cluster = response.cluster(metadata.getConfigs());
-            
-         // check if any topics metadata failed to get updated
-            Map<String, Exception> errors = response.topicErrors();
-            if (!errors.isEmpty())
-                log.warn("Error while fetching metadata : {}", errors);
+			log.info("Initiating connection to node {}", node);
+			//Thread.dumpStack();
+			aqClient.connect(node);
+			this.connectionStates.connecting(node, now);
+			this.connectionStates.ready(node);
+			log.debug("Connection is established to node {}", node);
+		} catch(Exception e) { 
+			if(e instanceof JMSException) {
+				JMSException jmsExcp = (JMSException)e;
+				String jmsError = jmsExcp.getErrorCode();
+				log.error("Connection Error " +jmsExcp );
+				if(jmsError != null && jmsError.equals("1405")) {
+					log.error("create session privilege is not assigned", e.getMessage());
+					log.info("create session, execute on dbms_aqin, execute on dbms_aqadm privileges required for producer to work");
+				} 
 
-            // don't update the cluster if there are no valid nodes...the topic we want may still be in the process of being
-            // created which means we will get errors and no nodes until it exists
-            if (cluster.nodes().size() > 0) {
-                this.metadata.update(cluster, null, now);
-            } else {
-                log.trace("Ignoring empty metadata response with correlation id {}.", requestHeader.correlationId());
-                this.metadata.failedUpdate(now, null);
-            }
-        }
+			}
 
-        @Override
-        public void handleDisconnection(String destination) {
-            //not used
-        }
+			/* attempt failed, we'll try again after the backoff */
+			connectionStates.disconnected(node, now);
+			/* maybe the problem is our metadata, update it */
+			((DefaultMetadataUpdater)metadataUpdater).requestUpdate();                     
 
-        @Override
-        public void handleAuthenticationFailure(AuthenticationException exception) {
-            metadataFetchInProgress = false;
-            if (metadata.updateRequested())
-                metadata.failedUpdate(time.milliseconds(), exception);
-        }
+			log.warn("Error connecting to node {}", node, e);
+			if(e instanceof JMSSecurityException || ((JMSException)e).getErrorCode().equals("12505"))
+				throw new InvalidLoginCredentialsException("Invalid login details provided:" + e.getMessage());
+			return false;
+		}
+		return true;
+	}
 
-        @Override
-        public void requestUpdate() {
-            this.metadata.requestUpdate();
-        }
+	private void handleDisconnection(Node node, boolean disconnected, long now) {
+		if(disconnected) {
+			disconnected(node, now);
+			((DefaultMetadataUpdater)metadataUpdater).requestUpdate();
+		}	
+	}
 
-        @Override
-        public void close() {
-        	aqClient.close();
-            this.metadata.close();
-        }
-        
-        /**
-         * Add a metadata request to the list of sends if we can make one
-         */
-        private long maybeUpdate(long now, Node node) {
+	public static List<org.apache.kafka.common.Node> convertToKafkaNodes(List<Node> okafkaNodeList)
+	{
+		ArrayList<org.apache.kafka.common.Node> kafkaNodeList = new ArrayList<org.apache.kafka.common.Node>();
+		for(Node n : okafkaNodeList)
+		{
+			kafkaNodeList.add((org.apache.kafka.common.Node)n);
+		}
+		return kafkaNodeList;
+	}
 
-            if (!canSendRequest(node, now)) {
-            	 if (connectionStates.canConnect(node, now)) {
-                     // we don't have a connection to this node right now, make one
-                     log.debug("Initialize connection to node {} for sending metadata request", node);
-                     try {
-                     	if( !initiateConnect(node, now))
-                     		return reconnectBackoffMs;
-                     } catch(InvalidLoginCredentialsException ilc) {
-                     	log.error("Failed to connect to node {} with error {}", node, ilc.getMessage());
-                     	this.metadata.failedUpdate(now, new AuthenticationException(ilc.getMessage()));
-                     	return reconnectBackoffMs;
-                     }   
-                 } else return reconnectBackoffMs;            
-            }
-            this.metadataFetchInProgress = true;
-            MetadataRequest.Builder metadataRequest;
-            if (metadata.needMetadataForAllTopics())
-                metadataRequest = MetadataRequest.Builder.allTopics();
-            else           	
-             metadataRequest = new MetadataRequest.Builder(new ArrayList<>(metadata.topics()),
-                        metadata.allowAutoTopicCreation());
-            log.debug("Sending metadata request {} to node {}", metadataRequest, node);
-            sendInternalMetadataRequest(metadataRequest, node, now);
-            return defaultRequestTimeoutMs;
-        }
+	public static List<Node> convertToOracleNodes(List<org.apache.kafka.common.Node> apacheNodeList)
+	{
+		ArrayList<Node> oracleNodeList = new ArrayList<Node>();
+		for(org.apache.kafka.common.Node n : apacheNodeList)
+		{
+			oracleNodeList.add((org.oracle.okafka.common.Node)n);
+		}
+		return oracleNodeList;
+	}
 
-    }
 
-    @Override
-    public ClientRequest newClientRequest(Node node,
-                                          AbstractRequest.Builder<?> requestBuilder,
-                                          long createdTimeMs,
-                                          boolean expectResponse) {
-        return newClientRequest(node, requestBuilder, createdTimeMs, expectResponse, defaultRequestTimeoutMs, null);
-    }
+	class DefaultMetadataUpdater implements MetadataUpdater {
 
-    @Override
-    public ClientRequest newClientRequest(Node node,
-                                          AbstractRequest.Builder<?> requestBuilder,
-                                          long createdTimeMs,
-                                          boolean expectResponse,
-                                          int requestTimeoutMs,
-                                          RequestCompletionHandler callback) {
-        return new ClientRequest(node, requestBuilder, correlation++, clientId, createdTimeMs, expectResponse,
-                defaultRequestTimeoutMs, callback);
-    }
+		/* the current cluster metadata */
+		private final Metadata metadata;
+
+		/* true iff there is a metadata request that has been sent and for which we have not yet received a response */
+		private boolean metadataFetchInProgress;
+
+		DefaultMetadataUpdater(Metadata metadata) {
+			this.metadata = metadata;
+			this.metadataFetchInProgress = false;
+		}
+
+		@Override
+		public List<org.apache.kafka.common.Node> fetchNodes() {
+			return (metadata.fetch().nodes());
+		}
+
+
+		@Override
+		public boolean isUpdateDue(long now) {
+			return !this.metadataFetchInProgress && this.metadata.timeToNextUpdate(now) == 0;
+		}
+
+		@Override
+		public long maybeUpdate(long now) {
+			// should we update our metadata?
+			long timeToNextMetadataUpdate = metadata.timeToNextUpdate(now);
+			long waitForMetadataFetch = this.metadataFetchInProgress ? defaultRequestTimeoutMs : 0;
+			long metadataTimeout = Math.max(timeToNextMetadataUpdate, waitForMetadataFetch);
+			if (metadataTimeout > 0) {
+				return metadataTimeout;
+			}
+			Node node = leastLoadedNode(now);
+			if (node == null)  
+			{
+				if(metadata != null && metadata.fetch() != null)
+				{
+					List<Node> nodes = convertToOracleNodes(metadata.fetch().nodes());
+					if(nodes != null)
+					{
+						String oldClusterId = null;
+						try {
+							oldClusterId = metadata.fetch().clusterResource().clusterId();
+						} catch(Exception ignoreExcp) {}
+						
+						Node oldNode = nodes.get(0);
+						Node newNode = new Node(oldNode.host(), oldNode.port(), oldNode.serviceName());
+						log.info("MetaData Updater : Trying to connect to: " + newNode);
+						boolean connected = initiateConnect(newNode,now);
+						if(connected) {
+							log.info("Connection Successful. Using this node to fetch metadata");
+							node = newNode;
+							Cluster renewCluster = new Cluster(oldClusterId, Collections.singletonList(newNode), new ArrayList<>(0),
+									Collections.emptySet(), Collections.emptySet());
+							this.metadata.update(renewCluster, Collections.<String>emptySet(), time.milliseconds(), true);
+						}
+						else {
+							log.info("Not able to connect to "+ newNode);
+						}
+					}
+				}
+			}
+			// If connection is not setup yet then return
+			if(node == null)
+			{
+				log.error("Give up sending metadata request since no node is available. Retry after " + reconnectBackoffMs);
+				return reconnectBackoffMs;
+			}
+			else {
+				log.debug("May Update matadata with node : " + node);
+			}
+
+			return maybeUpdate(now, node);
+		}
+
+		public void handleCompletedMetadataResponse(org.apache.kafka.common.requests.RequestHeader requestHeader, long now, MetadataResponse response) {
+			this.metadataFetchInProgress = false;
+			//org.apache.kafka.common.Cluster cluster = response.cluster(metadata.getConfigs());
+			org.apache.kafka.common.Cluster cluster = response.cluster();
+
+			// check if any topics metadata failed to get updated
+			Map<String, Exception> errors = response.topicErrors();
+			if (!errors.isEmpty())
+				log.warn("Error while fetching metadata : {}", errors);
+
+			// don't update the cluster if there are no valid nodes...the topic we want may still be in the process of being
+			// created which means we will get errors and no nodes until it exists
+			if (cluster.nodes().size() > 0) {
+				this.metadata.update(cluster, null, now, false);
+			} else {
+				log.debug("Ignoring empty metadata response with correlation id {}.", requestHeader.correlationId());
+				this.metadata.failedUpdate(now, null);
+			}
+		}
+
+		//@Override
+		public void handleDisconnection(String destination) {
+			//not used
+		}
+
+		// @Override
+		public void handleAuthenticationFailure(AuthenticationException exception) {
+			metadataFetchInProgress = false;
+			if (metadata.updateRequested())
+				metadata.failedUpdate(time.milliseconds(), exception);
+		}
+
+		// @Override
+		public void requestUpdate() {
+			this.metadata.requestUpdate();
+		}
+
+		@Override
+		public void close() {
+			aqClient.close();
+			this.metadata.close();
+		}
+
+		/**
+		 * Add a metadata request to the list of sends if we can make one
+		 */
+		private long maybeUpdate(long now, Node node) {
+			if (!canSendRequest(node, now)) {
+				log.debug("Cannot send Request. connect Now to node: " + node);
+				if (connectionStates.canConnect(node, now)) {
+					// we don't have a connection to this node right now, make one
+					//log.info(this.toString() + " Initialize connection to node {} for sending metadata request", node);
+					try {
+						if( !initiateConnect(node, now))
+							return reconnectBackoffMs;
+					} catch(InvalidLoginCredentialsException ilc) {
+						log.error("Failed to connect to node {} with error {}", node, ilc.getMessage());
+						this.metadata.failedUpdate(now, new AuthenticationException(ilc.getMessage()));
+						return reconnectBackoffMs;
+					}   
+				} else return reconnectBackoffMs;            
+			}
+			this.metadataFetchInProgress = true;
+			MetadataRequest.Builder metadataRequest;
+			if (metadata.needMetadataForAllTopics())
+				metadataRequest = MetadataRequest.Builder.allTopics();
+			else           	
+			{
+				List<String> topicList = new ArrayList<>(metadata.topics());
+				metadataRequest = new MetadataRequest.Builder(topicList,
+						metadata.allowAutoTopicCreation(), topicList);
+			}
+			log.debug("Sending metadata request {} to node {}", metadataRequest, node);
+			sendInternalMetadataRequest(metadataRequest, node, now);
+			return defaultRequestTimeoutMs;
+		}
+
+		@Override
+		public void handleServerDisconnect(long now, String nodeId,
+				Optional<AuthenticationException> maybeAuthException) {
+			// TODO Auto-generated method stub
+
+		}
+
+		@Override
+		public void handleFailedRequest(long now, Optional<KafkaException> maybeFatalException) {
+			// TODO Auto-generated method stub
+
+		}
+
+		@Override
+		public void handleSuccessfulResponse(org.apache.kafka.common.requests.RequestHeader requestHeader, long now,
+				org.apache.kafka.common.requests.MetadataResponse metadataResponse) {
+			// TODO Auto-generated method stub
+
+		}
+
+	}
+
+	@Override
+	public ClientRequest newClientRequest(Node node,
+			AbstractRequest.Builder<?> requestBuilder,
+			long createdTimeMs,
+			boolean expectResponse) {
+		return newClientRequest(node, requestBuilder, createdTimeMs, expectResponse, defaultRequestTimeoutMs, null);
+	}
+
+	@Override
+	public ClientRequest newClientRequest(Node node,
+			AbstractRequest.Builder<?> requestBuilder,
+			long createdTimeMs,
+			boolean expectResponse,
+			int requestTimeoutMs,
+			RequestCompletionHandler callback) {
+		return new ClientRequest(""+node.id(), requestBuilder, correlation++, clientId, createdTimeMs, expectResponse,
+				defaultRequestTimeoutMs, callback);
+	}
 
 }

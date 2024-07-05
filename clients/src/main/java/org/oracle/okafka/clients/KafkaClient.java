@@ -1,7 +1,7 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -32,7 +32,10 @@ package org.oracle.okafka.clients;
 import java.io.Closeable;
 
 import org.oracle.okafka.common.Node;
-import org.oracle.okafka.common.errors.AuthenticationException;
+import org.apache.kafka.clients.ClientRequest;
+import org.apache.kafka.clients.ClientResponse;
+import org.apache.kafka.clients.RequestCompletionHandler;
+import org.apache.kafka.common.errors.AuthenticationException;
 import org.oracle.okafka.common.requests.AbstractRequest;
 
 /**
@@ -167,5 +170,10 @@ public interface KafkaClient extends Closeable {
                                    boolean expectResponse,
                                    int requestTimeoutMs,
                                    RequestCompletionHandler callback);
+    
+    default void wakeup()
+    {
+    	// NO-OP for all AQKafkaAdmin AQKafkaConsumer and AQKafkaProuducer
+    }
 
 }

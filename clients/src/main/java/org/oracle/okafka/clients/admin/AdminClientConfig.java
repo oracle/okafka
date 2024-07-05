@@ -1,7 +1,7 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -27,14 +27,15 @@
 package org.oracle.okafka.clients.admin;
 
 import org.oracle.okafka.clients.CommonClientConfigs;
-import org.oracle.okafka.common.config.AbstractConfig;
-import org.oracle.okafka.common.config.ConfigDef;
-import org.oracle.okafka.common.config.ConfigDef.Importance;
-import org.oracle.okafka.common.config.ConfigDef.Type;
-import org.oracle.okafka.common.metrics.Sensor;
+import org.oracle.okafka.common.config.SslConfigs;
+import org.apache.kafka.common.config.AbstractConfig;
+import org.apache.kafka.common.config.ConfigDef;
+import org.apache.kafka.common.config.ConfigDef.Importance;
+import org.apache.kafka.common.config.ConfigDef.Type;
+import org.apache.kafka.common.metrics.Sensor;
 
-import static org.oracle.okafka.common.config.ConfigDef.Range.atLeast;
-import static org.oracle.okafka.common.config.ConfigDef.ValidString.in;
+import static org.apache.kafka.common.config.ConfigDef.Range.atLeast;
+import static org.apache.kafka.common.config.ConfigDef.ValidString.in;
 
 import java.util.Map;
 import java.util.Set;
@@ -179,7 +180,8 @@ public class AdminClientConfig extends AbstractConfig {
                                         Importance.MEDIUM,
                                         SECURITY_PROTOCOL_DOC)
                                 .withClientSslSupport()
-                                .withClientSaslSupport()                         
+                                //.withClientSaslSupport()
+                                .define(SslConfigs.TNS_ALIAS, ConfigDef.Type.STRING, null, Importance.MEDIUM, SslConfigs.TNS_ALIAS_DOC)                         
                                 .define(ORACLE_SERVICE_NAME,
                                 		Type.STRING,
                                 		"",
@@ -203,6 +205,10 @@ public class AdminClientConfig extends AbstractConfig {
 
     public AdminClientConfig(Map<?, ?> props) {
         super(CONFIG, props);
+    }
+    
+    protected AdminClientConfig(Map<?, ?> props, boolean doLog) {
+        super(CONFIG, props, doLog);
     }
 
     public static Set<String> configNames() {

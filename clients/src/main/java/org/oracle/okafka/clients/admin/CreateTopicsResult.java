@@ -1,9 +1,9 @@
 /*
-** OKafka Java Client version 0.8.
-**
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
-** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
-*/
+ ** OKafka Java Client version 23.4.
+ **
+ ** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
+ ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
+ */
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -23,37 +23,22 @@
  */
 package org.oracle.okafka.clients.admin;
 
+import org.apache.kafka.common.KafkaFuture;
+import org.apache.kafka.common.annotation.InterfaceStability;
 import java.util.Collection;
 import java.util.Map;
 
-import org.oracle.okafka.common.KafkaFuture;
-import org.oracle.okafka.common.annotation.InterfaceStability;
-
 /**
- * The result of {@link AdminClient#createTopics(Collection)}.
+ * The result of {@link Admin#createTopics(Collection)}.
  *
- * The API of this class is evolving, see {@link AdminClient} for details.
+ * The API of this class is evolving, see {@link Admin} for details.
  */
 @InterfaceStability.Evolving
-public class CreateTopicsResult {
-    private final Map<String, KafkaFuture<Void>> futures;
-
-    CreateTopicsResult(Map<String, KafkaFuture<Void>> futures) {
-        this.futures = futures;
-    }
-
-    /**
-     * Return a map from topic names to futures, which can be used to check the status of individual
-     * topic creations.
-     */
-    public Map<String, KafkaFuture<Void>> values() {
-        return futures;
-    }
-
-    /**
-     * Return a future which succeeds if all the topic creations succeed.
-     */
-    public KafkaFuture<Void> all() {
-        return KafkaFuture.allOf(futures.values().toArray(new KafkaFuture[0]));
-    }
+public class CreateTopicsResult extends org.apache.kafka.clients.admin.CreateTopicsResult {
+    
+	public CreateTopicsResult(Map<String, KafkaFuture<TopicMetadataAndConfig>> futures)
+	{
+		super(futures);
+	}
+	
 }

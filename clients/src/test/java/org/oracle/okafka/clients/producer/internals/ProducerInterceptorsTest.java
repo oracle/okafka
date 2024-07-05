@@ -1,7 +1,7 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -30,11 +30,12 @@
 package org.oracle.okafka.clients.producer.internals;
 
 
-import org.oracle.okafka.clients.producer.ProducerInterceptor;
-import org.oracle.okafka.clients.producer.ProducerRecord;
-import org.oracle.okafka.clients.producer.RecordMetadata;
-import org.oracle.okafka.common.KafkaException;
-import org.oracle.okafka.common.TopicPartition;
+import org.apache.kafka.clients.producer.ProducerInterceptor;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.clients.producer.internals.ProducerInterceptors;
+import org.apache.kafka.common.KafkaException;
+import org.apache.kafka.common.TopicPartition;
 import org.junit.Test;
 
 import java.util.ArrayList;
