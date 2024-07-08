@@ -4,7 +4,6 @@
 ** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
-
 repositories {
 	mavenCentral()	
 } 
@@ -13,7 +12,6 @@ apply plugin: 'java'
 apply plugin: 'eclipse'
 
 println 'Creating okafka-23.4.0.0.jar'
-
 
 sourceSets {
    		main {
@@ -45,6 +43,7 @@ dependencies {
 }
 	
 jar {
+      println 'Creating  JAR okafka-23.4.0.0.jar'
       description 'Generates okafka client jar without dependencies' 
       archiveBaseName = 'okafka'
       archiveVersion = '23.4.0.0'
@@ -54,4 +53,46 @@ jar {
       	'Build-Time-ISO-8601':new Date().format("yyyy-MM-dd HH:mm:ss")
       	)
   	  }
+	}
+	
+tasks.withType(Javadoc) {
+        // disable the crazy super-strict doclint tool in Java 8
+        // noinspection SpellCheckingInspection
+        title ="Oracle Kafka 23.4.0.0 API"
+        options.addStringOption('Xdoclint:none', '-quiet')
+        options.windowTitle = "Oracle Database Transactional Event Queues Java API Reference"
+        options.header = """<b>Oracle&reg; Database Transactional Event Queues Java API Reference<br>23ai</b><br>FF46992-04<br>"""
+        options.bottom = """<center><small>Copyright &copy; 2001, 2024, Oracle and/or its affiliates. All rights reserved.<small></center><p><small><br></small></p>"""
 }
+    
+javadoc {
+        include "org/oracle/okafka/clients/admin/*"
+        include "org/oracle/okafka/clients/consumer/*"
+        include "org/oracle/okafka/clients/producer/*"
+        include "org/oracle/okafka/common/errors/*"
+    }
+
+ task fullJar (type: Jar) {
+        archiveBaseName = 'okafka'
+        archiveClassifier = 'full-23.4.0.0'
+
+        manifest {
+            attributes( 'Implementation-Title'  : 'okafka',
+                        'Implementation-Version': project.version)
+        }
+
+        from "${rootProject.projectDir}/LICENSE.txt"
+        from "${rootProject.projectDir}/NOTICE"
+
+        from sourceSets.main.output
+
+        dependsOn configurations.runtimeClasspath
+        from {
+            configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
+        }
+
+        duplicatesStrategy 'exclude'
+    }
+
+
+    
