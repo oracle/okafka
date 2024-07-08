@@ -18,7 +18,7 @@ A database user should be created and should be granted the privileges mentioned
 
 ### Database user configuration ###
 
-To run `okafka application` against Oracle Database, a database user must be created and must be granted below privileges.
+To run `OKafka application` against Oracle Database, a database user must be created and must be granted below privileges.
 
 ```roomsql
 create user <user> identified by <password>
@@ -33,7 +33,7 @@ GRANT SELECT on USER_QUEUE_PARTITION_ASSIGNMENT_TABLE to user;
 exec DBMS_AQADM.GRANT_PRIV_FOR_RM_PLAN('user');
 ```
 
-Once user is created and above privileges are granted, connect to Oracle Database as this user and create a Transactional Event Queue using below PL/SQL script. One can also use KafkaAdmin as shown in examples folder to create a Transactional Event Queue. 
+Once user is created and above privileges are granted, connect to Oracle Database as this user and create a Transactional Event Queue using below PL/SQL script. One can also use `KafkaAdmin` interface as shown in `CreateTopic.java` in `examples` directory to create a Transactional Event Queue. 
 
 ```roomsql
 -- Create an OKafka topic named 'TXEQ' with 5 partition and retention time of 7 days. 
@@ -129,7 +129,7 @@ Repository contains 7 common OKafka application examples in `examples` folder.
 Connects to Oracle Database and create a topic TXEQ with 10 partitions with default retention time of 7 days.
 
 `2. DeleteTopic.java`
-Deletes already created OKafka Topic.
+Deletes already created OKafka topic.
 
 `3. SimpleProducer.java`
 Produces 100 messages into TxEQ topic.
