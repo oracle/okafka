@@ -31,10 +31,12 @@ package org.oracle.okafka.clients.producer.internals;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 
 import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
@@ -52,6 +54,8 @@ import org.oracle.okafka.common.requests.ProduceResponse;
 import org.oracle.okafka.common.utils.MessageIdConverter;
 import org.oracle.okafka.common.utils.MessageIdConverter.OKafkaOffset;
 import org.oracle.okafka.common.Node;
+import org.apache.kafka.common.InvalidRecordException;
+import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.errors.InvalidMetadataException;
 import org.apache.kafka.common.errors.InvalidTopicException;
@@ -62,6 +66,7 @@ import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.metrics.stats.Avg;
 import org.apache.kafka.common.metrics.stats.Max;
 import org.apache.kafka.common.metrics.stats.Meter;
+import org.apache.kafka.common.requests.ProduceResponse.RecordError;
 import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.Time;
 import org.slf4j.Logger;
@@ -511,17 +516,66 @@ public class SenderThread implements Runnable {
 
 	 private void completeBatch(ProducerBatch batch, ProduceResponse.PartitionResponse response) {
 
-		 if (batch.done(response.subPartitionId * MessageIdConverter.DEFAULT_SUBPARTITION_SIZE, response.logAppendTime, response.msgIds, null))
+		 if (batch.done(response.subPartitionId * MessageIdConverter.DEFAULT_SUBPARTITION_SIZE, response.logAppendTime, response.msgIds,null, null))
 			 this.accumulator.deallocate(batch);
 	 }
 
-	 private void failBatch(ProducerBatch batch, ProduceResponse.PartitionResponse response, RuntimeException exception) {
-		 failBatch(batch, response.subPartitionId, response.logAppendTime,  response.msgIds, exception);
+	 private void failBatch(ProducerBatch batch, ProduceResponse.PartitionResponse response, RuntimeException topLevelException) {
+		 if (response.recordErrors == null || response.recordErrors.isEmpty()) {
+			 
+			 failBatch(batch, response.subPartitionId, response.logAppendTime,  response.msgIds, topLevelException);
+			 
+	        } else {
+	            Map<Integer, RuntimeException> recordErrorMap = new HashMap<>(response.recordErrors.size());
+	            for (RecordError recordError : response.recordErrors) {
+	                // The API leaves us with some awkwardness interpreting the errors in the response.
+	                // We cannot differentiate between different error cases (such as INVALID_TIMESTAMP)
+	                // from the single error code at the partition level, so instead we use INVALID_RECORD
+	                // for all failed records and rely on the message to distinguish the cases.
+	                final String errorMessage;
+	                if (recordError.message != null) {
+	                    errorMessage = recordError.message;
+	                } else if (response.errorMessage != null) {
+	                    errorMessage = response.errorMessage;
+	                } else {
+	                    errorMessage = response.error.message();
+	                }
+
+	                // If the batch contained only a single record error, then we can unambiguously
+	                // use the exception type corresponding to the partition-level error code.
+	                if (response.recordErrors.size() == 1) {
+	                    recordErrorMap.put(recordError.batchIndex, response.error.exception(errorMessage));
+	                } else {
+	                    recordErrorMap.put(recordError.batchIndex, new InvalidRecordException(errorMessage));
+	                }
+	            }
+
+	            Function<Integer, RuntimeException> recordExceptions = batchIndex -> {
+	                RuntimeException exception = recordErrorMap.get(batchIndex);
+	                if (exception != null) {
+	                    return exception;
+	                } else {
+	                    // If the response contains record errors, then the records which failed validation
+	                    // will be present in the response. To avoid confusion for the remaining records, we
+	                    // return a generic exception.
+	                    return new KafkaException("Failed to append record because it was part of a batch " +
+	                        "which had one more more invalid records");
+	                }
+	            };
+
+				failBatch(batch, response.subPartitionId, response.logAppendTime,  response.msgIds, topLevelException,recordExceptions);   
+	        }
 	 }
 
 	 private void failBatch(ProducerBatch batch, long baseOffSet, long logAppendTime, List<OKafkaOffset> msgIds, RuntimeException exception) {
 		 this.sensors.recordErrors(batch.topicPartition.topic(), batch.recordCount);
-		 if (batch.done(baseOffSet, logAppendTime, msgIds, exception))
+		 if (batch.done(baseOffSet, logAppendTime, msgIds, exception ,batchIndex -> exception))
+			 this.accumulator.deallocate(batch);
+	 }
+	 
+	 private void failBatch(ProducerBatch batch, long baseOffSet, long logAppendTime, List<OKafkaOffset> msgIds, RuntimeException exception,Function<Integer, RuntimeException> recordExceptions) {
+		 this.sensors.recordErrors(batch.topicPartition.topic(), batch.recordCount);
+		 if (batch.done(baseOffSet, logAppendTime, msgIds, exception, recordExceptions))
 			 this.accumulator.deallocate(batch);
 	 }
 

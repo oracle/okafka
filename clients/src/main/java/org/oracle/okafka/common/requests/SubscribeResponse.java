@@ -52,4 +52,10 @@ public class SubscribeResponse extends AbstractResponse {
 		return 0;
 	}
 
+	@Override
+	public void maybeSetThrottleTimeMs(int arg0) {
+		// TODO Auto-generated method stub
+		
+	}
+
 }

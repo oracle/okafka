@@ -77,4 +77,10 @@ public class CreateTopicsResponse extends AbstractResponse {
 		return 0;
 	}
 
+	@Override
+	public void maybeSetThrottleTimeMs(int arg0) {
+		// TODO Auto-generated method stub
+		
+	}
+
 }

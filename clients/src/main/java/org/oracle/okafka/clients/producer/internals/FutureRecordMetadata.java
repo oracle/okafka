@@ -48,18 +48,16 @@ public final class FutureRecordMetadata implements Future<RecordMetadata> {
     // Removed final here. relativeOffset will be decided after the publish only
     private final long relativeOffset;
     private final long createTimestamp;
-    private final Long checksum;
     private final int serializedKeySize;
     private final int serializedValueSize;
     private final Time time;
     private volatile FutureRecordMetadata nextRecordMetadata = null;
 
     public FutureRecordMetadata(ProduceRequestResult result, long relativeOffset, long createTimestamp,
-                                Long checksum, int serializedKeySize, int serializedValueSize, Time _time) {
+                                int serializedKeySize, int serializedValueSize, Time _time) {
         this.result = result;
         this.relativeOffset = relativeOffset;
         this.createTimestamp = createTimestamp;
-        this.checksum = checksum;
         this.serializedKeySize = serializedKeySize;
         this.serializedValueSize = serializedValueSize;
         time = _time;
@@ -116,16 +114,12 @@ public final class FutureRecordMetadata implements Future<RecordMetadata> {
     }
 
     RecordMetadata valueOrError() throws ExecutionException {
-        if (this.result.error() != null)
-            throw new ExecutionException(this.result.error());
+        if (this.result.error((int)relativeOffset) != null)
+            throw new ExecutionException(this.result.error((int)relativeOffset));
         else
         {
             return value();
         }
-    }
-
-    Long checksumOrNull() {
-        return this.checksum;
     }
 
     /**
@@ -153,14 +147,14 @@ public final class FutureRecordMetadata implements Future<RecordMetadata> {
         	} 
         } 
         
-        RecordMetadata rm =  new RecordMetadata(result.topicPartition(), baseOffset, relOffset,
-                                  timestamp(), this.checksum, this.serializedKeySize, this.serializedValueSize);
+        RecordMetadata rm =  new RecordMetadata(result.topicPartition(), baseOffset, (int) relOffset,
+                                  timestamp(),this.serializedKeySize, this.serializedValueSize);
         return rm;
     }
     
     RuntimeException error() 
     {
-    	return result.error();
+    	return result.error((int) relativeOffset);
     }
 
     private long timestamp() {

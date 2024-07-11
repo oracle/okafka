@@ -115,8 +115,6 @@ import org.apache.kafka.clients.admin.DescribeUserScramCredentialsOptions;
 import org.apache.kafka.clients.admin.DescribeUserScramCredentialsResult;
 import org.apache.kafka.clients.admin.ElectLeadersOptions;
 import org.apache.kafka.clients.admin.ElectLeadersResult;
-import org.apache.kafka.clients.admin.ElectPreferredLeadersOptions;
-import org.apache.kafka.clients.admin.ElectPreferredLeadersResult;
 import org.apache.kafka.clients.admin.ExpireDelegationTokenOptions;
 import org.apache.kafka.clients.admin.ExpireDelegationTokenResult;
 import org.apache.kafka.clients.admin.FeatureUpdate;
@@ -1054,8 +1052,8 @@ public interface Admin extends org.apache.kafka.clients.admin.Admin {
      * @deprecated Since 2.4.0. Use {@link #electLeaders(ElectionType, Set)}.
      */
     @Deprecated
-    default ElectPreferredLeadersResult electPreferredLeaders(Collection<TopicPartition> partitions) {
-        return electPreferredLeaders(partitions, new ElectPreferredLeadersOptions());
+    default ElectLeadersResult electPreferredLeaders(Collection<TopicPartition> partitions) {
+        return electPreferredLeaders(partitions, new ElectLeadersOptions());
     }
 
     /**
@@ -1072,8 +1070,8 @@ public interface Admin extends org.apache.kafka.clients.admin.Admin {
      * @deprecated Since 2.4.0. Use {@link #electLeaders(ElectionType, Set, ElectLeadersOptions)}.
      */
     @Deprecated
-    default ElectPreferredLeadersResult electPreferredLeaders(Collection<TopicPartition> partitions,
-                                                              ElectPreferredLeadersOptions options) {
+    default ElectLeadersResult electPreferredLeaders(Collection<TopicPartition> partitions,
+                                                              ElectLeadersOptions options) {
     	
     	throw new FeatureNotSupportedException("This feature is not suported for this release.");
     	/*

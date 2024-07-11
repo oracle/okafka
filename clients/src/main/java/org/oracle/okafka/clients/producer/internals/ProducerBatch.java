@@ -52,6 +52,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 import static org.apache.kafka.common.record.RecordBatch.MAGIC_VALUE_V2;
 import static org.apache.kafka.common.record.RecordBatch.NO_TIMESTAMP;
@@ -113,12 +114,12 @@ public final class ProducerBatch {
 		if (!recordsBuilder.hasRoomFor(timestamp, key, value, headers)) {
 			return null;
 		} else {
-			Long checksum = this.recordsBuilder.append(timestamp, key, value, headers);
+			this.recordsBuilder.append(timestamp, key, value, headers);
 			this.maxRecordSize = Math.max(this.maxRecordSize, AbstractRecords.estimateSizeInBytesUpperBound(magic(),
 					recordsBuilder.compressionType(), key, value, headers));
 			this.lastAppendTime = now;
 			FutureRecordMetadata future = new FutureRecordMetadata(this.produceFuture, (long)this.recordCount,
-					timestamp, checksum,
+					timestamp,
 					key == null ? -1 : key.length,
 							value == null ? -1 : value.length,
 									Time.SYSTEM);
@@ -143,7 +144,7 @@ public final class ProducerBatch {
 			this.maxRecordSize = Math.max(this.maxRecordSize, AbstractRecords.estimateSizeInBytesUpperBound(magic(),
 					recordsBuilder.compressionType(), key, value, headers));
 			FutureRecordMetadata future = new FutureRecordMetadata(this.produceFuture, this.recordCount,
-					timestamp, thunk.future.checksumOrNull(),
+					timestamp,
 					key == null ? -1 : key.remaining(),
 							value == null ? -1 : value.remaining(),
 									Time.SYSTEM);
@@ -165,7 +166,7 @@ public final class ProducerBatch {
 			throw new IllegalStateException("Batch has already been completed in final state " + finalState.get());
 
 		log.trace("Aborting batch for partition {}", topicPartition, exception);
-		completeFutureAndFireCallbacks(ProduceResponse.INVALID_OFFSET, RecordBatch.NO_TIMESTAMP, exception);
+		completeFutureAndFireCallbacks(ProduceResponse.INVALID_OFFSET, RecordBatch.NO_TIMESTAMP, batchIndex->exception);
 	}
 
 	/**
@@ -193,17 +194,17 @@ public final class ProducerBatch {
 	 * @param exception The exception that occurred (or null if the request was successful)
 	 * @return true if the batch was completed successfully and false if the batch was previously aborted
 	 */
-	public boolean done(long baseOffset, long logAppendTime, RuntimeException exception) {
-		final FinalState tryFinalState = (exception == null) ? FinalState.SUCCEEDED : FinalState.FAILED;
+	public boolean done(long baseOffset, long logAppendTime, RuntimeException topLevelException,Function<Integer, RuntimeException> recordExceptions) {
+		final FinalState tryFinalState = (topLevelException == null) ? FinalState.SUCCEEDED : FinalState.FAILED;
 
 		if (tryFinalState == FinalState.SUCCEEDED) {
 			log.trace("Successfully produced messages to {} with base offset {}.", topicPartition, baseOffset);
 		} else {
-			log.trace("Failed to produce messages to {} with base offset {}.", topicPartition, baseOffset, exception);
+			log.trace("Failed to produce messages to {} with base offset {}.", topicPartition, baseOffset, topLevelException);
 		}
 
 		if (this.finalState.compareAndSet(null, tryFinalState)) {
-			completeFutureAndFireCallbacks(baseOffset, logAppendTime, exception);
+			completeFutureAndFireCallbacks(baseOffset, logAppendTime, recordExceptions);
 			return true;
 		}
 
@@ -224,25 +225,27 @@ public final class ProducerBatch {
 		return false;
 	}
 
-	private void completeFutureAndFireCallbacks(long baseOffset, long logAppendTime, RuntimeException exception) {
+	private void completeFutureAndFireCallbacks(long baseOffset, long logAppendTime, Function<Integer, RuntimeException> recordExceptions ) {
 		// Set the future before invoking the callbacks as we rely on its state for the `onCompletion` call
-		produceFuture.set(baseOffset, logAppendTime, exception);
+		produceFuture.set(baseOffset, logAppendTime, recordExceptions);
 
 		// execute callbacks
-		for (Thunk thunk : thunks) {
-			try {
-				if (exception == null) {
-					RecordMetadata metadata = thunk.future.value();
-					if (thunk.callback != null)
-						thunk.callback.onCompletion(metadata, null);
-				} else {
-					if (thunk.callback != null)
-						thunk.callback.onCompletion(null, exception);
-				}
-			} catch (Exception e) {
-				log.error("Error executing user-provided callback on message for topic-partition '{}'", topicPartition, e);
-			}
-		}
+		for (int i = 0; i < thunks.size(); i++) {
+            try {
+                Thunk thunk = thunks.get(i);
+                if (thunk.callback != null) {
+                    if (recordExceptions == null) {
+                        RecordMetadata metadata = thunk.future.value();
+                        thunk.callback.onCompletion(metadata, null);
+                    } else {
+                        RuntimeException exception = recordExceptions.apply(i);
+                        thunk.callback.onCompletion(null, exception);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error executing user-provided callback on message for topic-partition '{}'", topicPartition, e);
+            }
+        }
 
 		produceFuture.done();
 	}
@@ -255,17 +258,17 @@ public final class ProducerBatch {
 	 * @param exception The exception that occurred (or null if the request was successful)
 	 * @return true if the batch was completed successfully and false if the batch was previously aborted
 	 */
-	public boolean done(long baseOffset, long logAppendTime,  List<OKafkaOffset> msgIds, RuntimeException exception) {
-		final FinalState tryFinalState = (exception == null) ? FinalState.SUCCEEDED : FinalState.FAILED;
+	public boolean done(long baseOffset, long logAppendTime,  List<OKafkaOffset> msgIds, RuntimeException topLevelException,Function<Integer, RuntimeException> recordExceptions) {
+		final FinalState tryFinalState = (topLevelException == null) ? FinalState.SUCCEEDED : FinalState.FAILED;
 
 		if (tryFinalState == FinalState.SUCCEEDED) {
 			log.trace("Successfully produced messages to {} with base offset {}.", topicPartition, baseOffset);
 		} else {
-			log.trace("Failed to produce messages to {} with base offset {}.", topicPartition, baseOffset, exception);
+			log.trace("Failed to produce messages to {} with base offset {}.", topicPartition, baseOffset, topLevelException);
 		}
 
 		if (this.finalState.compareAndSet(null, tryFinalState)) {
-			completeFutureAndFireCallbacks(baseOffset, logAppendTime, msgIds, exception);
+			completeFutureAndFireCallbacks(baseOffset, logAppendTime, msgIds, recordExceptions);
 			return true;
 		}
 
@@ -298,25 +301,27 @@ public final class ProducerBatch {
 		 */
 	}
 
-	private void completeFutureAndFireCallbacks(long baseOffset, long logAppendTime, List<OKafkaOffset> msgIds, RuntimeException exception) {
+	private void completeFutureAndFireCallbacks(long baseOffset, long logAppendTime, List<OKafkaOffset> msgIds, Function<Integer, RuntimeException> recordExceptions) {
 		// Set the future before invoking the callbacks as we rely on its state for the `onCompletion` call
-		produceFuture.set(baseOffset, logAppendTime, msgIds, exception);
+		produceFuture.set(baseOffset, logAppendTime, msgIds, recordExceptions);
 
 		// execute callbacks
-		for (Thunk thunk : thunks) {
-			try {
-				if (exception == null) {
-					RecordMetadata metadata = thunk.future.value();
-					if (thunk.callback != null)
-						thunk.callback.onCompletion(metadata, null);
-				} else {
-					if (thunk.callback != null)
-						thunk.callback.onCompletion(null, exception);
-				}
-			} catch (Exception e) {
-				log.error("Error executing user-provided callback on message for topic-partition '{}'", topicPartition, e);
-			}
-		}
+		for (int i = 0; i < thunks.size(); i++) {
+            try {
+                Thunk thunk = thunks.get(i);
+                if (thunk.callback != null) {
+                    if (recordExceptions == null) {
+                        RecordMetadata metadata = thunk.future.value();
+                        thunk.callback.onCompletion(metadata, null);
+                    } else {
+                        RuntimeException exception = recordExceptions.apply(i);
+                        thunk.callback.onCompletion(null, exception);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error executing user-provided callback on message for topic-partition '{}'", topicPartition, e);
+            }
+        }
 
 		produceFuture.done();  
 	}
@@ -363,7 +368,7 @@ public final class ProducerBatch {
 			batch.closeForRecordAppends();
 		}
 
-		produceFuture.set(ProduceResponse.INVALID_OFFSET, NO_TIMESTAMP, new RecordBatchTooLargeException());
+		produceFuture.set(ProduceResponse.INVALID_OFFSET, NO_TIMESTAMP, batchIndex->new RecordBatchTooLargeException());
 		produceFuture.done();
 
 		if (hasSequence()) {

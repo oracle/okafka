@@ -35,6 +35,9 @@ import org.apache.kafka.clients.ClientResponse;
 import org.apache.kafka.clients.ClientUtils;
 import org.oracle.okafka.clients.admin.AdminClientConfig;
 import org.oracle.okafka.clients.admin.KafkaAdminClient.Call;
+import org.apache.kafka.clients.admin.AbortTransactionOptions;
+import org.apache.kafka.clients.admin.AbortTransactionResult;
+import org.apache.kafka.clients.admin.AbortTransactionSpec;
 import org.apache.kafka.clients.admin.AlterClientQuotasOptions;
 import org.apache.kafka.clients.admin.AlterClientQuotasResult;
 import org.apache.kafka.clients.admin.AlterConfigOp;
@@ -83,10 +86,16 @@ import org.apache.kafka.clients.admin.DescribeFeaturesOptions;
 import org.apache.kafka.clients.admin.DescribeFeaturesResult;
 import org.apache.kafka.clients.admin.DescribeLogDirsOptions;
 import org.apache.kafka.clients.admin.DescribeLogDirsResult;
+import org.apache.kafka.clients.admin.DescribeMetadataQuorumOptions;
+import org.apache.kafka.clients.admin.DescribeMetadataQuorumResult;
+import org.apache.kafka.clients.admin.DescribeProducersOptions;
+import org.apache.kafka.clients.admin.DescribeProducersResult;
 import org.apache.kafka.clients.admin.DescribeReplicaLogDirsOptions;
 import org.apache.kafka.clients.admin.DescribeReplicaLogDirsResult;
 import org.apache.kafka.clients.admin.DescribeTopicsOptions;
 import org.apache.kafka.clients.admin.DescribeTopicsResult;
+import org.apache.kafka.clients.admin.DescribeTransactionsOptions;
+import org.apache.kafka.clients.admin.DescribeTransactionsResult;
 import org.apache.kafka.clients.admin.DescribeUserScramCredentialsOptions;
 import org.apache.kafka.clients.admin.DescribeUserScramCredentialsResult;
 import org.apache.kafka.clients.admin.ElectLeadersOptions;
@@ -94,8 +103,13 @@ import org.apache.kafka.clients.admin.ElectLeadersResult;
 import org.apache.kafka.clients.admin.ExpireDelegationTokenOptions;
 import org.apache.kafka.clients.admin.ExpireDelegationTokenResult;
 import org.apache.kafka.clients.admin.FeatureUpdate;
+import org.apache.kafka.clients.admin.FenceProducersOptions;
+import org.apache.kafka.clients.admin.FenceProducersResult;
+import org.apache.kafka.clients.admin.ListClientMetricsResourcesOptions;
+import org.apache.kafka.clients.admin.ListClientMetricsResourcesResult;
 import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsOptions;
 import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsResult;
+import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsSpec;
 import org.apache.kafka.clients.admin.ListConsumerGroupsOptions;
 import org.apache.kafka.clients.admin.ListConsumerGroupsResult;
 import org.apache.kafka.clients.admin.ListOffsetsOptions;
@@ -103,6 +117,8 @@ import org.apache.kafka.clients.admin.ListOffsetsResult;
 import org.apache.kafka.clients.admin.ListPartitionReassignmentsOptions;
 import org.apache.kafka.clients.admin.ListPartitionReassignmentsResult;
 import org.apache.kafka.clients.admin.ListTopicsResult;
+import org.apache.kafka.clients.admin.ListTransactionsOptions;
+import org.apache.kafka.clients.admin.ListTransactionsResult;
 import org.apache.kafka.clients.admin.NewPartitionReassignment;
 import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.clients.admin.NewTopic;
@@ -139,8 +155,10 @@ import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.Node;
+import org.apache.kafka.common.TopicCollection;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.TopicPartitionReplica;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.acl.AclBinding;
 import org.apache.kafka.common.acl.AclBindingFilter;
 import org.apache.kafka.common.annotation.InterfaceStability;
@@ -399,7 +417,8 @@ public class KafkaAdminClient extends AdminClient {
 		try {
 			AdminMetadataManager metadataManager = new AdminMetadataManager(logContext,
 					config.getLong(AdminClientConfig.RETRY_BACKOFF_MS_CONFIG),
-					config.getLong(AdminClientConfig.METADATA_MAX_AGE_CONFIG));
+					config.getLong(AdminClientConfig.METADATA_MAX_AGE_CONFIG),
+					false);
 			List<MetricsReporter> reporters = config
 					.getConfiguredInstances(AdminClientConfig.METRIC_REPORTER_CLASSES_CONFIG, MetricsReporter.class);
 			Map<String, String> metricTags = Collections.singletonMap("client-id", clientId);
@@ -439,7 +458,8 @@ public class KafkaAdminClient extends AdminClient {
 			LogContext logContext = createLogContext(clientId);
 			AdminMetadataManager metadataManager = new AdminMetadataManager(logContext,
 					config.getLong(AdminClientConfig.RETRY_BACKOFF_MS_CONFIG),
-					config.getLong(AdminClientConfig.METADATA_MAX_AGE_CONFIG));
+					config.getLong(AdminClientConfig.METADATA_MAX_AGE_CONFIG),
+					false);
 			return new KafkaAdminClient(config, clientId, time, metadataManager, metrics, client, null, logContext);
 		} catch (Throwable exc) {
 			closeQuietly(metrics, "Metrics");
@@ -2025,5 +2045,74 @@ public class KafkaAdminClient extends AdminClient {
 	@Override
 	public Map<MetricName, ? extends Metric> metrics() {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
+
+	@Override
+	public DeleteTopicsResult deleteTopics(TopicCollection topics, DeleteTopicsOptions options) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public DescribeTopicsResult describeTopics(TopicCollection topics, DescribeTopicsOptions options) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public ListConsumerGroupOffsetsResult listConsumerGroupOffsets(Map<String, ListConsumerGroupOffsetsSpec> groupSpecs,
+			ListConsumerGroupOffsetsOptions options) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public DescribeMetadataQuorumResult describeMetadataQuorum(DescribeMetadataQuorumOptions options) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public DescribeProducersResult describeProducers(Collection<TopicPartition> partitions,
+			DescribeProducersOptions options) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public DescribeTransactionsResult describeTransactions(Collection<String> transactionalIds,
+			DescribeTransactionsOptions options) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public AbortTransactionResult abortTransaction(AbortTransactionSpec spec, AbortTransactionOptions options) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public ListTransactionsResult listTransactions(ListTransactionsOptions options) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public FenceProducersResult fenceProducers(Collection<String> transactionalIds, FenceProducersOptions options) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Uuid clientInstanceId(Duration timeout) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public ListClientMetricsResourcesResult listClientMetricsResources(ListClientMetricsResourcesOptions arg0) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

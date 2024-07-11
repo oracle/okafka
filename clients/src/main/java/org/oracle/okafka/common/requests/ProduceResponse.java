@@ -29,12 +29,14 @@
 
 package org.oracle.okafka.common.requests;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.protocol.ApiMessage;
 import org.apache.kafka.common.protocol.Errors;
+import org.apache.kafka.common.requests.ProduceResponse.RecordError;
 import org.oracle.okafka.common.protocol.ApiKeys;
 import org.oracle.okafka.common.requests.AbstractResponse;
 import org.oracle.okafka.common.utils.MessageIdConverter.OKafkaOffset;
@@ -95,6 +97,10 @@ public class ProduceResponse extends AbstractResponse {
         public long logAppendTime;
         public long subPartitionId;
         private boolean checkDuplicate;
+        
+        public Errors error=null;
+        public List<RecordError> recordErrors=new ArrayList<>();
+        public String errorMessage=null;
 
         public PartitionResponse(RuntimeException exception) {
             this.exception = exception;
@@ -150,6 +156,12 @@ public class ProduceResponse extends AbstractResponse {
 	public Map<Errors, Integer> errorCounts() {
 		// TODO Auto-generated method stub
 		return null;
+	}
+
+	@Override
+	public void maybeSetThrottleTimeMs(int arg0) {
+		// TODO Auto-generated method stub
+		
 	}
 	
 

@@ -386,7 +386,7 @@ public final class AQKafkaProducer extends AQClient {
 			produceResult.set(thisOffset.subPartitionId(), (publishException==null)?byteMessage.getJMSTimestamp():-1, 
 					Collections.singletonList(thisOffset), publishException);
 
-			frm = new FutureRecordMetadata(produceResult, 0, System.currentTimeMillis(), -1l,
+			frm = new FutureRecordMetadata(produceResult, 0, System.currentTimeMillis(),
 					serializedKey.length,  serializedValue.length,time );
 
 			produceResult.done();
@@ -397,7 +397,7 @@ public final class AQKafkaProducer extends AQClient {
 			log.error("Error while publishing records within a transaction." + e.getMessage(), e);
 			produceResult = new ProduceRequestResult(tp);
 			produceResult.set(-1L, -1L, null, new RuntimeException(e));
-			frm = new FutureRecordMetadata(produceResult, -1l, System.currentTimeMillis(), -1l,
+			frm = new FutureRecordMetadata(produceResult, -1l, System.currentTimeMillis(),
 					serializedKey.length,  serializedValue.length,time );
 			produceResult.done();
 		}

@@ -30,6 +30,8 @@
 package org.oracle.okafka.clients.producer.internals;
 
 import java.util.List;
+import java.util.function.Function;
+
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.oracle.okafka.common.utils.MessageIdConverter.OKafkaOffset;
@@ -59,11 +61,16 @@ public class ProduceRequestResult extends org.apache.kafka.clients.producer.inte
      * @param logAppendTime The log append time or -1 if CreateTime is being used
      * @param error The error that occurred if there was one, or null
      */
-    public void set(long baseOffset, long logAppendTime, List<OKafkaOffset> msgIds, RuntimeException error) {
-        set(baseOffset, logAppendTime, error);
+    public void set(long baseOffset, long logAppendTime, List<OKafkaOffset> msgIds, Function<Integer, RuntimeException> errorsByIndex) {
+        set(baseOffset, logAppendTime, errorsByIndex);
         this.msgIds = msgIds;
     }
-
+    
+    public void set(long baseOffset, long logAppendTime, List<OKafkaOffset> msgIds, RuntimeException errorsByIndex) {
+        set(baseOffset, logAppendTime,batchIndex -> errorsByIndex);
+        this.msgIds = msgIds;
+    }
+    
     /**
      * The base offset for the request (the first offset in the record set)
      */

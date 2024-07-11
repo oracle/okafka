@@ -55,6 +55,7 @@ import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.errors.ApiException;
 import org.apache.kafka.common.errors.AuthenticationException;
@@ -1841,5 +1842,12 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 	public Connection getDBConnection() throws KafkaException
 	{
 		return getDBConnection(true);
+	}
+
+
+	@Override
+	public Uuid clientInstanceId(Duration timeout) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

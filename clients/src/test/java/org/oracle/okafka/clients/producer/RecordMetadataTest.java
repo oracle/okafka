@@ -54,7 +54,6 @@ public class RecordMetadataTest {
         assertEquals(timestamp, metadata.timestamp());
         assertFalse(metadata.hasOffset());
         assertEquals(-1L, metadata.offset());
-        assertEquals(checksum.longValue(), metadata.checksum());
         assertEquals(keySize, metadata.serializedKeySize());
         assertEquals(valueSize, metadata.serializedValueSize());
     }
@@ -76,7 +75,6 @@ public class RecordMetadataTest {
         assertEquals(tp.partition(), metadata.partition());
         assertEquals(timestamp, metadata.timestamp());
         assertEquals((baseOffset << 16) + (relativeOffset), metadata.offset());
-        assertEquals(checksum.longValue(), metadata.checksum());
         assertEquals(keySize, metadata.serializedKeySize());
         assertEquals(valueSize, metadata.serializedValueSize());
     }

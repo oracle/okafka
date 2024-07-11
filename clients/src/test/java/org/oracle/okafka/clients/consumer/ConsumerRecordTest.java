@@ -55,7 +55,6 @@ public class ConsumerRecordTest {
         assertEquals(value, record.value());
         assertEquals(TimestampType.NO_TIMESTAMP_TYPE, record.timestampType());
         assertEquals(ConsumerRecord.NO_TIMESTAMP, record.timestamp());
-        assertEquals(ConsumerRecord.NULL_CHECKSUM, record.checksum());
         assertEquals(ConsumerRecord.NULL_SIZE, record.serializedKeySize());
         assertEquals(ConsumerRecord.NULL_SIZE, record.serializedValueSize());
         assertEquals(new RecordHeaders(), record.headers());

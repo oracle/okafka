@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Properties;
 import java.util.Set;
 import java.util.StringTokenizer;
@@ -85,7 +86,7 @@ import org.apache.kafka.clients.consumer.internals.ConsumerInterceptors;
 import org.oracle.okafka.clients.consumer.internals.ConsumerNetworkClient;
 import org.oracle.okafka.clients.consumer.internals.FetchMetricsRegistry;
 import org.oracle.okafka.clients.consumer.internals.OkafkaConsumerMetrics;
-import org.apache.kafka.clients.consumer.internals.NoOpConsumerRebalanceListener;
+import org.oracle.okafka.clients.consumer.internals.NoOpConsumerRebalanceListener;
 
 //import org.apache.kafka.clients.consumer.internals.SubscriptionState;
 import org.oracle.okafka.clients.consumer.internals.SubscriptionState;
@@ -99,6 +100,7 @@ import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.Uuid;
 import org.oracle.okafka.common.config.SslConfigs;
 import org.apache.kafka.common.errors.AuthenticationException;
 import org.oracle.okafka.common.errors.FeatureNotSupportedException;
@@ -1584,7 +1586,6 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 	 *
 	 */
 	@Deprecated
-	@Override
 	public void close(long timeout, TimeUnit timeUnit) {
 		close(Duration.ofMillis(timeUnit.toMillis(timeout)));
 	}
@@ -1738,6 +1739,24 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 	public void enforceRebalance() {
 		// TODO Auto-generated method stub
 
+	}
+	
+	@Override
+	public void enforceRebalance(String reason) {
+		// TODO Auto-generated method stub
+		
+	}
+	
+	@Override
+	public Uuid clientInstanceId(Duration timeout) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public OptionalLong currentLag(TopicPartition topicPartition) {
+		// TODO Auto-generated method stub
+		return null;
 	}
 	
 	private static class FetchResponseMetricAggregator {
@@ -1955,5 +1974,4 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
         }
         */
     }
-	
 }
