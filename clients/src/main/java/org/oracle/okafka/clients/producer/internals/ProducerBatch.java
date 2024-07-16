@@ -60,13 +60,16 @@ import static org.apache.kafka.common.record.RecordBatch.NO_TIMESTAMP;
 /**
  * A batch of records that is or will be sent.
  *
- * This class is not thread safe and external synchronization must be used when modifying it
+ * This class is not thread safe and external synchronization must be used when
+ * modifying it
  */
 public final class ProducerBatch {
 
 	private static final Logger log = LoggerFactory.getLogger(ProducerBatch.class);
 
-	private enum FinalState { ABORTED, FAILED, SUCCEEDED }
+	private enum FinalState {
+		ABORTED, FAILED, SUCCEEDED
+	}
 
 	final long createdMs;
 	final TopicPartition topicPartition;
@@ -106,11 +109,14 @@ public final class ProducerBatch {
 	}
 
 	/**
-	 * Append the record to the current record set and return the relative offset within that record set
+	 * Append the record to the current record set and return the relative offset
+	 * within that record set
 	 *
-	 * @return The RecordSend corresponding to this record or null if there isn't sufficient room.
+	 * @return The RecordSend corresponding to this record or null if there isn't
+	 *         sufficient room.
 	 */
-	public FutureRecordMetadata tryAppend(long timestamp, byte[] key, byte[] value, Header[] headers, Callback callback, long now) {
+	public FutureRecordMetadata tryAppend(long timestamp, byte[] key, byte[] value, Header[] headers, Callback callback,
+			long now) {
 		if (!recordsBuilder.hasRoomFor(timestamp, key, value, headers)) {
 			return null;
 		} else {
@@ -118,12 +124,10 @@ public final class ProducerBatch {
 			this.maxRecordSize = Math.max(this.maxRecordSize, AbstractRecords.estimateSizeInBytesUpperBound(magic(),
 					recordsBuilder.compressionType(), key, value, headers));
 			this.lastAppendTime = now;
-			FutureRecordMetadata future = new FutureRecordMetadata(this.produceFuture, (long)this.recordCount,
-					timestamp,
-					key == null ? -1 : key.length,
-							value == null ? -1 : value.length,
-									Time.SYSTEM);
-			// we have to keep every future returned to the users in case the batch needs to be
+			FutureRecordMetadata future = new FutureRecordMetadata(this.produceFuture, (long) this.recordCount,
+					timestamp, key == null ? -1 : key.length, value == null ? -1 : value.length, Time.SYSTEM);
+			// we have to keep every future returned to the users in case the batch needs to
+			// be
 			// split to several new batches and resent.
 			thunks.add(new Thunk(callback, future));
 			this.recordCount++;
@@ -132,7 +136,9 @@ public final class ProducerBatch {
 	}
 
 	/**
-	 * This method is only used by {@link #split(int)} when splitting a large batch to smaller ones.
+	 * This method is only used by {@link #split(int)} when splitting a large batch
+	 * to smaller ones.
+	 * 
 	 * @return true if the record has been successfully appended, false otherwise.
 	 */
 	private boolean tryAppendForSplit(long timestamp, ByteBuffer key, ByteBuffer value, Header[] headers, Thunk thunk) {
@@ -143,11 +149,8 @@ public final class ProducerBatch {
 			this.recordsBuilder.append(timestamp, key, value, headers);
 			this.maxRecordSize = Math.max(this.maxRecordSize, AbstractRecords.estimateSizeInBytesUpperBound(magic(),
 					recordsBuilder.compressionType(), key, value, headers));
-			FutureRecordMetadata future = new FutureRecordMetadata(this.produceFuture, this.recordCount,
-					timestamp,
-					key == null ? -1 : key.remaining(),
-							value == null ? -1 : value.remaining(),
-									Time.SYSTEM);
+			FutureRecordMetadata future = new FutureRecordMetadata(this.produceFuture, this.recordCount, timestamp,
+					key == null ? -1 : key.remaining(), value == null ? -1 : value.remaining(), Time.SYSTEM);
 			// Chain the future to the original thunk.
 			thunk.future.chain(future);
 			this.thunks.add(thunk);
@@ -159,48 +162,57 @@ public final class ProducerBatch {
 	/**
 	 * Abort the batch and complete the future and callbacks.
 	 *
-	 * @param exception The exception to use to complete the future and awaiting callbacks.
+	 * @param exception The exception to use to complete the future and awaiting
+	 *                  callbacks.
 	 */
 	public void abort(RuntimeException exception) {
 		if (!finalState.compareAndSet(null, FinalState.ABORTED))
 			throw new IllegalStateException("Batch has already been completed in final state " + finalState.get());
 
 		log.trace("Aborting batch for partition {}", topicPartition, exception);
-		completeFutureAndFireCallbacks(ProduceResponse.INVALID_OFFSET, RecordBatch.NO_TIMESTAMP, batchIndex->exception);
+		completeFutureAndFireCallbacks(ProduceResponse.INVALID_OFFSET, RecordBatch.NO_TIMESTAMP,
+				batchIndex -> exception);
 	}
 
 	/**
-	 * Return `true` if {@link #done(long, long, RuntimeException)} has been invoked at least once, `false` otherwise.
+	 * Return `true` if {@link #done(long, long, RuntimeException)} has been invoked
+	 * at least once, `false` otherwise.
 	 */
 	public boolean isDone() {
 		return finalState() != null;
 	}
 
 	/**
-	 * Finalize the state of a batch. Final state, once set, is immutable. This function may be called
-	 * once or twice on a batch. It may be called twice if
-	 * 1. An inflight batch expires before a response from the broker is received. The batch's final
-	 * state is set to FAILED. But it could succeed on the broker and second time around batch.done() may
-	 * try to set SUCCEEDED final state.
-	 * 2. If a transaction abortion happens or if the producer is closed forcefully, the final state is
-	 * ABORTED but again it could succeed if broker responds with a success.
+	 * Finalize the state of a batch. Final state, once set, is immutable. This
+	 * function may be called once or twice on a batch. It may be called twice if 1.
+	 * An inflight batch expires before a response from the broker is received. The
+	 * batch's final state is set to FAILED. But it could succeed on the broker and
+	 * second time around batch.done() may try to set SUCCEEDED final state. 2. If a
+	 * transaction abortion happens or if the producer is closed forcefully, the
+	 * final state is ABORTED but again it could succeed if broker responds with a
+	 * success.
 	 *
 	 * Attempted transitions from [FAILED | ABORTED] --> SUCCEEDED are logged.
-	 * Attempted transitions from one failure state to the same or a different failed state are ignored.
-	 * Attempted transitions from SUCCEEDED to the same or a failed state throw an exception.
+	 * Attempted transitions from one failure state to the same or a different
+	 * failed state are ignored. Attempted transitions from SUCCEEDED to the same or
+	 * a failed state throw an exception.
 	 *
-	 * @param baseOffset The base offset of the messages assigned by the server
+	 * @param baseOffset    The base offset of the messages assigned by the server
 	 * @param logAppendTime The log append time or -1 if CreateTime is being used
-	 * @param exception The exception that occurred (or null if the request was successful)
-	 * @return true if the batch was completed successfully and false if the batch was previously aborted
+	 * @param exception     The exception that occurred (or null if the request was
+	 *                      successful)
+	 * @return true if the batch was completed successfully and false if the batch
+	 *         was previously aborted
 	 */
-	public boolean done(long baseOffset, long logAppendTime, RuntimeException topLevelException,Function<Integer, RuntimeException> recordExceptions) {
+	public boolean done(long baseOffset, long logAppendTime, RuntimeException topLevelException,
+			Function<Integer, RuntimeException> recordExceptions) {
 		final FinalState tryFinalState = (topLevelException == null) ? FinalState.SUCCEEDED : FinalState.FAILED;
 
 		if (tryFinalState == FinalState.SUCCEEDED) {
 			log.trace("Successfully produced messages to {} with base offset {}.", topicPartition, baseOffset);
 		} else {
-			log.trace("Failed to produce messages to {} with base offset {}.", topicPartition, baseOffset, topLevelException);
+			log.trace("Failed to produce messages to {} with base offset {}.", topicPartition, baseOffset,
+					topLevelException);
 		}
 
 		if (this.finalState.compareAndSet(null, tryFinalState)) {
@@ -215,37 +227,41 @@ public final class ProducerBatch {
 						tryFinalState, topicPartition, baseOffset, this.finalState.get());
 			} else {
 				// FAILED --> FAILED and ABORTED --> FAILED transitions are ignored.
-				log.debug("Ignored state transition {} -> {} for {} batch with base offset {}",
-						this.finalState.get(), tryFinalState, topicPartition, baseOffset);
+				log.debug("Ignored state transition {} -> {} for {} batch with base offset {}", this.finalState.get(),
+						tryFinalState, topicPartition, baseOffset);
 			}
 		} else {
 			// A SUCCESSFUL batch must not attempt another state change.
-			throw new IllegalStateException("A " + this.finalState.get() + " batch must not attempt another state change to " + tryFinalState);
+			throw new IllegalStateException(
+					"A " + this.finalState.get() + " batch must not attempt another state change to " + tryFinalState);
 		}
 		return false;
 	}
 
-	private void completeFutureAndFireCallbacks(long baseOffset, long logAppendTime, Function<Integer, RuntimeException> recordExceptions ) {
-		// Set the future before invoking the callbacks as we rely on its state for the `onCompletion` call
+	private void completeFutureAndFireCallbacks(long baseOffset, long logAppendTime,
+			Function<Integer, RuntimeException> recordExceptions) {
+		// Set the future before invoking the callbacks as we rely on its state for the
+		// `onCompletion` call
 		produceFuture.set(baseOffset, logAppendTime, recordExceptions);
 
 		// execute callbacks
 		for (int i = 0; i < thunks.size(); i++) {
-            try {
-                Thunk thunk = thunks.get(i);
-                if (thunk.callback != null) {
-                    if (recordExceptions == null) {
-                        RecordMetadata metadata = thunk.future.value();
-                        thunk.callback.onCompletion(metadata, null);
-                    } else {
-                        RuntimeException exception = recordExceptions.apply(i);
-                        thunk.callback.onCompletion(null, exception);
-                    }
-                }
-            } catch (Exception e) {
-                log.error("Error executing user-provided callback on message for topic-partition '{}'", topicPartition, e);
-            }
-        }
+			try {
+				Thunk thunk = thunks.get(i);
+				if (thunk.callback != null) {
+					if (recordExceptions == null) {
+						RecordMetadata metadata = thunk.future.value();
+						thunk.callback.onCompletion(metadata, null);
+					} else {
+						RuntimeException exception = recordExceptions.apply(i);
+						thunk.callback.onCompletion(null, exception);
+					}
+				}
+			} catch (Exception e) {
+				log.error("Error executing user-provided callback on message for topic-partition '{}'", topicPartition,
+						e);
+			}
+		}
 
 		produceFuture.done();
 	}
@@ -253,18 +269,22 @@ public final class ProducerBatch {
 	/**
 	 * Complete the request. If the batch was previously aborted, this is a no-op.
 	 *
-	 * @param baseOffset The base offset of the messages assigned by the server
+	 * @param baseOffset    The base offset of the messages assigned by the server
 	 * @param logAppendTime The log append time or -1 if CreateTime is being used
-	 * @param exception The exception that occurred (or null if the request was successful)
-	 * @return true if the batch was completed successfully and false if the batch was previously aborted
+	 * @param exception     The exception that occurred (or null if the request was
+	 *                      successful)
+	 * @return true if the batch was completed successfully and false if the batch
+	 *         was previously aborted
 	 */
-	public boolean done(long baseOffset, long logAppendTime,  List<OKafkaOffset> msgIds, RuntimeException topLevelException,Function<Integer, RuntimeException> recordExceptions) {
+	public boolean done(long baseOffset, long logAppendTime, List<OKafkaOffset> msgIds,
+			RuntimeException topLevelException, Function<Integer, RuntimeException> recordExceptions) {
 		final FinalState tryFinalState = (topLevelException == null) ? FinalState.SUCCEEDED : FinalState.FAILED;
 
 		if (tryFinalState == FinalState.SUCCEEDED) {
 			log.trace("Successfully produced messages to {} with base offset {}.", topicPartition, baseOffset);
 		} else {
-			log.trace("Failed to produce messages to {} with base offset {}.", topicPartition, baseOffset, topLevelException);
+			log.trace("Failed to produce messages to {} with base offset {}.", topicPartition, baseOffset,
+					topLevelException);
 		}
 
 		if (this.finalState.compareAndSet(null, tryFinalState)) {
@@ -279,51 +299,52 @@ public final class ProducerBatch {
 						tryFinalState, topicPartition, baseOffset, this.finalState.get());
 			} else {
 				// FAILED --> FAILED and ABORTED --> FAILED transitions are ignored.
-				log.debug("Ignored state transition {} -> {} for {} batch with base offset {}",
-						this.finalState.get(), tryFinalState, topicPartition, baseOffset);
+				log.debug("Ignored state transition {} -> {} for {} batch with base offset {}", this.finalState.get(),
+						tryFinalState, topicPartition, baseOffset);
 			}
 		} else {
 			// A SUCCESSFUL batch must not attempt another state change.
-			throw new IllegalStateException("A " + this.finalState.get() + " batch must not attempt another state change to " + tryFinalState);
+			throw new IllegalStateException(
+					"A " + this.finalState.get() + " batch must not attempt another state change to " + tryFinalState);
 		}
 		return false;
 		/*
-        if( !this.finalState.compareAndSet(null, tryFinalState)) {
-        	if (this.finalState.get() == FinalState.ABORTED) {
-                log.debug("ProduceResponse returned for {} after batch had already been aborted.", topicPartition);
-                return false;
-            } else {
-                throw new IllegalStateException("Batch has already been completed in final state " + this.finalState.get());
-            }
-        }
-        completeFutureAndFireCallbacks(msgIds, logAppendTime, exception);
-        return true;
+		 * if( !this.finalState.compareAndSet(null, tryFinalState)) { if
+		 * (this.finalState.get() == FinalState.ABORTED) { log.
+		 * debug("ProduceResponse returned for {} after batch had already been aborted."
+		 * , topicPartition); return false; } else { throw new
+		 * IllegalStateException("Batch has already been completed in final state " +
+		 * this.finalState.get()); } } completeFutureAndFireCallbacks(msgIds,
+		 * logAppendTime, exception); return true;
 		 */
 	}
 
-	private void completeFutureAndFireCallbacks(long baseOffset, long logAppendTime, List<OKafkaOffset> msgIds, Function<Integer, RuntimeException> recordExceptions) {
-		// Set the future before invoking the callbacks as we rely on its state for the `onCompletion` call
+	private void completeFutureAndFireCallbacks(long baseOffset, long logAppendTime, List<OKafkaOffset> msgIds,
+			Function<Integer, RuntimeException> recordExceptions) {
+		// Set the future before invoking the callbacks as we rely on its state for the
+		// `onCompletion` call
 		produceFuture.set(baseOffset, logAppendTime, msgIds, recordExceptions);
 
 		// execute callbacks
 		for (int i = 0; i < thunks.size(); i++) {
-            try {
-                Thunk thunk = thunks.get(i);
-                if (thunk.callback != null) {
-                    if (recordExceptions == null) {
-                        RecordMetadata metadata = thunk.future.value();
-                        thunk.callback.onCompletion(metadata, null);
-                    } else {
-                        RuntimeException exception = recordExceptions.apply(i);
-                        thunk.callback.onCompletion(null, exception);
-                    }
-                }
-            } catch (Exception e) {
-                log.error("Error executing user-provided callback on message for topic-partition '{}'", topicPartition, e);
-            }
-        }
+			try {
+				Thunk thunk = thunks.get(i);
+				if (thunk.callback != null) {
+					if (recordExceptions == null) {
+						RecordMetadata metadata = thunk.future.value();
+						thunk.callback.onCompletion(metadata, null);
+					} else {
+						RuntimeException exception = recordExceptions.apply(i);
+						thunk.callback.onCompletion(null, exception);
+					}
+				}
+			} catch (Exception e) {
+				log.error("Error executing user-provided callback on message for topic-partition '{}'", topicPartition,
+						e);
+			}
+		}
 
-		produceFuture.done();  
+		produceFuture.done();
 	}
 
 	public Deque<ProducerBatch> split(int splitBatchSize) {
@@ -336,8 +357,8 @@ public final class ProducerBatch {
 
 		RecordBatch recordBatch = recordBatchIter.next();
 		if (recordBatch.magic() < MAGIC_VALUE_V2 && !recordBatch.isCompressed())
-			throw new IllegalArgumentException("Batch splitting cannot be used with non-compressed messages " +
-					"with version v0 and v1");
+			throw new IllegalArgumentException(
+					"Batch splitting cannot be used with non-compressed messages " + "with version v0 and v1");
 
 		if (recordBatchIter.hasNext())
 			throw new IllegalArgumentException("A producer batch should only have one record batch.");
@@ -368,7 +389,8 @@ public final class ProducerBatch {
 			batch.closeForRecordAppends();
 		}
 
-		produceFuture.set(ProduceResponse.INVALID_OFFSET, NO_TIMESTAMP, batchIndex->new RecordBatchTooLargeException());
+		produceFuture.set(ProduceResponse.INVALID_OFFSET, NO_TIMESTAMP,
+				batchIndex -> new RecordBatchTooLargeException());
 		produceFuture.done();
 
 		if (hasSequence()) {
@@ -387,8 +409,10 @@ public final class ProducerBatch {
 				recordsBuilder.compressionType(), record.key(), record.value(), record.headers()), batchSize);
 		ByteBuffer buffer = ByteBuffer.allocate(initialSize);
 
-		// Note that we intentionally do not set producer state (producerId, epoch, sequence, and isTransactional)
-		// for the newly created batch. This will be set when the batch is dequeued for sending (which is consistent
+		// Note that we intentionally do not set producer state (producerId, epoch,
+		// sequence, and isTransactional)
+		// for the newly created batch. This will be set when the batch is dequeued for
+		// sending (which is consistent
 		// with how normal batches are handled).
 		MemoryRecordsBuilder builder = MemoryRecords.builder(buffer, magic(), recordsBuilder.compressionType(),
 				TimestampType.CREATE_TIME, 0L);
@@ -458,14 +482,12 @@ public final class ProducerBatch {
 	public boolean inRetry() {
 		return this.retry;
 	}
-	
-	public List<OKafkaOffset> retryMsgIdList()
-	{
+
+	public List<OKafkaOffset> retryMsgIdList() {
 		return reTryMsgIdList;
 	}
-	
-	public void setRetryMsgId(List<OKafkaOffset> retryMsgIdList)
-	{
+
+	public void setRetryMsgId(List<OKafkaOffset> retryMsgIdList) {
 		this.reTryMsgIdList = retryMsgIdList;
 	}
 
@@ -486,19 +508,22 @@ public final class ProducerBatch {
 	}
 
 	public void setProducerState(ProducerIdAndEpoch producerIdAndEpoch, int baseSequence, boolean isTransactional) {
-		recordsBuilder.setProducerState(producerIdAndEpoch.producerId, producerIdAndEpoch.epoch, baseSequence, isTransactional);
+		recordsBuilder.setProducerState(producerIdAndEpoch.producerId, producerIdAndEpoch.epoch, baseSequence,
+				isTransactional);
 	}
 
 	public void resetProducerState(ProducerIdAndEpoch producerIdAndEpoch, int baseSequence, boolean isTransactional) {
 		log.info("Resetting sequence number of batch with current sequence {} for partition {} to {}",
 				this.baseSequence(), this.topicPartition, baseSequence);
 		reopened = true;
-		recordsBuilder.reopenAndRewriteProducerState(producerIdAndEpoch.producerId, producerIdAndEpoch.epoch, baseSequence, isTransactional);
+		recordsBuilder.reopenAndRewriteProducerState(producerIdAndEpoch.producerId, producerIdAndEpoch.epoch,
+				baseSequence, isTransactional);
 	}
 
 	/**
-	 * Release resources required for record appends (e.g. compression buffers). Once this method is called, it's only
-	 * possible to update the RecordBatch header.
+	 * Release resources required for record appends (e.g. compression buffers).
+	 * Once this method is called, it's only possible to update the RecordBatch
+	 * header.
 	 */
 	public void closeForRecordAppends() {
 		recordsBuilder.closeForRecordAppends();
@@ -507,19 +532,19 @@ public final class ProducerBatch {
 	public void close() {
 		recordsBuilder.close();
 		if (!recordsBuilder.isControlBatch()) {
-			CompressionRatioEstimator.updateEstimation(topicPartition.topic(),
-					recordsBuilder.compressionType(),
+			CompressionRatioEstimator.updateEstimation(topicPartition.topic(), recordsBuilder.compressionType(),
 					(float) recordsBuilder.compressionRatio());
 		}
 		reopened = false;
 	}
 
 	/**
-	 * Abort the record builder and reset the state of the underlying buffer. This is used prior to aborting
-	 * the batch with {@link #abort(RuntimeException)} and ensures that no record previously appended can be
-	 * read. This is used in scenarios where we want to ensure a batch ultimately gets aborted, but in which
-	 * it is not safe to invoke the completion callbacks (e.g. because we are holding a lock,
-	 * {@link RecordAccumulator#abortBatches()}).
+	 * Abort the record builder and reset the state of the underlying buffer. This
+	 * is used prior to aborting the batch with {@link #abort(RuntimeException)} and
+	 * ensures that no record previously appended can be read. This is used in
+	 * scenarios where we want to ensure a batch ultimately gets aborted, but in
+	 * which it is not safe to invoke the completion callbacks (e.g. because we are
+	 * holding a lock, {@link RecordAccumulator#abortBatches()}).
 	 */
 	public void abortRecordAppends() {
 		recordsBuilder.abort();

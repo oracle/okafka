@@ -12,40 +12,41 @@ import java.util.Map;
 
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.oracle.okafka.common.Node;
+import org.oracle.okafka.common.errors.FeatureNotSupportedException;
 import org.oracle.okafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.protocol.ApiMessage;
 import org.apache.kafka.common.protocol.Errors;
 
 public class CommitResponse extends AbstractResponse {
-	
+
 	private final boolean error;
 	private final Map<Node, Exception> result;
 	private final Map<Node, List<TopicPartition>> nodes;
 	private final Map<TopicPartition, OffsetAndMetadata> offsets;
-	
+
 	public CommitResponse(Map<Node, Exception> result, Map<Node, List<TopicPartition>> nodes,
-			              Map<TopicPartition, OffsetAndMetadata> offsets, boolean error) {
+			Map<TopicPartition, OffsetAndMetadata> offsets, boolean error) {
 		super(ApiKeys.COMMIT);
 		this.result = result;
 		this.nodes = nodes;
 		this.offsets = offsets;
 		this.error = error;
-		
+
 	}
-	
+
 	public Map<Node, Exception> getResult() {
 		return result;
 	}
-	
+
 	public Map<Node, List<TopicPartition>> getNodes() {
 		return nodes;
 	}
-	
+
 	public Map<TopicPartition, OffsetAndMetadata> offsets() {
 		return offsets;
 	}
-	
+
 	public boolean error() {
 		return error;
 	}
@@ -70,9 +71,7 @@ public class CommitResponse extends AbstractResponse {
 
 	@Override
 	public void maybeSetThrottleTimeMs(int arg0) {
-		// TODO Auto-generated method stub
-		
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
-	
 
 }

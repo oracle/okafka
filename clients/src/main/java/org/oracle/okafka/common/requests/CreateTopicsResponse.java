@@ -33,6 +33,7 @@ import java.util.Map;
 
 import org.apache.kafka.common.protocol.ApiMessage;
 import org.apache.kafka.common.protocol.Errors;
+import org.oracle.okafka.common.errors.FeatureNotSupportedException;
 import org.oracle.okafka.common.protocol.ApiKeys;
 
 public class CreateTopicsResponse extends AbstractResponse {
@@ -79,8 +80,7 @@ public class CreateTopicsResponse extends AbstractResponse {
 
 	@Override
 	public void maybeSetThrottleTimeMs(int arg0) {
-		// TODO Auto-generated method stub
-		
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");		
 	}
 
 }

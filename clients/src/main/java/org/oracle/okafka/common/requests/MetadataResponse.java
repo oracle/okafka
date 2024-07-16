@@ -37,6 +37,7 @@ import org.apache.kafka.common.Cluster;
 import org.oracle.okafka.clients.NetworkClient;
 import org.oracle.okafka.clients.TopicTeqParameters;
 import org.oracle.okafka.common.Node;
+import org.oracle.okafka.common.errors.FeatureNotSupportedException;
 import org.oracle.okafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.config.AbstractConfig;
@@ -107,8 +108,7 @@ public class MetadataResponse extends AbstractResponse {
 
 	@Override
 	public void maybeSetThrottleTimeMs(int arg0) {
-		// TODO Auto-generated method stub
-		
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");		
 	}
 }
 

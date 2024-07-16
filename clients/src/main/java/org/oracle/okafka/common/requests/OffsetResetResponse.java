@@ -11,6 +11,7 @@ import java.util.Map;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.protocol.ApiMessage;
 import org.apache.kafka.common.protocol.Errors;
+import org.oracle.okafka.common.errors.FeatureNotSupportedException;
 import org.oracle.okafka.common.protocol.ApiKeys;
 
 public class OffsetResetResponse extends AbstractResponse {
@@ -50,7 +51,6 @@ public class OffsetResetResponse extends AbstractResponse {
 
 	@Override
 	public void maybeSetThrottleTimeMs(int arg0) {
-		// TODO Auto-generated method stub
-		
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");		
 	}
 }
