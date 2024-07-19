@@ -3,6 +3,7 @@ package org.oracle.okafka.common.requests;
 import java.util.List;
 import java.util.Map;
 
+import org.oracle.okafka.common.errors.FeatureNotSupportedException;
 import org.oracle.okafka.common.internals.PartitionData;
 import org.oracle.okafka.common.internals.SessionData;
 import org.oracle.okafka.common.protocol.ApiKeys;
@@ -88,5 +89,10 @@ public class JoinGroupResponse extends AbstractResponse {
 	public int throttleTimeMs() {
 		// TODO Auto-generated method stub
 		return 0;
+	}
+
+	@Override
+	public void maybeSetThrottleTimeMs(int arg0) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");		
 	}
 }

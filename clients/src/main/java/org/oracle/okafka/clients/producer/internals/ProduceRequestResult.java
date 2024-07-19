@@ -30,45 +30,55 @@
 package org.oracle.okafka.clients.producer.internals;
 
 import java.util.List;
+import java.util.function.Function;
+
 import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.TopicPartition;
 import org.oracle.okafka.common.utils.MessageIdConverter.OKafkaOffset;
 
 /**
- * A class that models the future completion of a produce request for a single partition. There is one of these per
- * partition in a produce request and it is shared by all the {@link RecordMetadata} instances that are batched together
+ * A class that models the future completion of a produce request for a single
+ * partition. There is one of these per partition in a produce request and it is
+ * shared by all the {@link RecordMetadata} instances that are batched together
  * for the same partition in the request.
  */
 public class ProduceRequestResult extends org.apache.kafka.clients.producer.internals.ProduceRequestResult {
 
-    private volatile List<OKafkaOffset> msgIds = null;
+	private volatile List<OKafkaOffset> msgIds = null;
 
-    /**
-     * Create an instance of this class.
-     *
-     * @param topicPartition The topic and partition to which this record set was sent was sent
-     */
-    public ProduceRequestResult(TopicPartition topicPartition) {
-        super(topicPartition);
-    }
+	/**
+	 * Create an instance of this class.
+	 *
+	 * @param topicPartition The topic and partition to which this record set was
+	 *                       sent was sent
+	 */
+	public ProduceRequestResult(TopicPartition topicPartition) {
+		super(topicPartition);
+	}
 
-    /**
-     * Set the result of the produce request.
-     *
-     * @param baseOffset The base offset assigned to the record
-     * @param logAppendTime The log append time or -1 if CreateTime is being used
-     * @param error The error that occurred if there was one, or null
-     */
-    public void set(long baseOffset, long logAppendTime, List<OKafkaOffset> msgIds, RuntimeException error) {
-        set(baseOffset, logAppendTime, error);
-        this.msgIds = msgIds;
-    }
+	/**
+	 * Set the result of the produce request.
+	 *
+	 * @param baseOffset    The base offset assigned to the record
+	 * @param logAppendTime The log append time or -1 if CreateTime is being used
+	 * @param error         The error that occurred if there was one, or null
+	 */
+	public void set(long baseOffset, long logAppendTime, List<OKafkaOffset> msgIds,
+			Function<Integer, RuntimeException> errorsByIndex) {
+		set(baseOffset, logAppendTime, errorsByIndex);
+		this.msgIds = msgIds;
+	}
 
-    /**
-     * The base offset for the request (the first offset in the record set)
-     */
-    public List<OKafkaOffset> msgIds() {
-        return msgIds;
-    }
+	public void set(long baseOffset, long logAppendTime, List<OKafkaOffset> msgIds, RuntimeException errorsByIndex) {
+		set(baseOffset, logAppendTime, batchIndex -> errorsByIndex);
+		this.msgIds = msgIds;
+	}
+
+	/**
+	 * The base offset for the request (the first offset in the record set)
+	 */
+	public List<OKafkaOffset> msgIds() {
+		return msgIds;
+	}
 
 }
