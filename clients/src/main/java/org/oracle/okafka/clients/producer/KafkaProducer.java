@@ -1835,4 +1835,9 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 	{
 		return getDBConnection(true);
 	}
+
+	@Override
+	public Uuid clientInstanceId(Duration timeout) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
 }

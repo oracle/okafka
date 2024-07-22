@@ -386,7 +386,7 @@ public final class AQKafkaProducer extends AQClient {
 			produceResult.set(thisOffset.subPartitionId(), (publishException==null)?byteMessage.getJMSTimestamp():-1, 
 					Collections.singletonList(thisOffset), publishException);
 
-			frm = new FutureRecordMetadata(produceResult, 0, System.currentTimeMillis(), -1l,
+			frm = new FutureRecordMetadata(produceResult, 0, System.currentTimeMillis(),
 					serializedKey.length,  serializedValue.length,time );
 
 			produceResult.done();

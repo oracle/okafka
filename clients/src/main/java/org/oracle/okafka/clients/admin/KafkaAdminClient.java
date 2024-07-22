@@ -399,7 +399,7 @@ public class KafkaAdminClient extends AdminClient {
 		try {
 			AdminMetadataManager metadataManager = new AdminMetadataManager(logContext,
 					config.getLong(AdminClientConfig.RETRY_BACKOFF_MS_CONFIG),
-					config.getLong(AdminClientConfig.METADATA_MAX_AGE_CONFIG));
+					config.getLong(AdminClientConfig.METADATA_MAX_AGE_CONFIG), false);
 			List<MetricsReporter> reporters = config
 					.getConfiguredInstances(AdminClientConfig.METRIC_REPORTER_CLASSES_CONFIG, MetricsReporter.class);
 			Map<String, String> metricTags = Collections.singletonMap("client-id", clientId);
@@ -439,7 +439,7 @@ public class KafkaAdminClient extends AdminClient {
 			LogContext logContext = createLogContext(clientId);
 			AdminMetadataManager metadataManager = new AdminMetadataManager(logContext,
 					config.getLong(AdminClientConfig.RETRY_BACKOFF_MS_CONFIG),
-					config.getLong(AdminClientConfig.METADATA_MAX_AGE_CONFIG));
+					config.getLong(AdminClientConfig.METADATA_MAX_AGE_CONFIG), false);
 			return new KafkaAdminClient(config, clientId, time, metadataManager, metrics, client, null, logContext);
 		} catch (Throwable exc) {
 			closeQuietly(metrics, "Metrics");
@@ -469,7 +469,8 @@ public class KafkaAdminClient extends AdminClient {
 		if (config.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG).trim()
 				.equalsIgnoreCase("PLAINTEXT")) {
 
-			addresses = ClientUtils.parseAndValidateAddresses(config.getList(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG), ClientDnsLookup.RESOLVE_CANONICAL_BOOTSTRAP_SERVERS_ONLY);
+			addresses = ClientUtils.parseAndValidateAddresses(config.getList(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG),
+					ClientDnsLookup.RESOLVE_CANONICAL_BOOTSTRAP_SERVERS_ONLY);
 			serviceName = config.getString(ConsumerConfig.ORACLE_SERVICE_NAME);
 			instanceName =config.getString(ConsumerConfig.ORACLE_INSTANCE_NAME);
 		}
@@ -1033,27 +1034,29 @@ public class KafkaAdminClient extends AdminClient {
 		private void handleResponse(long now, Call call, ClientResponse response) {
 
 			try {
-				    if(response.wasDisconnected()) {
-				    	client.disconnected( (org.oracle.okafka.common.Node)(metadataManager.nodeById(Integer.parseInt(response.destination()))), now);
-				    	metadataManager.requestUpdate();
-				    	
-				    }
-					call.handleResponse(response.responseBody());
-				} catch (Throwable t) {
-					if (log.isTraceEnabled())
-						log.trace("{} handleResponse failed with {}", call, prettyPrintException(t));
-					call.fail(now, t);
+				if (response.wasDisconnected()) {
+					client.disconnected((org.oracle.okafka.common.Node) (metadataManager
+							.nodeById(Integer.parseInt(response.destination()))), now);
+					metadataManager.requestUpdate();
+
 				}
+				call.handleResponse(response.responseBody());
+			} catch (Throwable t) {
+				if (log.isTraceEnabled())
+					log.trace("{} handleResponse failed with {}", call, prettyPrintException(t));
+				call.fail(now, t);
+			}
 		}
 
 		/**
 		 * Time out expired calls that are in flight.
 		 *
-		 * Calls that are in flight may have been partially or completely sent over the wire. They may
-		 * even be in the process of being processed by the remote server. At the moment, our only option
-		 * to time them out is to close the entire connection.
+		 * Calls that are in flight may have been partially or completely sent over the
+		 * wire. They may even be in the process of being processed by the remote
+		 * server. At the moment, our only option to time them out is to close the
+		 * entire connection.
 		 *
-		 * @param processor         The timeout processor.
+		 * @param processor The timeout processor.
 		 */
 		private void timeoutCallsInFlight(TimeoutProcessor processor) {
 			int numTimedOut = 0;
@@ -1062,7 +1065,8 @@ public class KafkaAdminClient extends AdminClient {
 				if (contexts.isEmpty())
 					continue;
 				String nodeId = entry.getKey();
-				// We assume that the first element in the list is the earliest. So it should be the
+				// We assume that the first element in the list is the earliest. So it should be
+				// the
 				// only one we need to check the timeout for.
 				Call call = contexts.get(0);
 				if (processor.callHasExpired(call)) {
@@ -1071,9 +1075,11 @@ public class KafkaAdminClient extends AdminClient {
 					} else {
 						log.debug("Closing connection to {} to time out {}", nodeId, call);
 						call.aborted = true;
-						client.disconnect((org.oracle.okafka.common.Node)metadataManager.nodeById(Integer.parseInt(nodeId)));
+						client.disconnect(
+								(org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(nodeId)));
 						numTimedOut++;
-						// We don't remove anything from the callsInFlight data structure. Because the connection
+						// We don't remove anything from the callsInFlight data structure. Because the
+						// connection
 						// has been closed, the calls should be returned by the next client#poll(),
 						// and handled at that point.
 					}
@@ -1086,8 +1092,8 @@ public class KafkaAdminClient extends AdminClient {
 		/**
 		 * Handle responses from the server.
 		 *
-		 * @param now                   The current time in milliseconds.
-		 * @param responses             The latest responses from KafkaClient.
+		 * @param now       The current time in milliseconds.
+		 * @param responses The latest responses from KafkaClient.
 		 **/
 		private void handleResponses(long now, List<ClientResponse> responses) {
 			for (ClientResponse response : responses) {
@@ -1096,11 +1102,14 @@ public class KafkaAdminClient extends AdminClient {
 				Call call = correlationIdToCalls.get(correlationId);
 				if (call == null) {
 					// If the server returns information about a correlation ID we didn't use yet,
-					// an internal server error has occurred. Close the connection and log an error message.
-					log.error("Internal server error on {}: server returned information about unknown " +
-							"correlation ID {}, requestHeader = {}", response.destination(), correlationId,
-							response.requestHeader());
-					client.disconnect((org.oracle.okafka.common.Node)metadataManager.nodeById(Integer.parseInt(response.destination())));
+					// an internal server error has occurred. Close the connection and log an error
+					// message.
+					log.error(
+							"Internal server error on {}: server returned information about unknown "
+									+ "correlation ID {}, requestHeader = {}",
+							response.destination(), correlationId, response.requestHeader());
+					client.disconnect((org.oracle.okafka.common.Node) metadataManager
+							.nodeById(Integer.parseInt(response.destination())));
 					continue;
 				}
 
@@ -1108,23 +1117,26 @@ public class KafkaAdminClient extends AdminClient {
 				correlationIdToCalls.remove(correlationId);
 				List<Call> calls = callsInFlight.get(response.destination());
 				if ((calls == null) || (!calls.remove(call))) {
-					log.error("Internal server error on {}: ignoring call {} in correlationIdToCall " +
-							"that did not exist in callsInFlight", response.destination(), call);
+					log.error("Internal server error on {}: ignoring call {} in correlationIdToCall "
+							+ "that did not exist in callsInFlight", response.destination(), call);
 					continue;
 				}
 
-				// Handle the result of the call. This may involve retrying the call, if we got a
+				// Handle the result of the call. This may involve retrying the call, if we got
+				// a
 				// retriable exception.
 				if (response.versionMismatch() != null) {
 					call.fail(now, response.versionMismatch());
 				} else if (response.wasDisconnected()) {
-					AuthenticationException authException = client.authenticationException((org.oracle.okafka.common.Node)call.curNode());
+					AuthenticationException authException = client
+							.authenticationException((org.oracle.okafka.common.Node) call.curNode());
 					if (authException != null) {
 						call.fail(now, authException);
 					} else {
-						call.fail(now, new DisconnectException(String.format(
-								"Cancelled %s request with correlation id %s due to node %s being disconnected",
-								call.callName, correlationId, response.destination())));
+						call.fail(now,
+								new DisconnectException(String.format(
+										"Cancelled %s request with correlation id %s due to node %s being disconnected",
+										call.callName, correlationId, response.destination())));
 					}
 					metadataManager.requestUpdate();
 				} else {
@@ -1142,14 +1154,16 @@ public class KafkaAdminClient extends AdminClient {
 		}
 
 		/**
-		 * Unassign calls that have not yet been sent based on some predicate. For example, this
-		 * is used to reassign the calls that have been assigned to a disconnected node.
+		 * Unassign calls that have not yet been sent based on some predicate. For
+		 * example, this is used to reassign the calls that have been assigned to a
+		 * disconnected node.
 		 *
-		 * @param shouldUnassign Condition for reassignment. If the predicate is true, then the calls will
-		 *                       be put back in the pendingCalls collection and they will be reassigned
+		 * @param shouldUnassign Condition for reassignment. If the predicate is true,
+		 *                       then the calls will be put back in the pendingCalls
+		 *                       collection and they will be reassigned
 		 */
 		private void unassignUnsentCalls(Predicate<org.oracle.okafka.common.Node> shouldUnassign) {
-			for (Iterator<Map.Entry<Node, List<Call>>> iter = callsToSend.entrySet().iterator(); iter.hasNext(); ) {
+			for (Iterator<Map.Entry<Node, List<Call>>> iter = callsToSend.entrySet().iterator(); iter.hasNext();) {
 				Map.Entry<Node, List<Call>> entry = iter.next();
 				org.oracle.okafka.common.Node node = (org.oracle.okafka.common.Node) entry.getKey();
 				List<Call> awaitingCalls = entry.getValue();
@@ -1236,10 +1250,8 @@ public class KafkaAdminClient extends AdminClient {
 
 				// Check if the AdminClient thread should shut down.
 				long curHardShutdownTimeMs = hardShutdownTimeMs.get();
-				if ( curHardShutdownTimeMs != INVALID_SHUTDOWN_TIME) 
-				{
-					if(threadShouldExit(now, curHardShutdownTimeMs))
-					{
+				if (curHardShutdownTimeMs != INVALID_SHUTDOWN_TIME) {
+					if (threadShouldExit(now, curHardShutdownTimeMs)) {
 						break;
 					}
 				}
@@ -1262,7 +1274,8 @@ public class KafkaAdminClient extends AdminClient {
 					metadataManager.transitionToUpdatePending(now);
 					Call metadataCall = makeMetadataCall(now);
 					// Create a new metadata fetch call and add it to the end of pendingCalls.
-					// Assign a node for just the new call (we handled the other pending nodes above).
+					// Assign a node for just the new call (we handled the other pending nodes
+					// above).
 
 					if (!maybeDrainPendingCall(metadataCall, now))
 						pendingCalls.add(metadataCall);
@@ -1273,25 +1286,24 @@ public class KafkaAdminClient extends AdminClient {
 					pollTimeout = Math.min(pollTimeout, metadataFetchDelayMs);
 				}
 
-				// Ensure that we use a small poll timeout if there are pending calls which need to be sent
+				// Ensure that we use a small poll timeout if there are pending calls which need
+				// to be sent
 				if (!pendingCalls.isEmpty())
 					pollTimeout = Math.min(pollTimeout, retryBackoffMs);
 
 				/*
-				 * OKafka uses synchronous network I/O. No need to wait 
-	                // Wait for network responses.
-	                log.trace("Entering KafkaClient#poll(timeout={})", pollTimeout);
-	                List<ClientResponse> responses = client.poll(pollTimeout, now);
-	                log.trace("KafkaClient#poll retrieved {} response(s)", responses.size());
+				 * OKafka uses synchronous network I/O. No need to wait // Wait for network
+				 * responses. log.trace("Entering KafkaClient#poll(timeout={})", pollTimeout);
+				 * List<ClientResponse> responses = client.poll(pollTimeout, now);
+				 * log.trace("KafkaClient#poll retrieved {} response(s)", responses.size());
 				 */
 				// unassign calls to disconnected nodes
 				unassignUnsentCalls(client::connectionFailed);
 
 				/*
-				 * For OKafka Response is handled in sendEligibleCalls itself
-	                // Update the current time and handle the latest responses.
-	                now = time.milliseconds();
-	                handleResponses(now, responses);
+				 * For OKafka Response is handled in sendEligibleCalls itself // Update the
+				 * current time and handle the latest responses. now = time.milliseconds();
+				 * handleResponses(now, responses);
 				 */
 			}
 		}
@@ -1299,12 +1311,12 @@ public class KafkaAdminClient extends AdminClient {
 		/**
 		 * Queue a call for sending.
 		 *
-		 * If the AdminClient thread has exited, this will fail. Otherwise, it will succeed (even
-		 * if the AdminClient is shutting down). This function should called when retrying an
-		 * existing call.
+		 * If the AdminClient thread has exited, this will fail. Otherwise, it will
+		 * succeed (even if the AdminClient is shutting down). This function should
+		 * called when retrying an existing call.
 		 *
-		 * @param call      The new call object.
-		 * @param now       The current time in milliseconds.
+		 * @param call The new call object.
+		 * @param now  The current time in milliseconds.
 		 */
 		void enqueue(Call call, long now) {
 			if (call.tries > maxRetries) {
@@ -1335,8 +1347,8 @@ public class KafkaAdminClient extends AdminClient {
 		 *
 		 * This will fail if the AdminClient is scheduled to shut down.
 		 *
-		 * @param call      The new call object.
-		 * @param now       The current time in milliseconds.
+		 * @param call The new call object.
+		 * @param now  The current time in milliseconds.
 		 */
 		void call(Call call, long now) {
 			if (hardShutdownTimeMs.get() != INVALID_SHUTDOWN_TIME) {
@@ -1359,9 +1371,8 @@ public class KafkaAdminClient extends AdminClient {
 					// for allowAutoTopicCreation (and it simplifies communication with
 					// older brokers)
 					/*
-	                    return new MetadataRequest.Builder(new MetadataRequestData()
-	                        .setTopics(Collections.emptyList())
-	                        .setAllowAutoTopicCreation(true));
+					 * return new MetadataRequest.Builder(new MetadataRequestData()
+					 * .setTopics(Collections.emptyList()) .setAllowAutoTopicCreation(true));
 					 */
 					return new MetadataRequest.Builder(Collections.emptyList(), true, Collections.emptyList());
 				}
@@ -1653,15 +1664,16 @@ public class KafkaAdminClient extends AdminClient {
 				
 				if (newTopic.replicasAssignments() != null) {
 					if (newTopic.configs() != null) {
-						topicDetails =  new TopicDetails(newTopic.replicasAssignments(), newTopic.configs());
+						topicDetails = new TopicDetails(newTopic.replicasAssignments(), newTopic.configs());
 					} else {
-						topicDetails =  new TopicDetails(newTopic.replicasAssignments());
+						topicDetails = new TopicDetails(newTopic.replicasAssignments());
 					}
 				} else {
 					if (newTopic.configs() != null) {
-						topicDetails =  new TopicDetails(newTopic.numPartitions(), newTopic.replicationFactor(), newTopic.configs());
+						topicDetails = new TopicDetails(newTopic.numPartitions(), newTopic.replicationFactor(),
+								newTopic.configs());
 					} else {
-						topicDetails =  new TopicDetails(newTopic.numPartitions(), newTopic.replicationFactor());
+						topicDetails = new TopicDetails(newTopic.numPartitions(), newTopic.replicationFactor());
 					}
 				}
 				topicsMap.put(newTopic.name(), topicDetails);
@@ -1678,8 +1690,8 @@ public class KafkaAdminClient extends AdminClient {
 			@Override
 			public void handleResponse(org.apache.kafka.common.requests.AbstractResponse abstractResponse) {
 				CreateTopicsResponse response = (CreateTopicsResponse) abstractResponse;
-				
-				// Handle server responses for particular topics.				
+
+				// Handle server responses for particular topics.
 				for (Map.Entry<String, Exception> entry : response.errors().entrySet()) {
 					KafkaFutureImpl<TopicMetadataAndConfig> future = topicFutures.get(entry.getKey());
 					if (future == null) {
@@ -1698,10 +1710,11 @@ public class KafkaAdminClient extends AdminClient {
 				for (Map.Entry<String, KafkaFutureImpl<TopicMetadataAndConfig>> entry : topicFutures.entrySet()) {
 					KafkaFutureImpl<TopicMetadataAndConfig> future = entry.getValue();
 					if (!future.isDone()) {
-						if(response.getResult() != null) {
+						if (response.getResult() != null) {
 							future.completeExceptionally(response.getResult());
-						} else future.completeExceptionally(new ApiException(
-								"The server response did not " + "contain a reference to node " + entry.getKey()));
+						} else
+							future.completeExceptionally(new ApiException(
+									"The server response did not " + "contain a reference to node " + entry.getKey()));
 					}
 				}
 			}
@@ -1714,27 +1727,26 @@ public class KafkaAdminClient extends AdminClient {
 		if (!topicsMap.isEmpty()) {
 			runnable.call(call, now);
 		}
-		org.apache.kafka.clients.admin.CreateTopicsResult createTopicResults =  
-				new org.oracle.okafka.clients.admin.CreateTopicsResult(new HashMap<String, KafkaFuture<TopicMetadataAndConfig>>(topicFutures));
+		org.apache.kafka.clients.admin.CreateTopicsResult createTopicResults = new org.oracle.okafka.clients.admin.CreateTopicsResult(
+				new HashMap<String, KafkaFuture<TopicMetadataAndConfig>>(topicFutures));
 		return createTopicResults;
 	}
 	
 	@Override
-	public DeleteTopicsResult deleteTopics(Collection<String> topicNames, DeleteTopicsOptions options)
-	{
-		org.oracle.okafka.clients.admin.DeleteTopicsResult delResult = deleteTopics( topicNames, new org.oracle.okafka.clients.admin.DeleteTopicsOptions());
-		KafkaFuture<Void> ftr =  delResult.all();
+	public DeleteTopicsResult deleteTopics(Collection<String> topicNames, DeleteTopicsOptions options) {
+		org.oracle.okafka.clients.admin.DeleteTopicsResult delResult = deleteTopics(topicNames,
+				new org.oracle.okafka.clients.admin.DeleteTopicsOptions());
+		KafkaFuture<Void> ftr = delResult.all();
 		try {
 			ftr.get();
-		}catch(Exception e)
-		{
-			log.error("Exception from deleteTopics" ,e);
+		} catch (Exception e) {
+			log.error("Exception from deleteTopics", e);
 		}
 		return null;
 	}
 
-	
-	public org.oracle.okafka.clients.admin.DeleteTopicsResult deleteTopics(Collection<String> topicNames, org.oracle.okafka.clients.admin.DeleteTopicsOptions options) {
+	public org.oracle.okafka.clients.admin.DeleteTopicsResult deleteTopics(Collection<String> topicNames,
+			org.oracle.okafka.clients.admin.DeleteTopicsOptions options) {
 		final Map<String, KafkaFutureImpl<Void>> topicFutures = new HashMap<>(topicNames.size());
 		final List<String> validTopicNames = new ArrayList<>(topicNames.size());
 		for (String topicName : topicNames) {
@@ -1778,10 +1790,11 @@ public class KafkaAdminClient extends AdminClient {
 				for (Map.Entry<String, KafkaFutureImpl<Void>> entry : topicFutures.entrySet()) {
 					KafkaFutureImpl<Void> future = entry.getValue();
 					if (!future.isDone()) {
-						if(response.getResult() != null) {
+						if (response.getResult() != null) {
 							future.completeExceptionally(response.getResult());
-						} else future.completeExceptionally(new ApiException(
-								"The server response did not " + "contain a reference to node " + entry.getKey()));
+						} else
+							future.completeExceptionally(new ApiException(
+									"The server response did not " + "contain a reference to node " + entry.getKey()));
 					}
 				}
 			}
@@ -1794,10 +1807,12 @@ public class KafkaAdminClient extends AdminClient {
 		if (!validTopicNames.isEmpty()) {
 			runnable.call(call, now);
 		}
-		return new org.oracle.okafka.clients.admin.DeleteTopicsResult(new HashMap<String, KafkaFuture<Void>>(topicFutures));
+		return new org.oracle.okafka.clients.admin.DeleteTopicsResult(
+				new HashMap<String, KafkaFuture<Void>>(topicFutures));
 	}
 
-	private void handleNotControllerError(org.apache.kafka.common.requests.AbstractResponse response) throws ApiException {
+	private void handleNotControllerError(org.apache.kafka.common.requests.AbstractResponse response)
+			throws ApiException {
 		if (response.errorCounts().containsKey(Errors.NOT_CONTROLLER)) {
 			handleNotControllerError(Errors.NOT_CONTROLLER);
 		}
@@ -2024,6 +2039,64 @@ public class KafkaAdminClient extends AdminClient {
 
 	@Override
 	public Map<MetricName, ? extends Metric> metrics() {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
+
+	@Override
+	public DeleteTopicsResult deleteTopics(TopicCollection topics, DeleteTopicsOptions options) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
+
+	@Override
+	public DescribeTopicsResult describeTopics(TopicCollection topics, DescribeTopicsOptions options) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
+
+	@Override
+	public ListConsumerGroupOffsetsResult listConsumerGroupOffsets(Map<String, ListConsumerGroupOffsetsSpec> groupSpecs,
+			ListConsumerGroupOffsetsOptions options) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
+
+	@Override
+	public DescribeMetadataQuorumResult describeMetadataQuorum(DescribeMetadataQuorumOptions options) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
+
+	@Override
+	public DescribeProducersResult describeProducers(Collection<TopicPartition> partitions,
+			DescribeProducersOptions options) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
+
+	@Override
+	public DescribeTransactionsResult describeTransactions(Collection<String> transactionalIds,
+			DescribeTransactionsOptions options) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
+
+	@Override
+	public AbortTransactionResult abortTransaction(AbortTransactionSpec spec, AbortTransactionOptions options) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
+
+	@Override
+	public ListTransactionsResult listTransactions(ListTransactionsOptions options) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
+
+	@Override
+	public FenceProducersResult fenceProducers(Collection<String> transactionalIds, FenceProducersOptions options) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
+
+	@Override
+	public Uuid clientInstanceId(Duration timeout) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
+
+	@Override
+	public ListClientMetricsResourcesResult listClientMetricsResources(ListClientMetricsResourcesOptions arg0) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 }
