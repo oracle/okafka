@@ -45,13 +45,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
-import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
-import java.lang.instrument.Instrumentation;
 
 
 import javax.jms.JMSException;
@@ -59,11 +57,8 @@ import javax.jms.JMSException;
 import oracle.jms.AQjmsBytesMessage;
 import oracle.jms.AQjmsDestination;
 
-//import org.oracle.okafka.clients.consumer.OffsetResetStrategy;
-import org.oracle.okafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.ClientDnsLookup;
 import org.apache.kafka.clients.ClientUtils;
-//import org.oracle.okafka.clients.consumer.internals.PartitionAssignor;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerGroupMetadata;
 import org.apache.kafka.clients.consumer.ConsumerInterceptor;
@@ -75,19 +70,15 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.clients.consumer.OffsetCommitCallback;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
-//import org.oracle.okafka.clients.ClientUtils;
 import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.clients.Metadata;
 import org.oracle.okafka.clients.NetworkClient;
 import org.apache.kafka.clients.consumer.internals.ConsumerInterceptors;
-//import org.oracle.okafka.clients.consumer.OffsetAndMetadata;
-//import org.oracle.okafka.clients.consumer.internals.ConsumerInterceptors;
 import org.oracle.okafka.clients.consumer.internals.ConsumerNetworkClient;
 import org.oracle.okafka.clients.consumer.internals.FetchMetricsRegistry;
 import org.oracle.okafka.clients.consumer.internals.OkafkaConsumerMetrics;
 import org.apache.kafka.clients.consumer.internals.NoOpConsumerRebalanceListener;
 
-//import org.apache.kafka.clients.consumer.internals.SubscriptionState;
 import org.oracle.okafka.clients.consumer.internals.SubscriptionState;
 import org.oracle.okafka.clients.consumer.internals.SubscriptionState.FetchPosition;
 import org.apache.kafka.clients.Metadata.LeaderAndEpoch;
@@ -106,7 +97,6 @@ import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
 import org.oracle.okafka.common.network.AQClient;
 import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.common.internals.ClusterResourceListeners;
-import org.apache.kafka.common.metrics.Gauge;
 import org.apache.kafka.common.metrics.JmxReporter;
 import org.apache.kafka.common.metrics.MetricConfig;
 import org.apache.kafka.common.metrics.Metrics;
@@ -115,8 +105,6 @@ import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.metrics.stats.Avg;
 import org.apache.kafka.common.metrics.stats.Max;
 import org.apache.kafka.common.metrics.stats.Meter;
-import org.apache.kafka.common.metrics.stats.Min;
-import org.apache.kafka.common.metrics.stats.Value;
 import org.apache.kafka.common.metrics.stats.WindowedCount;
 import org.apache.kafka.common.record.TimestampType;
 import org.oracle.okafka.common.requests.IsolationLevel;
@@ -1566,7 +1554,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 	 * Tries to close the consumer cleanly.
 	 * If auto-commit is enabled, this will commit the current offsets . Close doen't take timeout into consideration.
 	 *
-	 * @throws org.oracle.okafka.common.KafkaException for any other error during close
+	 * @throws org.apache.kafka.common.KafkaException for any other error during close
 	 */
 	@Override
 	public void close() {
