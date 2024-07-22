@@ -41,7 +41,7 @@ ext {
 }
 
 project(':clients') {
-    apply plugin : 'java'
+    apply plugin : 'java-library'
     
     sourceCompatibility = minJavaVersion
     targetCompatibility = minJavaVersion
