@@ -18,7 +18,7 @@ import org.apache.kafka.common.KafkaFuture;
 
 import org.oracle.okafka.clients.admin.AdminClient;
 
-public class SimpleAdminOKafka {
+public class CreateTopic {
 
 	public static void main(String[] args) {
 		Properties props = new Properties();

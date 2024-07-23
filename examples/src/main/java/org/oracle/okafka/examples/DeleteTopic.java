@@ -19,7 +19,7 @@ import org.oracle.okafka.clients.admin.AdminClient;
 import org.oracle.okafka.clients.admin.DeleteTopicsResult;
 import org.oracle.okafka.clients.admin.KafkaAdminClient;
 
-public class OKafkaDeleteTopic {
+public class DeleteTopic {
 	
 	public static void main(String[] args) {
 		Properties props = new Properties();

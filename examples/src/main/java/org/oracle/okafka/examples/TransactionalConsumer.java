@@ -25,7 +25,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.oracle.okafka.clients.consumer.KafkaConsumer;
 
 
-public class TransactionalConsumerOKafka {
+public class TransactionalConsumer {
 
 	// Dummy implementation of ConsumerRebalanceListener interface
 	// It only maintains the list of assigned partitions in assignedPartitions list
