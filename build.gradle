@@ -41,7 +41,7 @@ ext {
 }
 
 project(':clients') {
-    apply plugin : 'java'
+    apply plugin : 'java-library'
     
     sourceCompatibility = minJavaVersion
     targetCompatibility = minJavaVersion
@@ -67,12 +67,11 @@ project(':clients') {
     dependencies {
 
       // These dependencies are used by the application.
-	  implementation group: 'com.oracle.database.jdbc', name: 'ojdbc11', version: '23.4.0.24.05'
-	  implementation group: 'com.oracle.database.messaging', name: 'aqapi', version: '23.3.0.0'
+      implementation group: 'com.oracle.database.jdbc', name: 'ojdbc11', version: '23.4.0.24.05'
+      implementation group: 'com.oracle.database.messaging', name: 'aqapi', version: '23.3.0.0'
       implementation group: 'javax.transaction', name: 'jta', version: '1.1'
       implementation group: 'javax.jms', name: 'javax.jms-api', version: '2.0'
       implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '23.4.0.24.05'
-      
       implementation group: 'org.slf4j', name: 'slf4j-api', version: '2.0.0-alpha0'          
       implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.7.1'
       // Use JUnit test framework

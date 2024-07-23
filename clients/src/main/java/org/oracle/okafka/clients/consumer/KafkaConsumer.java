@@ -75,19 +75,15 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.clients.consumer.OffsetCommitCallback;
 import org.apache.kafka.clients.consumer.OffsetResetStrategy;
-//import org.oracle.okafka.clients.ClientUtils;
 import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.clients.Metadata;
 import org.oracle.okafka.clients.NetworkClient;
 import org.apache.kafka.clients.consumer.internals.ConsumerInterceptors;
-//import org.oracle.okafka.clients.consumer.OffsetAndMetadata;
-//import org.oracle.okafka.clients.consumer.internals.ConsumerInterceptors;
 import org.oracle.okafka.clients.consumer.internals.ConsumerNetworkClient;
 import org.oracle.okafka.clients.consumer.internals.FetchMetricsRegistry;
 import org.oracle.okafka.clients.consumer.internals.OkafkaConsumerMetrics;
 import org.oracle.okafka.clients.consumer.internals.NoOpConsumerRebalanceListener;
 
-//import org.apache.kafka.clients.consumer.internals.SubscriptionState;
 import org.oracle.okafka.clients.consumer.internals.SubscriptionState;
 import org.oracle.okafka.clients.consumer.internals.SubscriptionState.FetchPosition;
 import org.apache.kafka.clients.Metadata.LeaderAndEpoch;
@@ -1627,8 +1623,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 	 * Tries to close the consumer cleanly. If auto-commit is enabled, this will
 	 * commit the current offsets . Close doen't take timeout into consideration.
 	 *
-	 * @throws org.oracle.okafka.common.KafkaException for any other error during
-	 *                                                 close
+	 * @throws org.apache.kafka.common.KafkaException for any other error during close
 	 */
 	@Override
 	public void close() {
@@ -1825,7 +1820,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 	public OptionalLong currentLag(TopicPartition topicPartition) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
-
+	
 	private static class FetchResponseMetricAggregator {
 		private final FetchManagerMetrics sensors;
 		private final Set<TopicPartition> unrecordedPartitions;

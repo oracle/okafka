@@ -148,7 +148,7 @@ import org.apache.kafka.common.annotation.InterfaceStability;
 import org.apache.kafka.common.config.ConfigResource;
 
 /**
- * The administrative client for Kafka, which supports managing and inspecting topics, brokers, configurations and ACLs.
+ * The administrative client for Kafka, which supports managing and inspecting topics.
  * <p>
  * Instances returned from the {@code create} methods of this interface are guaranteed to be thread safe.
  * However, the {@link KafkaFuture KafkaFutures} returned from request methods are executed
@@ -214,17 +214,7 @@ import org.apache.kafka.common.config.ConfigResource;
  * The client will transparently retry certain errors which are usually transient.
  * For example if the request for {@code createTopics()} get sent to a node which was not the controller
  * the metadata would be refreshed and the request re-sent to the controller.
- *
- * <h3>Broker Compatibility</h3>
- * <p>
- * The minimum broker version required is 0.10.0.0. Methods with stricter requirements will specify the minimum broker
- * version required.
- * <p>
- * This client was introduced in 0.11.0.0 and the API is still evolving. We will try to evolve the API in a compatible
- * manner, but we reserve the right to make breaking changes in minor releases, if necessary. We will update the
- * {@code InterfaceStability} annotation and this notice once the API is considered stable.
- * <p>
- */
+  */
 @InterfaceStability.Evolving
 public interface Admin extends org.apache.kafka.clients.admin.Admin {
 
