@@ -20,7 +20,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 public class SimpleConsumer {
 	public static void main(String[] args) {
 		Properties props = new Properties();
-//		props.put("bootstrap.servers", "den02tgo.us.oracle.com:9092");
+		props.put("bootstrap.servers", "den02tgo.us.oracle.com:9092");
 		props.put("group.id", "S1");
 		props.put("enable.auto.commit", "true");
 		props.put("max.poll.records", 1000);
@@ -28,6 +28,7 @@ public class SimpleConsumer {
 		props.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
 		props.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
 
+		/*
 		// Option 2: Connect to Oracle Autonomous Database using Oracle Wallet
 		// This option to be used when connecting to Oracle autonomous database instance
 		// on OracleCloud
@@ -35,6 +36,7 @@ public class SimpleConsumer {
 		// location for Oracle Wallet, tnsnames.ora file and ojdbc.properties file
 		props.put("oracle.net.tns_admin", "./Wallet_Oratest23ai");
 		props.put("tns.alias", "oratest23ai_high");
+		*/
 
 		KafkaConsumer<String, String> consumer = new KafkaConsumer<String, String>(props);
 		consumer.subscribe(Arrays.asList("TXEQ"));
