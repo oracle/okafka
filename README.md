@@ -22,6 +22,7 @@ To run `OKafka application` against Oracle Database, a database user must be cre
 
 ```roomsql
 create user <user> identified by <password>
+GRANT CONNECT , RESOURCE to user;
 GRANT EXECUTE on DBMS_AQ to user;
 GRANT EXECUTE on DBMS_AQADM to user;
 GRANT EXECUTE on DBMS_AQIN to user;
