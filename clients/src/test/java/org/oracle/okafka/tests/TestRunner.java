@@ -1,5 +1,4 @@
 package org.oracle.okafka.tests;
-import java.util.Scanner;
 
 import org.junit.runner.JUnitCore;
 import org.junit.runner.Result;
@@ -20,7 +19,6 @@ class TestRunner {
 	        System.out.println("Test failure : "+ failure.toString());
 	    }
 			System.out.println("Tests ran succesfully: " + result.wasSuccessful());
-		    
 	   }
    }
 
