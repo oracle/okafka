@@ -8,10 +8,14 @@
 package org.oracle.okafka.examples;
 
 import org.oracle.okafka.clients.producer.KafkaProducer;
+import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Properties;
 import java.util.concurrent.Future;
@@ -19,65 +23,82 @@ import java.util.concurrent.Future;
 public class ProducerOKafka {
 	
 	public static void main(String[] args) {
+		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "DEBUG");
+
+		// Get application properties
+		Properties appProperties = null;
 		try {
-			Properties props = new getProperties();
-			String topic = props.getProperty("topic.name", "TXEQ");
-			props.remove("topic.name"); // Pass props to build OKafkaProducer		
-			Producer<String, String> producer = new KafkaProducer<String, String>(props);
-			
-			String baseMsg = "This is test with 128 characters Payload used to test Oracle Kafka. "+
-					 "Read https://github.com/oracle/okafka/blob/master/README.md";
-	
-			
-			Future<RecordMetadata> lastFuture = null;
-			int msgCnt = 10;
-			String key = "Just some key for OKafka";
-			ArrayList<Future<RecordMetadata>> metadataList = new ArrayList<Future<RecordMetadata>>();
-			
+			appProperties = getProperties();
+			if (appProperties == null) {
+				System.out.println("Application properties not found!");
+				System.exit(-1);
+			}
+		} catch (Exception e) {
+			System.out.println("Application properties not found!");
+			System.out.println("Exception: " + e);
+			System.exit(-1);
+		}
+
+		String topic = appProperties.getProperty("topic.name", "TXEQ");
+		appProperties.remove("topic.name"); // Pass props to build OKafkaProducer
+
+		Producer<String, String> producer = new KafkaProducer<>(appProperties);
+
+		String baseMsg = "This is test with 128 characters Payload used to test Oracle Kafka. "+
+				"Read https://github.com/oracle/okafka/blob/master/README.md";
+
+		Future<RecordMetadata> lastFuture = null;
+		int msgCnt = 10;
+		String key = "Just some key for OKafka";
+		ArrayList<Future<RecordMetadata>> metadataList = new ArrayList<>();
+
+		try {
 			for(int i=0;i<msgCnt;i++) {
                 RecordHeader rH1 = new RecordHeader("CLIENT_ID", "FIRST_CLIENT".getBytes());
-				RecordHeader rH2 = new RecordHeader("REPLY_TO", "TXEQ_2".getBytes()); 
-				ProducerRecord<String, String> producerRecord = 
-						new ProducerRecord<String, String>(topic, key+i, i+ baseMsg);
+				RecordHeader rH2 = new RecordHeader("REPLY_TO", "TXEQ_2".getBytes());
+				ProducerRecord<String, String> producerRecord =
+						new ProducerRecord<>(topic, key+i, i+ baseMsg);
                 producerRecord.headers().add(rH1).add(rH2);
 				lastFuture = producer.send(producerRecord);
 				metadataList.add(lastFuture);
 			}
 			RecordMetadata  rd = lastFuture.get();
 			System.out.println("Last record placed in " + rd.partition() + " Offset " + rd.offset());
-			
-			System.out.println("Initiating close");
-			producer.close();
-		}		
-		catch(Exception e)
-		{
-			System.out.println("Exception in Main " + e );
+		}
+		catch(Exception e) {
+			System.out.println("Failed to send messages:");
 			e.printStackTrace();
 		}
+		finally {
+			System.out.println("Initiating close");
+			producer.close();
+		}
+
 	}
-	
-	 private static java.util.Properties getProperties()  throws IOException {
-	        InputStream inputStream = null;
-	        Properties appProperties = null;
 
-	        try {
-	            Properties prop = new Properties();
-	            String propFileName = "config.properties";
-	            inputStream = new FileInPutStream(propFileName);
-	            if (inputStream != null) {
-	                prop.load(inputStream);
-	            } else {
-	                throw new FileNotFoundException("property file '" + propFileName + "' not found.");
-	            }
-	            appProperties = prop;
+	private static java.util.Properties getProperties()  throws IOException {
+		InputStream inputStream = null;
+		Properties appProperties;
 
-	        } catch (Exception e) {
-	            System.out.println("Exception: " + e);
-	            throw e;
-	        } finally {
-	            inputStream.close();
-	        }
-	        return appProperties;
-	    }
+		try {
+			Properties prop = new Properties();
+			String propFileName = "config.properties";
+			inputStream = ProducerOKafka.class.getClassLoader().getResourceAsStream(propFileName);
+			if (inputStream != null) {
+				prop.load(inputStream);
+			} else {
+				throw new FileNotFoundException("property file '" + propFileName + "' not found.");
+			}
+			appProperties = prop;
+
+		} catch (Exception e) {
+			System.out.println("Exception: " + e);
+			throw e;
+		} finally {
+			if (inputStream != null)
+				inputStream.close();
+		}
+		return appProperties;
+	}
 
 }

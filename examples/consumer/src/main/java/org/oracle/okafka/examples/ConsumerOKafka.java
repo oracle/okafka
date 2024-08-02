@@ -7,22 +7,39 @@
 
 package org.oracle.okafka.examples;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Properties;
 import java.time.Duration;
 import java.util.Arrays;
 
 import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 public class ConsumerOKafka {
 	public static void main(String[] args) {
-		Properties props = new getProperties();
-		String topic = props.getProperty("topic.name", "TXEQ");
-		props.remove("topic.name"); // Pass props to build OKafkaConsumer		
-		KafkaConsumer<Integer , String> consumer = new KafkaConsumer<Integer, String>(props);
+		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "DEBUG");
+
+		// Get application properties
+		Properties appProperties = null;
+		try {
+			appProperties = getProperties();
+			if (appProperties == null) {
+				System.out.println("Application properties not found!");
+				System.exit(-1);
+			}
+		} catch (Exception e) {
+			System.out.println("Application properties not found!");
+			System.out.println("Exception: " + e);
+			System.exit(-1);
+		}
+
+		String topic = appProperties.getProperty("topic.name", "TXEQ");
+		appProperties.remove("topic.name"); // Pass props to build OKafkaProducer
+
+		KafkaConsumer<Integer , String> consumer = new KafkaConsumer<Integer, String>(appProperties);
 		consumer.subscribe(Arrays.asList(topic));
 
 		while(true) {
@@ -58,7 +75,7 @@ public class ConsumerOKafka {
 		try {
 			Properties prop = new Properties();
 			String propFileName = "config.properties";
-			inputStream = new FileInPutStream(propFileName);
+			inputStream = ConsumerOKafka.class.getClassLoader().getResourceAsStream(propFileName);
 			if (inputStream != null) {
 				prop.load(inputStream);
 			} else {
