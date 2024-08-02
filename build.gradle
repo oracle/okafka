@@ -129,3 +129,92 @@ project(':clients') {
         duplicatesStrategy 'exclude'
     }
 }
+
+
+project(':examples:consumer') {
+    apply plugin : 'java'
+    apply plugin : 'application'
+
+    sourceCompatibility = minJavaVersion
+    targetCompatibility = minJavaVersion
+
+    dependencies {
+        // These dependencies are used by the application.
+        implementation project(':clients')
+        implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '23.4.0.24.05'
+        implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.7.1'
+    }
+
+
+    tasks.named('jar') {
+        description('Generates okafka client consumer jar ')
+        archiveBaseName = 'okafka'
+        archiveClassifier = 'consumer'
+
+        from "${rootProject.projectDir}/LICENSE.txt"
+        from "${rootProject.projectDir}/NOTICE"
+
+        manifest {
+            attributes( 'Implementation-Title'  : 'okafka consumer',
+                        'Implementation-Version': project.version)
+        }
+    }
+
+    tasks.named('run') {
+        description('Run okafka client consumer')
+        application {
+            mainClass = 'org.oracle.okafka.examples.Consumer'
+        }
+    }
+}
+
+project(':examples:producer') {
+    apply plugin : 'java'
+    apply plugin : 'application'
+
+    sourceCompatibility = minJavaVersion
+    targetCompatibility = minJavaVersion
+
+    dependencies {
+        // These dependencies are used by the application.
+        implementation project(':clients')
+        implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '23.4.0.24.05'
+        implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.7.1'
+    }
+
+    tasks.named('jar') {
+        description('Generates okafka client producer jar ')
+        archiveBaseName = 'okafka'
+        archiveClassifier = 'producer'
+
+        from "${rootProject.projectDir}/LICENSE.txt"
+        from "${rootProject.projectDir}/NOTICE"
+
+        manifest {
+            attributes( 'Implementation-Title'  : 'okafka producer',
+                        'Implementation-Version': project.version)
+        }
+    }
+
+    tasks.named('run') {
+        description('Run okafka client producer')
+        application {
+            mainClass = 'org.oracle.okafka.examples.Producer'
+        }
+    }
+}
+
+configurations {
+    childJar
+}
+
+dependencies {
+    subprojects.each {
+        childJar project(it.path)
+    }
+}
+
+task multiProjectJar (type: Jar,  dependsOn: configurations.childJar) {
+    description 'Generates a jar containing okafka client, all its dependencies and examples for okafka demo'
+    from { configurations.childJar.collect { zipTree(it) } }
+}

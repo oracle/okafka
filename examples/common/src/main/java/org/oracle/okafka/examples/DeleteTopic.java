@@ -1,9 +1,9 @@
 /*
-** OKafka Java Client version 23.4.
-**
-** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
-** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
-*/
+ ** OKafka Java Client version 23.4.
+ **
+ ** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
+ ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
+ */
 
 package org.oracle.okafka.examples;
 
@@ -33,7 +33,6 @@ public class DeleteTopic {
 		//props.put("bootstrap.servers", "phoenix266026.dev3sub1phx.databasede3phx.oraclevcn.com:1521"); 
 		props.put("bootstrap.servers", "phoenix94147.dev3sub2phx.databasede3phx.oraclevcn.com:1521");
 		
-		
 		/*
 		//Option 2: Connect to Oracle Autonomous Database using Oracle Wallet
 		//This option to be used when connecting to Oracle autonomous database instance on OracleCloud
@@ -42,16 +41,12 @@ public class DeleteTopic {
 		props.put("oracle.net.tns_admin","."); 
 		props.put("tns.alias","Oracle23ai_high"); 
 		 */
-
 		try (Admin admin = AdminClient.create(props)) {
-	
-			/*		NewTopic t1 = new NewTopic("TOPIC_TEQ", 5, (short)0);			
-			kAdminClient.createTopics(Collections.singletonList(t1)); */
-			
-			org.apache.kafka.clients.admin.DeleteTopicsResult delResult = admin.deleteTopics(Collections.singletonList("TEQ"));
-			
+
+			org.apache.kafka.clients.admin.DeleteTopicsResult delResult = admin.deleteTopics(Collections.singletonList("TXEQ"));
+
 			//DeleteTopicsResult delResult = kAdminClient.deleteTopics(Collections.singletonList("TEQ2"), new org.oracle.okafka.clients.admin.DeleteTopicsOptions());
-			
+
 			Thread.sleep(5000);
 			System.out.println("Auto Clsoing admin now");
 		}
@@ -60,9 +55,6 @@ public class DeleteTopic {
 			System.out.println("Exception while creating topic " + e);
 			e.printStackTrace();
 		}
-		
-		System.out.println("Main thread complete ");
-
 	}
 
 }

@@ -13,7 +13,7 @@ public class OkafkaSetup {
 	  final Properties BaseProperties = new Properties();
 	  InputStream input;
     	  try {
-    		  input = new FileInputStream("config.properties");
+    		  input = new FileInputStream("src/test/java/test.config");
               BaseProperties.load(input);
 	        } catch (Exception e) {
 	        	System.out.println("Exception whlie loading config.properties file. " + e);
@@ -21,6 +21,4 @@ public class OkafkaSetup {
 	        }
 	  return BaseProperties;
     }
-    
-    
 }
