@@ -14,7 +14,8 @@ import java.util.Properties;
 import java.time.Duration;
 import java.util.Arrays;
 
-import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.oracle.okafka.clients.consumer.KafkaConsumer;
+
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 
@@ -39,14 +40,14 @@ public class ConsumerOKafka {
 		String topic = appProperties.getProperty("topic.name", "TXEQ");
 		appProperties.remove("topic.name"); // Pass props to build OKafkaProducer
 
-		KafkaConsumer<Integer , String> consumer = new KafkaConsumer<Integer, String>(appProperties);
+		KafkaConsumer<String , String> consumer = new KafkaConsumer<>(appProperties);
 		consumer.subscribe(Arrays.asList(topic));
 
 		while(true) {
 			try {
-				ConsumerRecords <Integer, String> records = consumer.poll(Duration.ofMillis(10000));
+				ConsumerRecords <String, String> records = consumer.poll(Duration.ofMillis(10000));
 
-				for (ConsumerRecord<Integer, String> record : records)
+				for (ConsumerRecord<String, String> record : records)
 					System.out.printf("partition = %d, offset = %d, key = %d, value =%s\n  ", record.partition(), record.offset(), record.key(), record.value());
 
 				if(records != null && records.count() > 0) {

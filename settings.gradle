@@ -6,4 +6,7 @@
 */
 
 rootProject.name = 'okafka'
-include(':clients', 'examples:consumer', 'examples:producer')
+include(':clients', 'examples:consumer', 'examples:producer', 'examples:TxProducer', 'examples:TxConsumer')
+// include 'examples:TxProducer'
+// findProject(':examples:TxProducer')?.name = 'TxProducer'
+

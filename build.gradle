@@ -203,6 +203,85 @@ project(':examples:producer') {
     }
 }
 
+project(':examples:TxProducer') {
+    apply plugin : 'java'
+    apply plugin : 'application'
+
+    sourceCompatibility = minJavaVersion
+    targetCompatibility = minJavaVersion
+
+    dependencies {
+        // These dependencies are used by the application.
+        implementation project(':clients')
+        implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '23.4.0.24.05'
+        implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.7.1'
+        implementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.5.6'
+    }
+
+    tasks.named('jar') {
+        description('Generates OKafka Transactional Producer jar ')
+        archiveBaseName = 'okafka'
+        archiveClassifier = 'txproducer'
+
+        from "${rootProject.projectDir}/LICENSE.txt"
+        from "${rootProject.projectDir}/NOTICE"
+
+        manifest {
+            attributes(
+                    'Implementation-Title'  : 'OKafka Transactional Producer',
+                    'Implementation-Version': project.version
+            )
+        }
+    }
+
+    tasks.named('run') {
+        description('Run OKafka Transactional Producer')
+        application {
+            mainClass = 'org.oracle.okafka.examples.TransactionalProducerOKafka'
+        }
+    }
+}
+
+project(':examples:TxConsumer') {
+    apply plugin : 'java'
+    apply plugin : 'application'
+
+    sourceCompatibility = minJavaVersion
+    targetCompatibility = minJavaVersion
+
+    dependencies {
+        // These dependencies are used by the application.
+        implementation project(':clients')
+        implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '23.4.0.24.05'
+        implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.7.1'
+        implementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.5.6'
+    }
+
+
+    tasks.named('jar') {
+        description('Generates OKafka Transactional Consumer jar ')
+        archiveBaseName = 'okafka'
+        archiveClassifier = 'txconsumer'
+
+        from "${rootProject.projectDir}/LICENSE.txt"
+        from "${rootProject.projectDir}/NOTICE"
+
+        manifest {
+            attributes(
+                    'Implementation-Title'  : 'OKafka Transactional Consumer',
+                    'Implementation-Version': project.version
+            )
+        }
+    }
+
+    tasks.named('run') {
+        description('Run OKafka Transactional Consumer')
+        application {
+            mainClass = 'org.oracle.okafka.examples.TransactionalConsumerOKafka'
+        }
+    }
+}
+
 configurations {
     childJar
 }
