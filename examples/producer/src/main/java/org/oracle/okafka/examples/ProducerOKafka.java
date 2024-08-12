@@ -8,6 +8,7 @@
 package org.oracle.okafka.examples;
 
 import org.oracle.okafka.clients.producer.KafkaProducer;
+
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;

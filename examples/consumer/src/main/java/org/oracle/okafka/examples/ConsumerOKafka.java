@@ -21,7 +21,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 
 public class ConsumerOKafka {
 	public static void main(String[] args) {
-		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "DEBUG");
+		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "INFO");
 
 		// Get application properties
 		Properties appProperties = null;
@@ -43,20 +43,21 @@ public class ConsumerOKafka {
 		KafkaConsumer<String , String> consumer = new KafkaConsumer<>(appProperties);
 		consumer.subscribe(Arrays.asList(topic));
 
-		while(true) {
+
 			try {
-				ConsumerRecords <String, String> records = consumer.poll(Duration.ofMillis(10000));
+				while(true) {
+					ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(10000));
 
-				for (ConsumerRecord<String, String> record : records)
-					System.out.printf("partition = %d, offset = %d, key = %d, value =%s\n  ", record.partition(), record.offset(), record.key(), record.value());
+					for (ConsumerRecord<String, String> record : records)
+						System.out.printf("partition = %d, offset = %d, key = %s, value =%s\n  ", record.partition(), record.offset(), record.key(), record.value());
 
-				if(records != null && records.count() > 0) {
-					System.out.println("Committing records" + records.count());
-					consumer.commitSync();     
-				}
-				else {
-					System.out.println("No Record Fetched. Retrying in 1 second");
-					Thread.sleep(1000);
+					if (records != null && records.count() > 0) {
+						System.out.println("Committing records" + records.count());
+						consumer.commitSync();
+					} else {
+						System.out.println("No Record Fetched. Retrying in 1 second");
+						Thread.sleep(1000);
+					}
 				}
 			}catch(Exception e)
 			{
@@ -66,7 +67,7 @@ public class ConsumerOKafka {
 			finally {
 				consumer.close();
 			}
-		}
+
 	}
 
 	private static java.util.Properties getProperties()  throws IOException {
