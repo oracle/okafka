@@ -17,7 +17,7 @@ import org.apache.kafka.common.header.internals.RecordHeader;
 import java.sql.Connection;
 import java.util.Properties;
 
-public class TransactionalProducerOKafka {
+public class TransactionalProducer {
 	public static void main(String[] args) {
 		Producer<String, String> producer = null;
 		try {

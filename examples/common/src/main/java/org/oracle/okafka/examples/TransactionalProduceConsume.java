@@ -31,7 +31,7 @@ import org.apache.kafka.common.errors.DisconnectException;
 import org.apache.kafka.common.header.Header;
 import org.oracle.okafka.clients.consumer.KafkaConsumer;
 
-public class TransactionalConsumerProducer {
+public class TransactionalProduceConsume {
 
 	static int msgNo =0;
 	static PreparedStatement instCStmt = null;

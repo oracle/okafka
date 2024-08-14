@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.Properties;
 import java.util.concurrent.Future;
 
-public class SimpleProducerOKafka {
+public class SimpleProducer {
 	
 	public static void main(String[] args) {
 		long startTime =0;

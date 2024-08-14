@@ -54,6 +54,12 @@ project(':clients') {
          		exclude 'test/**'
       		}
    		}
+   		
+   		test {
+      		java {
+         		srcDirs = []
+      		}
+   		}
 	}
 
     println 'Creating okafka-23.4.0.0.jar'
