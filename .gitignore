@@ -27,6 +27,7 @@ clients/.project
 clients/.settings/
 examples/.project
 examples/.settings/
+examples/ojdbc.properties
 examples/consumer/.classpath
 examples/consumer/.project
 examples/consumer/.settings/

@@ -7,39 +7,59 @@
 
 package org.oracle.okafka.examples;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Properties;
 import java.time.Duration;
 import java.util.Arrays;
 
-import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.common.TopicPartition;
+import org.oracle.okafka.clients.consumer.KafkaConsumer;
+
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.oracle.okafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicPartition;
 
 public class ConsumerOKafka {
 	public static void main(String[] args) {
-		Properties props = new getProperties();
-		String topic = props.getProperty("topic.name", "TXEQ");
-		props.remove("topic.name"); // Pass props to build OKafkaConsumer		
-		KafkaConsumer<Integer , String> consumer = new KafkaConsumer<Integer, String>(props);
+		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "DEBUG");
+
+		// Get application properties
+		Properties appProperties = null;
+		try {
+			appProperties = getProperties();
+			if (appProperties == null) {
+				System.out.println("Application properties not found!");
+				System.exit(-1);
+			}
+		} catch (Exception e) {
+			System.out.println("Application properties not found!");
+			System.out.println("Exception: " + e);
+			System.exit(-1);
+		}
+
+		String topic = appProperties.getProperty("topic.name", "TXEQ");
+		appProperties.remove("topic.name"); // Pass props to build OKafkaProducer
+
+		KafkaConsumer<String , String> consumer = new KafkaConsumer<>(appProperties);
 		consumer.subscribe(Arrays.asList(topic));
 
-		while(true) {
+
 			try {
-				ConsumerRecords <Integer, String> records = consumer.poll(Duration.ofMillis(10000));
+				while(true) {
+					ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(10000));
 
-				for (ConsumerRecord<Integer, String> record : records)
-					System.out.printf("partition = %d, offset = %d, key = %d, value =%s\n  ", record.partition(), record.offset(), record.key(), record.value());
+					for (ConsumerRecord<String, String> record : records)
+						System.out.printf("partition = %d, offset = %d, key = %s, value =%s\n  ", record.partition(), record.offset(), record.key(), record.value());
 
-				if(records != null && records.count() > 0) {
-					System.out.println("Committing records" + records.count());
-					consumer.commitSync();     
-				}
-				else {
-					System.out.println("No Record Fetched. Retrying in 1 second");
-					Thread.sleep(1000);
+					if (records != null && records.count() > 0) {
+						System.out.println("Committing records" + records.count());
+						consumer.commitSync();
+					} else {
+						System.out.println("No Record Fetched. Retrying in 1 second");
+						Thread.sleep(1000);
+					}
 				}
 			}catch(Exception e)
 			{
@@ -49,7 +69,7 @@ public class ConsumerOKafka {
 			finally {
 				consumer.close();
 			}
-		}
+
 	}
 
 	private static java.util.Properties getProperties()  throws IOException {
@@ -59,7 +79,7 @@ public class ConsumerOKafka {
 		try {
 			Properties prop = new Properties();
 			String propFileName = "config.properties";
-			inputStream = new FileInPutStream(propFileName);
+			inputStream = ConsumerOKafka.class.getClassLoader().getResourceAsStream(propFileName);
 			if (inputStream != null) {
 				prop.load(inputStream);
 			} else {
