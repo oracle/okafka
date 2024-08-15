@@ -1,7 +1,7 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -31,15 +31,15 @@ package org.oracle.okafka.clients;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.oracle.okafka.common.config.AbstractConfig;
+//import org.oracle.okafka.common.config.AbstractConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Some configurations shared by both producer and consumer
  */
-public class CommonClientConfigs {
-	private static final Logger log = LoggerFactory.getLogger(CommonClientConfigs.class);
+public class CommonClientConfigs extends org.apache.kafka.clients.CommonClientConfigs {
+	//private static final Logger log = LoggerFactory.getLogger(CommonClientConfigs.class);
 
     /*
      * NOTE: DO NOT CHANGE EITHER CONFIG NAMES AS THESE ARE PART OF THE PUBLIC API AND CHANGE WILL BREAK USER CODE.
@@ -55,6 +55,10 @@ public class CommonClientConfigs {
     public static final String ORACLE_INSTANCE_NAME_DOC = "instance name of the oracle database instance to connect to";
     public static final String ORACLE_NET_TNS_ADMIN = "oracle.net.tns_admin";
 	public static final String ORACLE_NET_TNS_ADMIN_DOC = "location of file tnsnames.ora and ojdbc.properties";
+	
+	public static final String ORACLE_TRANSACTIONAL_PRODUCER ="oracle.transactional.producer";
+	
+	/*
     public static final String METADATA_MAX_AGE_CONFIG = "metadata.max.age.ms";
     public static final String METADATA_MAX_AGE_DOC = "The period of time in milliseconds after which we force a refresh of metadata even if we haven't seen any partition leadership changes to proactively discover any new brokers or partitions.";
 
@@ -102,6 +106,7 @@ public class CommonClientConfigs {
                                                          + "for the response of a request. If the response is not received before the timeout "
                                                          + "elapses the client will resend the request if necessary or fail the request if "
                                                          + "retries are exhausted. This property is not yet supported.";
+    */
 
     /**
      * Postprocess the configuration so that exponential backoff is disabled when reconnect backoff
@@ -112,6 +117,7 @@ public class CommonClientConfigs {
      *
      * @return                          The new values which have been set as described in postProcessParsedConfig.
      */
+	/*
     public static Map<String, Object> postProcessReconnectBackoffConfigs(AbstractConfig config,
                                                     Map<String, Object> parsedValues) {
         HashMap<String, Object> rval = new HashMap<>();
@@ -122,5 +128,5 @@ public class CommonClientConfigs {
             rval.put(RECONNECT_BACKOFF_MAX_MS_CONFIG, parsedValues.get(RECONNECT_BACKOFF_MS_CONFIG));
         }
         return rval;
-    }  
+    } */ 
 }

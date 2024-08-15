@@ -1,7 +1,7 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -32,14 +32,23 @@ package org.oracle.okafka.common.requests;
 import oracle.jms.AQjmsBytesMessage;
 
 import java.util.List;
+import java.util.Map;
+
+import org.apache.kafka.common.protocol.ApiMessage;
+import org.apache.kafka.common.protocol.Errors;
+import org.oracle.okafka.common.errors.FeatureNotSupportedException;
+import org.oracle.okafka.common.protocol.ApiKeys;
 
 public class FetchResponse extends AbstractResponse {
 	private final String topic;
 	private final List<AQjmsBytesMessage> messages;
+	private final Exception exception;
 	
-	public FetchResponse(String topic, List<AQjmsBytesMessage> messages) {
+	public FetchResponse(String topic, List<AQjmsBytesMessage> messages, Exception exception) {
+		super(ApiKeys.FETCH);
 		this.topic = topic;
 		this.messages = messages;
+		this.exception = exception;
 	}
 	
 	public String topic() {
@@ -48,6 +57,33 @@ public class FetchResponse extends AbstractResponse {
 	
 	public List<AQjmsBytesMessage> getMessages() {
 		return this.messages;
+	}
+	
+	public Exception getException() {
+		return this.exception;
+	}
+
+	@Override
+	public ApiMessage data() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public Map<Errors, Integer> errorCounts() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public int throttleTimeMs() {
+		// TODO Auto-generated method stub
+		return 0;
+	}
+
+	@Override
+	public void maybeSetThrottleTimeMs(int arg0) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");		
 	}
 
 }

@@ -1,9 +1,9 @@
 /*
-** OKafka Java Client version 0.8.
-**
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
-** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
-*/
+ ** OKafka Java Client version 23.4.
+ **
+ ** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
+ ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
+ */
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
@@ -24,16 +24,16 @@
 
 package org.oracle.okafka.clients.admin;
 
+import org.apache.kafka.common.KafkaFuture;
+import org.apache.kafka.common.annotation.InterfaceStability;
+
 import java.util.Collection;
 import java.util.Map;
 
-import org.oracle.okafka.common.KafkaFuture;
-import org.oracle.okafka.common.annotation.InterfaceStability;
-
 /**
- * The result of the {@link AdminClient#deleteTopics(Collection)} call.
+ * The result of the {@link Admin#deleteTopics(Collection)} call.
  *
- * The API of this class is evolving, see {@link AdminClient} for details.
+ * The API of this class is evolving, see {@link Admin} for details.
  */
 @InterfaceStability.Evolving
 public class DeleteTopicsResult {

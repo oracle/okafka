@@ -1,26 +1,9 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
-
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements. See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License. You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 
 package org.oracle.okafka.clients.producer.internals;
 
@@ -30,16 +13,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.oracle.okafka.common.MetricName;
-import org.oracle.okafka.common.MetricNameTemplate;
-import org.oracle.okafka.common.metrics.Measurable;
-import org.oracle.okafka.common.metrics.Metrics;
-import org.oracle.okafka.common.metrics.Sensor;
+import org.apache.kafka.common.MetricName;
+import org.apache.kafka.common.MetricNameTemplate;
+import org.apache.kafka.common.metrics.Measurable;
+import org.apache.kafka.common.metrics.Metrics;
+import org.apache.kafka.common.metrics.Sensor;
 
 public class SenderMetricsRegistry {
-
-    final static String METRIC_GROUP_NAME = "producer-metrics";
-    final static String TOPIC_METRIC_GROUP_NAME = "producer-topic-metrics";
+	final static String TOPIC_METRIC_GROUP_NAME = "producer-topic-metrics";
+	final static String OKAFKA_PRODUCER_METRIC_GROUP_NAME= "producer-metrics";
 
     private final List<MetricNameTemplate> allTemplates;
 
@@ -85,14 +67,15 @@ public class SenderMetricsRegistry {
         this.tags = this.metrics.config().tags().keySet();
         this.allTemplates = new ArrayList<>();
         
-        /***** Client level *****/
+        /* Client level */
         
         this.batchSizeAvg = createMetricName("batch-size-avg",
                 "The average number of bytes sent per partition per-request.");
         this.batchSizeMax = createMetricName("batch-size-max",
                 "The max number of bytes sent per partition per-request.");
         this.compressionRateAvg = createMetricName("compression-rate-avg",
-                "The average compression rate of record batches.");
+                "The average compression rate of record batches, defined as the average ratio of the " +
+                        "compressed batch size over the uncompressed size.");
         this.recordQueueTimeAvg = createMetricName("record-queue-time-avg",
                 "The average time in ms record batches spent in the send buffer.");
         this.recordQueueTimeMax = createMetricName("record-queue-time-max",
@@ -133,7 +116,7 @@ public class SenderMetricsRegistry {
         this.produceThrottleTimeMax = createMetricName("produce-throttle-time-max",
                 "The maximum time in ms a request was throttled by a broker");
 
-        /***** Topic level *****/
+        /* Topic level */
         this.topicTags = new LinkedHashSet<>(tags);
         this.topicTags.add("topic");
 
@@ -147,7 +130,8 @@ public class SenderMetricsRegistry {
         this.topicByteTotal = createTopicTemplate("byte-total", 
                 "The total number of bytes sent for a topic.");
         this.topicCompressionRate = createTopicTemplate("compression-rate",
-                "The average compression rate of record batches for a topic.");
+                "The average compression rate of record batches for a topic, defined as the average ratio " +
+                        "of the compressed batch size over the uncompressed size.");
         this.topicRecordRetryRate = createTopicTemplate("record-retry-rate",
                 "The average per-second number of retried record sends for a topic");
         this.topicRecordRetryTotal = createTopicTemplate("record-retry-total",
@@ -160,14 +144,14 @@ public class SenderMetricsRegistry {
     }
 
     private MetricName createMetricName(String name, String description) {
-        return this.metrics.metricInstance(createTemplate(name, METRIC_GROUP_NAME, description, this.tags));
+        return this.metrics.metricInstance(createTemplate(name, OKAFKA_PRODUCER_METRIC_GROUP_NAME, description, this.tags));
     }
 
     private MetricNameTemplate createTopicTemplate(String name, String description) {
         return createTemplate(name, TOPIC_METRIC_GROUP_NAME, description, this.topicTags);
     }
 
-    /** topic level metrics **/
+    /* topic level metrics */
     public MetricName topicRecordSendRate(Map<String, String> tags) {
         return this.metrics.metricInstance(this.topicRecordSendRate, tags);
     }

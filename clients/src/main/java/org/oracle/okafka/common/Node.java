@@ -1,7 +1,7 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -24,15 +24,17 @@
 
 package org.oracle.okafka.common;
 
-public class Node {
+public class Node  extends org.apache.kafka.common.Node{
 	private static final Node NO_NODE = new Node(-1, "", -1, "", "");
 
-    private final int id;
-    private final String idString;
-    private final String instanceName;
-    private final String host;
-    private final int port;
-    private final String serviceName;
+    private int id;
+    private String idString;
+    private String instanceName;
+    private String host;
+    private int port;
+    private String serviceName;
+    private String user;
+    private String protocol;
     
     // Cache hashCode as it is called in performance sensitive parts of the code (e.g. RecordAccumulator.ready)
     private Integer hash;
@@ -46,14 +48,19 @@ public class Node {
     }
 
     public Node(int id, String host, int port, String serviceName, String instanceName) {
+    	super(id, host, port);
+    	
     	if(id<=0)
     		id = 0;
         this.id = id;
-        this.idString = "instance"+id; 
-        this.host = host;
+        this.idString = "INSTANCE_"+id;
+        if(host != null)
+        	this.host = host.toUpperCase();
         this.port = port;
-        this.serviceName = serviceName;
-        this.instanceName = instanceName;
+        if(serviceName != null)
+        	this.serviceName = serviceName.toUpperCase();
+        if(instanceName != null)
+        	this.instanceName = instanceName.toUpperCase();
     }
 
     public static Node noNode() {
@@ -69,6 +76,37 @@ public class Node {
      */
     public int id() {
         return id;
+    }
+    
+    public void setId(int newId)
+    {
+    	if(id <=0)
+    	{
+    		id = newId;
+    	}
+    }
+    
+    public void setService(String _service)
+    {
+    	if(serviceName==null)
+    		serviceName = _service.toUpperCase();
+    }
+    
+    public void setInstanceName(String _instanceName)
+    {
+    	if(instanceName == null || instanceName.length()==0)
+    		instanceName = _instanceName.toUpperCase();
+    }
+    
+    public void setUser(String _user) {
+    	if(user == null || user.length() == 0 )
+    		this.user = _user.toUpperCase();
+    }
+    
+    public void setProtocol(String _protocol)
+    {
+    	if(protocol == null)
+    		protocol = _protocol.toUpperCase();
     }
 
     /**
@@ -103,32 +141,55 @@ public class Node {
     public String idString() {
     	return idString;
     }
+    
+    public String user()
+    {
+    	return user;
+    }
+    
+    public String protocol()
+    {
+    	return protocol;
+    }
+    
 
     @Override
     public int hashCode() {
-        Integer h = this.hash;
-        if (h == null) {
-            int result = 31 + (((host == null) || host.isEmpty()) ? 0 : host.hashCode());
-            result = 31 * result + id;
-            result = 31 * result + port;
-            result = 31 * result +(((serviceName == null) || serviceName.isEmpty()) ? 0 : serviceName.hashCode());
-            result = 31 * result +(((instanceName == null) || instanceName.isEmpty()) ? 0 : instanceName.hashCode());
-            this.hash = result;
-            return result;
-        } else {
-            return h;
-        }
+    	Integer h = this.hash;
+    	if (h == null) {
+    		h  = getHashCode();
+    	} 
+    	return h;
+    }
+    
+    public int updateHashCode()
+    {
+        this.hash = getHashCode();
+        return this.hash;
+    }
+    
+    private int getHashCode()
+    {
+    	int result = 31 + (((host == null) || host.isEmpty()) ? 0 : host.hashCode());
+        result = 31 * result + id;
+        result = 31 * result + port;
+        result = 31 * result +(((serviceName == null) || serviceName.isEmpty()) ? 0 : serviceName.hashCode());
+        result = 31 * result +(((instanceName == null) || instanceName.isEmpty()) ? 0 : instanceName.hashCode());
+        result = 31 * result +(((user == null) || user.isEmpty()) ? 0 : user.hashCode());
+        return result;
     }
 
     @Override
     public boolean equals(Object obj) {
         if (this == obj)
             return true;
+        
         if (obj == null || getClass() != obj.getClass())
             return false;
+        
         Node other = (Node) obj;
         return (host== null ? other.host() == null : host.equals(other.host())) &&
-            id == other.id() &&
+           // id == other.id() &&
             port == other.port() &&          
             (serviceName == null ? other.serviceName() == null : serviceName.equals(other.serviceName())) &&
             (instanceName == null ? other.instanceName() == null : instanceName.equals(other.instanceName())); 
@@ -138,6 +199,7 @@ public class Node {
     public String toString() {
     	String str = ((serviceName != null) && !serviceName.equals("")) ? serviceName : "";
     	String str2 = ((instanceName != null) && !instanceName.equals("")) ? instanceName : "";
-        return id + ":" + host + ":" + port + ":" +  str + ":" + str2;
+    	String str3 = ((user != null) && !user.equals("")) ? user : "";
+        return id + ":" + host + ":" + port + ":" +  str + ":" + str2+ ":" + str3;
     }
 }

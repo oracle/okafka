@@ -1,7 +1,7 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -33,7 +33,8 @@ package org.oracle.okafka.clients;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.oracle.okafka.common.Node;
-import org.oracle.okafka.common.errors.AuthenticationException;
+import org.apache.kafka.clients.ConnectionState;
+import org.apache.kafka.common.errors.AuthenticationException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -65,12 +66,14 @@ public final class ClusterConnectionStates {
      */
     public boolean canConnect(Node node, long now) {
         NodeConnectionState state = nodeState.get(node);
-
         if (state == null)
+        {
             return true;
-        else
+        }
+        else {
             return state.state.isDisconnected() &&
                    now - state.lastConnectAttemptMs >= state.reconnectBackoffMs;
+        }
     }
 
     /**
@@ -83,8 +86,16 @@ public final class ClusterConnectionStates {
         if (state == null)
             return false;
         else
+        {
+        	/*if(state.state.isDisconnected()) 
+        	{
+        		System.out.println("Disconnected Node " + node);
+        		System.out.println("Now = " + now +" LastConnection AttemptMs =" + state.lastConnectAttemptMs
+        				+" reconnectBackOff " +state.reconnectBackoffMs );
+        	}*/
             return state.state.isDisconnected() &&
                    now - state.lastConnectAttemptMs < state.reconnectBackoffMs;
+        }
     }
 
     /**
@@ -288,7 +299,6 @@ public final class ClusterConnectionStates {
      * The state of our connection to a node.
      */
     private static class NodeConnectionState {
-
         ConnectionState state;
         AuthenticationException authenticationException;
         long lastConnectAttemptMs;

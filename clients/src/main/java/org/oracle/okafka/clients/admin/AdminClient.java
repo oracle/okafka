@@ -1,7 +1,7 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -29,24 +29,76 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
-import org.oracle.okafka.common.TopicPartition;
-import org.oracle.okafka.common.TopicPartitionReplica;
-import org.oracle.okafka.common.acl.AclBinding;
-import org.oracle.okafka.common.acl.AclBindingFilter;
-import org.oracle.okafka.common.annotation.InterfaceStability;
-import org.oracle.okafka.common.config.ConfigResource;
+//import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.clients.admin.AlterConfigsOptions;
+import org.apache.kafka.clients.admin.AlterConfigsResult;
+import org.apache.kafka.clients.admin.AlterReplicaLogDirsOptions;
+import org.apache.kafka.clients.admin.AlterReplicaLogDirsResult;
+import org.apache.kafka.clients.admin.Config;
+import org.apache.kafka.clients.admin.CreateAclsOptions;
+import org.apache.kafka.clients.admin.CreateAclsResult;
+import org.apache.kafka.clients.admin.CreateDelegationTokenOptions;
+import org.apache.kafka.clients.admin.CreateDelegationTokenResult;
+import org.apache.kafka.clients.admin.CreatePartitionsOptions;
+import org.apache.kafka.clients.admin.CreatePartitionsResult;
+import org.apache.kafka.clients.admin.CreateTopicsOptions;
+import org.apache.kafka.clients.admin.CreateTopicsResult;
+import org.apache.kafka.clients.admin.DeleteAclsOptions;
+import org.apache.kafka.clients.admin.DeleteAclsResult;
+import org.apache.kafka.clients.admin.DeleteConsumerGroupsOptions;
+import org.apache.kafka.clients.admin.DeleteConsumerGroupsResult;
+import org.apache.kafka.clients.admin.DeleteRecordsOptions;
+import org.apache.kafka.clients.admin.DeleteRecordsResult;
+import org.apache.kafka.clients.admin.DeleteTopicsOptions;
+import org.apache.kafka.clients.admin.DeleteTopicsResult;
+import org.apache.kafka.clients.admin.DescribeAclsOptions;
+import org.apache.kafka.clients.admin.DescribeAclsResult;
+import org.apache.kafka.clients.admin.DescribeClusterOptions;
+import org.apache.kafka.clients.admin.DescribeClusterResult;
+import org.apache.kafka.clients.admin.DescribeConfigsOptions;
+import org.apache.kafka.clients.admin.DescribeConfigsResult;
+import org.apache.kafka.clients.admin.DescribeConsumerGroupsOptions;
+import org.apache.kafka.clients.admin.DescribeConsumerGroupsResult;
+import org.apache.kafka.clients.admin.DescribeDelegationTokenOptions;
+import org.apache.kafka.clients.admin.DescribeDelegationTokenResult;
+import org.apache.kafka.clients.admin.DescribeLogDirsOptions;
+import org.apache.kafka.clients.admin.DescribeLogDirsResult;
+import org.apache.kafka.clients.admin.DescribeReplicaLogDirsOptions;
+import org.apache.kafka.clients.admin.DescribeReplicaLogDirsResult;
+import org.apache.kafka.clients.admin.DescribeTopicsOptions;
+import org.apache.kafka.clients.admin.DescribeTopicsResult;
+import org.apache.kafka.clients.admin.ExpireDelegationTokenOptions;
+import org.apache.kafka.clients.admin.ExpireDelegationTokenResult;
+import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsOptions;
+import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsResult;
+import org.apache.kafka.clients.admin.ListConsumerGroupsOptions;
+import org.apache.kafka.clients.admin.ListConsumerGroupsResult;
+import org.apache.kafka.clients.admin.ListTopicsOptions;
+import org.apache.kafka.clients.admin.ListTopicsResult;
+import org.apache.kafka.clients.admin.NewPartitions;
+import org.apache.kafka.clients.admin.NewTopic;
+import org.apache.kafka.clients.admin.RecordsToDelete;
+import org.apache.kafka.clients.admin.RenewDelegationTokenOptions;
+import org.apache.kafka.clients.admin.RenewDelegationTokenResult;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.TopicPartitionReplica;
+import org.apache.kafka.common.acl.AclBinding;
+import org.apache.kafka.common.acl.AclBindingFilter;
+import org.apache.kafka.common.annotation.InterfaceStability;
+import org.apache.kafka.common.config.ConfigResource;
 
 /**
- * The administrative client for Transactional Event Queues(TEQ), which supports managing and inspecting topics.
- * 
- * Topic can be created or altered with following configs. If these configs are not overriden by client then server default values are used.
- * 
- * retention.ms: Amount of time in milliseconds messages stay in topic and are available for consumption. In kafka retention time starts after
- * enqueue of a message whereas in TEQ retention starts after all subscribers(groups) of a topic consume a message. In TEQ retention.ms is rounded to seconds. This property is supported on or later 20c database.
- *
+  * The administrative client for Transactional Event Queues(TXEQ), which supports managing and inspecting topics.
+ * For this release only creation of topic(s) and deletion of topic(s) is supported.
+ * A topic can be created by invoking {@code #createTopics(Collection)} and deleted by invoking {@code #deleteTopics(Collection)} method.
+ * <p>
+ * Topic can be created with following configuration. 
+ * <p>
+ * retention.ms: Amount of time in milliseconds for which records stay in topic and are available for consumption. Internally, <i>retention.ms</i> value is rounded to the second. Default value for this parameter is 7 days.
+ * </p>
  */
 @InterfaceStability.Evolving
-public abstract class AdminClient implements AutoCloseable {
+public abstract class AdminClient  implements Admin {
 
     /**
      * Create a new AdminClient with the given configuration.
@@ -54,8 +106,19 @@ public abstract class AdminClient implements AutoCloseable {
      * @param props The configuration.
      * @return The new KafkaAdminClient.
      */
+	final static String DUMMY_BOOTSTRAP ="localhost:1521";
     public static AdminClient create(Properties props) {
-        return KafkaAdminClient.createInternal(new AdminClientConfig(props), null);
+    	String bootStrap = (String)props.get(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG);
+    	if(bootStrap== null)
+    	{
+    		String secProtocol = props.getProperty(AdminClientConfig.SECURITY_PROTOCOL_CONFIG);
+    		if(secProtocol != null && secProtocol.equalsIgnoreCase("SSL")) {
+    			// Connect using Oracle Wallet and tnsnames.ora. 
+    			// User does not need to know the database host ip and port.
+    			props.setProperty(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, DUMMY_BOOTSTRAP);
+    		}
+    	}
+        return KafkaAdminClient.createInternal(new org.oracle.okafka.clients.admin.AdminClientConfig(props), new KafkaAdminClient.TimeoutProcessorFactory());
     }
 
     /**
@@ -65,6 +128,18 @@ public abstract class AdminClient implements AutoCloseable {
      * @return The new KafkaAdminClient.
      */
     public static AdminClient create(Map<String, Object> conf) {
+    	
+    	String bootStrap = (String)conf.get(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG);
+    	if(bootStrap == null)
+    	{
+    		String setSecProtocol = (String)conf.get(AdminClientConfig.SECURITY_PROTOCOL_CONFIG);
+    		if(setSecProtocol != null && setSecProtocol.equalsIgnoreCase("SSL")) 
+    		{
+    			// Connect using Wallet and TNSNAMES.ora. 
+    			// User does not need to know the database host ip and port.
+    			conf.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG, DUMMY_BOOTSTRAP);
+    		}
+    	}
         return KafkaAdminClient.createInternal(new AdminClientConfig(conf), null);
     }
 
@@ -140,6 +215,7 @@ public abstract class AdminClient implements AutoCloseable {
     public abstract DeleteTopicsResult deleteTopics(Collection<String> topics, DeleteTopicsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public ListTopicsResult listTopics() {
@@ -147,11 +223,13 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract ListTopicsResult listTopics(ListTopicsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public DescribeTopicsResult describeTopics(Collection<String> topicNames) {
@@ -159,12 +237,14 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract DescribeTopicsResult describeTopics(Collection<String> topicNames,
                                                          DescribeTopicsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public DescribeClusterResult describeCluster() {
@@ -172,11 +252,13 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract DescribeClusterResult describeCluster(DescribeClusterOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public DescribeAclsResult describeAcls(AclBindingFilter filter) {
@@ -184,11 +266,13 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract DescribeAclsResult describeAcls(AclBindingFilter filter, DescribeAclsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public CreateAclsResult createAcls(Collection<AclBinding> acls) {
@@ -196,11 +280,13 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract CreateAclsResult createAcls(Collection<AclBinding> acls, CreateAclsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public DeleteAclsResult deleteAcls(Collection<AclBindingFilter> filters) {
@@ -208,12 +294,14 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract DeleteAclsResult deleteAcls(Collection<AclBindingFilter> filters, DeleteAclsOptions options);
 
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public DescribeConfigsResult describeConfigs(Collection<ConfigResource> resources) {
@@ -221,12 +309,14 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract DescribeConfigsResult describeConfigs(Collection<ConfigResource> resources,
                                                            DescribeConfigsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public AlterConfigsResult alterConfigs(Map<ConfigResource, Config> configs) {
@@ -234,11 +324,13 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract AlterConfigsResult alterConfigs(Map<ConfigResource, Config> configs, AlterConfigsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public AlterReplicaLogDirsResult alterReplicaLogDirs(Map<TopicPartitionReplica, String> replicaAssignment) {
@@ -246,11 +338,13 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract AlterReplicaLogDirsResult alterReplicaLogDirs(Map<TopicPartitionReplica, String> replicaAssignment, AlterReplicaLogDirsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public DescribeLogDirsResult describeLogDirs(Collection<Integer> brokers) {
@@ -258,11 +352,13 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract DescribeLogDirsResult describeLogDirs(Collection<Integer> brokers, DescribeLogDirsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public DescribeReplicaLogDirsResult describeReplicaLogDirs(Collection<TopicPartitionReplica> replicas) {
@@ -270,11 +366,13 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract DescribeReplicaLogDirsResult describeReplicaLogDirs(Collection<TopicPartitionReplica> replicas, DescribeReplicaLogDirsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public CreatePartitionsResult createPartitions(Map<String, NewPartitions> newPartitions) {
@@ -282,12 +380,14 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract CreatePartitionsResult createPartitions(Map<String, NewPartitions> newPartitions,
                                                             CreatePartitionsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public DeleteRecordsResult deleteRecords(Map<TopicPartition, RecordsToDelete> recordsToDelete) {
@@ -295,12 +395,14 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract DeleteRecordsResult deleteRecords(Map<TopicPartition, RecordsToDelete> recordsToDelete,
                                                       DeleteRecordsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public CreateDelegationTokenResult createDelegationToken() {
@@ -309,12 +411,14 @@ public abstract class AdminClient implements AutoCloseable {
 
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract CreateDelegationTokenResult createDelegationToken(CreateDelegationTokenOptions options);
 
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public RenewDelegationTokenResult renewDelegationToken(byte[] hmac) {
@@ -322,23 +426,27 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract RenewDelegationTokenResult renewDelegationToken(byte[] hmac, RenewDelegationTokenOptions options);
 
     /**
-     * This method is not yet supported.
+     * @hidden
+     * <This method is not yet supported.
      */
     public ExpireDelegationTokenResult expireDelegationToken(byte[] hmac) {
         return expireDelegationToken(hmac, new ExpireDelegationTokenOptions());
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract ExpireDelegationTokenResult expireDelegationToken(byte[] hmac, ExpireDelegationTokenOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public DescribeDelegationTokenResult describeDelegationToken() {
@@ -346,17 +454,20 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract DescribeDelegationTokenResult describeDelegationToken(DescribeDelegationTokenOptions options);
 
     /**
-     * DThis method is not yet supported.
+     * @hidden
+     * This method is not yet supported.
      */
     public abstract DescribeConsumerGroupsResult describeConsumerGroups(Collection<String> groupIds,
                                                                         DescribeConsumerGroupsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public DescribeConsumerGroupsResult describeConsumerGroups(Collection<String> groupIds) {
@@ -364,11 +475,13 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract ListConsumerGroupsResult listConsumerGroups(ListConsumerGroupsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public ListConsumerGroupsResult listConsumerGroups() {
@@ -376,11 +489,13 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract ListConsumerGroupOffsetsResult listConsumerGroupOffsets(String groupId, ListConsumerGroupOffsetsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public ListConsumerGroupOffsetsResult listConsumerGroupOffsets(String groupId) {
@@ -388,11 +503,13 @@ public abstract class AdminClient implements AutoCloseable {
     }
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public abstract DeleteConsumerGroupsResult deleteConsumerGroups(Collection<String> groupIds, DeleteConsumerGroupsOptions options);
 
     /**
+     * @hidden
      * This method is not yet supported.
      */
     public DeleteConsumerGroupsResult deleteConsumerGroups(Collection<String> groupIds) {

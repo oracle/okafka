@@ -1,7 +1,7 @@
 /*
-** OKafka Java Client version 0.8.
+** OKafka Java Client version 23.4.
 **
-** Copyright (c) 2019, 2020 Oracle and/or its affiliates.
+** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -10,13 +10,17 @@ package org.oracle.okafka.clients.admin.internals;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.oracle.okafka.clients.ClientRequest;
-import org.oracle.okafka.clients.ClientResponse;
+import org.apache.kafka.clients.ClientRequest;
+import org.apache.kafka.clients.ClientResponse;
+import org.apache.kafka.clients.admin.internals.AdminMetadataManager;
 import org.oracle.okafka.clients.admin.AdminClientConfig;
 import org.oracle.okafka.common.Node;
 import org.oracle.okafka.common.errors.ConnectionException;
@@ -30,8 +34,8 @@ import org.oracle.okafka.common.requests.DeleteTopicsResponse;
 import org.oracle.okafka.common.requests.CreateTopicsRequest.TopicDetails;
 import org.oracle.okafka.common.utils.ConnectionUtils;
 import org.oracle.okafka.common.utils.CreateTopics;
-import org.oracle.okafka.common.utils.LogContext;
-import org.oracle.okafka.common.utils.Time;
+import org.apache.kafka.common.utils.LogContext;
+import org.apache.kafka.common.utils.Time;
 
 /**
  * AQ client for publishing requests to AQ and generating reponses.
@@ -43,12 +47,15 @@ public class AQKafkaAdmin extends AQClient{
 	private final AdminClientConfig configs;
 	private final Time time;
 	private final Map<Node, Connection> connections;
+	private final AdminMetadataManager metadataManager;
+	private boolean forceMetadata = false;
 	
-	public AQKafkaAdmin(LogContext logContext, AdminClientConfig configs, Time time) {
+	public AQKafkaAdmin(LogContext logContext, AdminClientConfig configs, AdminMetadataManager _metadataManager, Time time) {
 		super(logContext.logger(AQKafkaAdmin.class), configs);
 		this.configs = configs;
 		this.time = time;
-		this.connections = new HashMap<>();	
+		this.connections = new HashMap<Node, Connection>();	
+		this.metadataManager = _metadataManager;
 	}
 	
 	/**
@@ -56,7 +63,7 @@ public class AQKafkaAdmin extends AQClient{
 	 */
 	@Override
 	public ClientResponse send(ClientRequest request) {
-		return parseRequest(request, request.apiKey());
+		return parseRequest(request, ApiKeys.convertToOracleApiKey(request.apiKey()));
 		
 	}
 	
@@ -84,15 +91,16 @@ public class AQKafkaAdmin extends AQClient{
 	 */
 	private ClientResponse createTopics(ClientRequest request) {
 		
-		 Node node = request.destination();
+		 Node node = (org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
 		 CreateTopicsRequest.Builder builder= (CreateTopicsRequest.Builder)request.requestBuilder();
 		 Map<String, TopicDetails> topics = builder.build().topics();
 		 Connection jdbcConn = connections.get(node);		 
-		 Map<String, Exception> result = new HashMap<>();
+		 Map<String, Exception> result = new HashMap<String, Exception>();
 		 SQLException exception = null;
 		 try {			 			 
 			 result = CreateTopics.createTopics(jdbcConn, topics) ;
 		 } catch(SQLException sql) {
+			 sql.printStackTrace();
 			 exception = sql;
 			 log.trace("Unexcepted error occured with connection to node {}, closing the connection", request.destination());
 			 log.trace("Failed to create topics {}", topics.keySet());
@@ -119,9 +127,9 @@ public class AQKafkaAdmin extends AQClient{
 		CreateTopicsResponse topicResponse = new CreateTopicsResponse(errors);
 		if(result != null)
 			topicResponse.setResult(result);
-		ClientResponse response = new ClientResponse(request.makeHeader(),
+		ClientResponse response = new ClientResponse(request.makeHeader((short)1),
 				request.callback(), request.destination(), request.createdTimeMs(),
-				time.milliseconds(), disconnected, topicResponse);
+				time.milliseconds(), disconnected, null, null, topicResponse);
 
 		return response;
 	}
@@ -132,7 +140,7 @@ public class AQKafkaAdmin extends AQClient{
 	 * @return response for delete topics request.
 	 */
 	private ClientResponse deleteTopics(ClientRequest request) {
-		 Node node = request.destination();
+		 Node node =(org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
 		 DeleteTopicsRequest.Builder builder= (DeleteTopicsRequest.Builder)request.requestBuilder();
 		 Set<String> topics = builder.build().topics();
 		 Connection jdbcConn = connections.get(node);
@@ -185,16 +193,32 @@ public class AQKafkaAdmin extends AQClient{
 		DeleteTopicsResponse topicResponse = new DeleteTopicsResponse(errors);
 		if(result != null)
 			topicResponse.setResult(result);
-		ClientResponse response = new ClientResponse(request.makeHeader(),
+		ClientResponse response = new ClientResponse(request.makeHeader((short)1),
 				request.callback(), request.destination(), request.createdTimeMs(),
-				time.milliseconds(), disconnected, topicResponse);
+				time.milliseconds(), disconnected, null, null, topicResponse);
 		return response;
 	}
 	
 	private ClientResponse getMetadata(ClientRequest request) {
-		ClientResponse response = getMetadataNow(request, connections.get(request.destination()));
-		if(response.wasDisconnected()) 
-			connections.remove(request.destination());
+		Node node =(org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
+		if (node == null)
+		{
+			List<org.apache.kafka.common.Node> nodeList = metadataManager.updater().fetchNodes();
+			for(org.apache.kafka.common.Node nodeNow : nodeList)
+			{
+				if(nodeNow.id() == Integer.parseInt(request.destination()))
+				{
+					node = (org.oracle.okafka.common.Node)nodeNow;
+				}
+			}
+			
+		}
+		ClientResponse response = getMetadataNow(request, connections.get(node), node, forceMetadata);
+		if(response.wasDisconnected()) { 
+
+			connections.remove(node);
+			forceMetadata = true;
+		}
 		
 		return response;
 	}
@@ -207,11 +231,16 @@ public class AQKafkaAdmin extends AQClient{
 	 */
 	private Connection getConnection(Node node) {
 		try {
-			connections.put(node, ConnectionUtils.createJDBCConnection(node, configs));
-		} catch(SQLException sqlException) {
-			if(sqlException.getErrorCode()== 1017)
-			throw new InvalidLoginCredentialsException(sqlException);
-			throw new ConnectionException(sqlException.getMessage());
+			Connection newConn = ConnectionUtils.createJDBCConnection(node, configs);
+			connections.put(node, newConn);
+		} catch(SQLException excp) {
+			log.error("Exception while connecting to Oracle Database " + excp, excp);
+			
+			excp.printStackTrace();
+			if(excp.getErrorCode()== 1017)
+				throw new InvalidLoginCredentialsException(excp);
+			
+			throw new ConnectionException(excp.getMessage());
 		}
 		return connections.get(node);
 	}
@@ -226,9 +255,9 @@ public class AQKafkaAdmin extends AQClient{
 	 */
 	@Override
 	public void close() {
-		for(Map.Entry<Node, Connection> connection: connections.entrySet()) {
-			close(connection.getKey());
-		}
+		List<Node> closeNodes = new ArrayList<Node>();
+		closeNodes.addAll(connections.keySet());
+		closeNodes.forEach(n->close(n));
 	}
 	
 	/**
@@ -248,7 +277,4 @@ public class AQKafkaAdmin extends AQClient{
 			
 		}
 	}
-		
-	
-
 }
