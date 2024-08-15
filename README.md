@@ -128,29 +128,13 @@ gradle javadoc
 
 ## Examples
 
-Repository contains 7 common OKafka application examples in `examples` folder.
+Repository contains 2 common OKafka application examples in `examples` folder.
 
-`1. CreateTopic.java` -  
-Connects to Oracle Database and create a topic TXEQ with 10 partitions with default retention time of 7 days.
+`1. ProducerOKafka.java`
+Produces 10 messages into TxEQ topic.
 
-`2. DeleteTopic.java`
-Deletes already created OKafka topic.
-
-`3. SimpleProducer.java`
-Produces 100 messages into TxEQ topic.
-
-`4. SimpleConsumer.java`
-Consumes 100 messages from TxEQ topic. 
-
-`5. TransactionalProducer.java`
-Retrieves the Oracle Database Connection object from OKafka producer. Atomically performs a DML operation and sends a record. 
-
-`6. TransactionalConsumer.java`
-Retrieves the Oracle Database Connection object from OKafka consumer. Atomically consumes a batch of records and perform DML operation for each record.
-
-
-`7. TransactionalProduceConsume.java`
-Atomically consumes a batch of messages from TXEQ topic using OKafka Consumer, processes records from the batch and produces them in the tpic TxEQ_2 using OKafka Producer. To achieve atomicity for this these consume-process-produce operations, application retrieves the Oracle Database Connection object from OKafka Consumer and pass it to create an OKafka Producer.
+`2. ConsumerOKafka.java`
+Consumes 10 messages from TxEQ topic. 
 
 ## Kafka Java Client APIs supported
 
