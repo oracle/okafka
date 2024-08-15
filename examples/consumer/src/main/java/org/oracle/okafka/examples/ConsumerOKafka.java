@@ -16,8 +16,10 @@ import java.util.Arrays;
 
 import org.oracle.okafka.clients.consumer.KafkaConsumer;
 
+import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.TopicPartition;
 
 public class ConsumerOKafka {
 	public static void main(String[] args) {

@@ -22,6 +22,7 @@ To run `OKafka application` against Oracle Database, a database user must be cre
 
 ```roomsql
 create user <user> identified by <password>
+
 GRANT AQ_USER_ROLE to user;
 GRANT CONNECT, RESOURCE, unlimited tablespace to user;
 GRANT EXECUTE on DBMS_AQ to user;
@@ -36,6 +37,13 @@ GRANT SELECT on GV_$PDBS to user;
 GRANT SELECT on USER_QUEUE_PARTITION_ASSIGNMENT_TABLE to user;
 GRANT SELECT on SYS.DBA_RSRC_PLAN_DIRECTIVES to user;
 EXEC DBMS_AQADM.GRANT_PRIV_FOR_RM_PLAN('user');
+```
+
+Note:
+It is preferred in general to assign or grant a specific quota on a tablespace to a database user instead of granting unlimited quota in default tablespace. One can create a table space and use the following command to grant quota on a specific tablespace to a database user.
+
+```roomsql
+ALTER USER user QUOTA  UNLIMITED /* or size-clause */ on tablespace_name;
 ```
 
 Once user is created and above privileges are granted, connect to Oracle Database as this user and create a Transactional Event Queue using below PL/SQL script. One can also use `KafkaAdmin` interface as shown in `CreateTopic.java` in `examples` directory to create a Transactional Event Queue. 
