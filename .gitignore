@@ -35,3 +35,9 @@ examples/producer/.classpath
 examples/producer/.project
 examples/producer/.settings/
 okafka-github/
+clients/config.properties
+clients/ojdbc.properties
+clientsafterConsumingOkafka.csv
+clientsafterProducingOkafka.csv
+examples/.externalToolBuilders/
+/.gitignore/
