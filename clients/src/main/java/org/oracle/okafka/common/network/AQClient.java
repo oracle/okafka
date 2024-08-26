@@ -80,7 +80,7 @@ public abstract class AQClient {
 	private Map<Integer, Timestamp> instancesTostarttime;
 	public List<Node> all_nodes = new ArrayList<>();
 	public List<PartitionInfo> partitionInfoList = new ArrayList<>();
-	private static int userQueueShardsQueryIndex = 0;
+	private  int userQueueShardsQueryIndex = 0;
 	
 	public static final String PARTITION_PROPERTY = "AQINTERNAL_PARTITION";
 	public static final String HEADERCOUNT_PROPERTY = "AQINTERNAL_HEADERCOUNT";
@@ -469,9 +469,6 @@ public abstract class AQClient {
 		if(nodes.size() <= 0 || topics == null || topics.isEmpty())
 			return;
 
-		//String queryQShard = "select shard_id, enqueue_instance from user_queue_shards where  name = ? ";
-//		String queryQShard = "select SHARD_ID, ENQUEUE_INSTANCE from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) ";
-		
 		String queryQShard[] = {"select SHARD_ID, OWNER_INSTANCE from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) ",
 		"select SHARD_ID, ENQUEUE_INSTANCE from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) "};
 		
