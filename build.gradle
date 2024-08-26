@@ -33,7 +33,7 @@ allprojects {
 
 ext {
     gradleVersion = '8.8'
-    minJavaVersion = JavaVersion.VERSION_17
+    minJavaVersion = JavaVersion.VERSION_11
 
     mavenUrl = project.hasProperty('mavenUrl') ? project.mavenUrl : ''
     mavenUsername = project.hasProperty('mavenUsername') ? project.mavenUsername : ''
