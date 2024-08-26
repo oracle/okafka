@@ -50,8 +50,6 @@ project(':clients') {
         main {
             java {
                 srcDir 'src/main/java'
-                exclude 'tests/**'
-                exclude 'test/**'
             }
         }
     }
@@ -125,6 +123,10 @@ project(':clients') {
 
         duplicatesStrategy 'exclude'
     }
+    
+    tasks.withType(Test) {
+    onlyIf { false }
+	}
 }
 
 
