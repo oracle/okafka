@@ -643,6 +643,11 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 		TopicConsumers consumers = topicConsumersMap.get(node);
 		Connection con = ((AQjmsSession)consumers.getSession()).getDBConnection();
 		
+		
+		 // First Join Group Request from any client or a group leader must attempt to clean the USER_QUEUE_PARTITION_ASSIGNMENT_TABLE
+		if(joinGroupVersion < 0 || sessionData.getLeader() ==1)
+			removeStaleEntries(con);
+		
 		final String qpimLstType = "SYS.AQ$_QPIM_INFO_LIST";
 		final String qpatLstType = "SYS.AQ$_QPAT_INFO_LIST";
 		log.debug("Assigned partition Size " + sessionData.getAssignedPartitions().size());
@@ -731,6 +736,18 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 			}	
 		}
 	}
+    
+    private void removeStaleEntries(Connection con)
+    {
+    	try {
+    		PreparedStatement prStmt = con.prepareStatement("DELETE FROM USER_QUEUE_PARTITION_ASSIGNMENT_TABLE where session_id = -1");
+    		prStmt.execute();
+    		con.commit();
+    	}catch(Exception e)
+    	{
+    		log.warn("Exception while deleting stale entries from USER_QUEUE_PARTITION_ASSIGNMENT_TABLE",e);
+    	}
+    }
     
     private int getSessionId(Connection con) throws SQLException {
     	
