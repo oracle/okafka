@@ -54,7 +54,7 @@ begin
 end;
 ```
 
-> NOTE: A Topic can also be created using OKAFKA Administration methods. Or, through the Producer interface which creates a new topic if it was not previously created.
+> Note: A Topic can also be created using OKAFKA Administration methods. Or, through the Producer interface which creates a new topic if it was not previously created.
 
 #### Connection configuration
 
@@ -102,7 +102,7 @@ Learn more about [JDBC Thin Connections with a Wallet (mTLS)](https://docs.oracl
 
 You can get a detailed description of the Producer, Consumer and Administration APIs in the [Kafka APIs for Oracle Transactional Event Queues Documentation](https://docs.oracle.com/en/database/oracle/oracle-database/23/adque/Kafka_cient_interface_TEQ.html#GUID-5549915E-6509-4065-B05E-E96338F4742C).
 
-> NOTE: Topic name property should be provided in UPPERCASE.
+> Note: Topic name property should be provided in UPPERCASE.
 >
 >> ```text
 >> topic.name=<Oracle Database TxEventQ Topic, use uppercase>
