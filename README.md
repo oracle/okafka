@@ -74,10 +74,10 @@ oracle.net.tns_admin = "location of ojdbc.properties file"
 
 `ojdbc.properties` file must have below properties
 
-'''  
+```text
 user(in lowercase)=DatabaseUserName
 password(in lowercase)=Password
-'''
+```
 
 2.SSL: This protocol requires that, while connecting to Oracle Database, the JDBC driver authenticates database user using Oracle Wallet or Java KeyStore(JKS) files. This protocol is typically used to o connect to Oracle database 23ai instance in Oracle Autonomous cloud. To use this protocol `Okafka` application must specify following properties.
 
