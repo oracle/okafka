@@ -1622,7 +1622,7 @@ public class KafkaAdminClient extends AdminClient {
 						topicDetails = new TopicDetails(newTopic.numPartitions(), newTopic.replicationFactor());
 					}
 				}
-				topicsMap.put(newTopic.name(), topicDetails);
+				topicsMap.put(newTopic.name().toUpperCase(), topicDetails);
 			}
 		}
 		final long now = time.milliseconds();
@@ -1703,7 +1703,7 @@ public class KafkaAdminClient extends AdminClient {
 				topicFutures.put(topicName, future);
 			} else if (!topicFutures.containsKey(topicName)) {
 				topicFutures.put(topicName, new KafkaFutureImpl<Void>());
-				validTopicNames.add(topicName);
+				validTopicNames.add(topicName.toUpperCase());
 			}
 		}
 		final long now = time.milliseconds();
