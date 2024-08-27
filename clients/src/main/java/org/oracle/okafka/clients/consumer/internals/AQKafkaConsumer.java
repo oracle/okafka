@@ -1,9 +1,9 @@
 /*
-** OKafka Java Client version 23.4.
-**
-** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
-** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
-*/
+ ** OKafka Java Client version 23.4.
+ **
+ ** Copyright (c) 2019, 2024 Oracle and/or its affiliates.
+ ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
+ */
 
 package org.oracle.okafka.clients.consumer.internals;
 
@@ -97,7 +97,7 @@ public final class AQKafkaConsumer extends AQClient{
 	private List<ConsumerPartitionAssignor> assignors;
 	private final SelectorMetrics selectorMetrics;
 	private Metadata metadata;
-	
+
 	private boolean skipConnectMe = false;
 	private boolean externalConn = false;
 
@@ -114,7 +114,7 @@ public final class AQKafkaConsumer extends AQClient{
 		this.selectorMetrics.recordConnectionCount(topicConsumersMap);;
 
 	}
-	
+
 	public void setAssignors(List<ConsumerPartitionAssignor> _assignores )
 	{
 		assignors = _assignores;
@@ -128,7 +128,7 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 		return cr;
 	}
-	
+
 	/**
 	 * Determines the type of request and calls appropriate method for handling request
 	 * @param request request to be sent
@@ -159,7 +159,7 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 		return null;
 	}
-	
+
 	/**
 	 * Consumes messages in bulk from a given topic . Consumes or wait till either timeout occurs or max.poll.records condition is met
 	 * @param node consume by establishing connection to this instance. 
@@ -217,7 +217,7 @@ public final class AQKafkaConsumer extends AQClient{
 					}
 				}
 			}
-			
+
 			return createFetchResponse(request, topic, msgs, false, null);
 		} catch(JMSException exception) { 
 			log.debug("Exception in bulkReceive " + exception.getMessage(),exception );
@@ -227,21 +227,21 @@ public final class AQKafkaConsumer extends AQClient{
 			{
 				errorCode = ((SQLException)linkedException).getErrorCode();
 			}
-			
+
 			if(errorCode != 24003)
 			{
 				try {
-				errorCode = Integer.parseInt(exception.getErrorCode());
+					errorCode = Integer.parseInt(exception.getErrorCode());
 				}catch(Exception parseEx) {
 					//Do Nothing. Keep original ErrorCode
 				}
 			}
 			log.debug("Dequeue Error Code = " + errorCode);
- 			//If not Rebalancing Error and not Transient error then 
- 			if(!(errorCode == 24003 ||	errorCode == 120)) {
- 				log.warn("Exception from bulkReceive " + exception.getMessage(), exception);
- 				close(node);
- 				disconnected = true;
+			//If not Rebalancing Error and not Transient error then 
+			if(!(errorCode == 24003 ||	errorCode == 120)) {
+				log.warn("Exception from bulkReceive " + exception.getMessage(), exception);
+				close(node);
+				disconnected = true;
 				log.error("failed to receive messages from topic: {}", topic);
 			}
 			return createFetchResponse(request, topic, Collections.emptyList(), disconnected, exception);
@@ -252,13 +252,13 @@ public final class AQKafkaConsumer extends AQClient{
 			return createFetchResponse(request, topic, Collections.emptyList(), true, ex);
 		}
 	}
-	
+
 	private ClientResponse createFetchResponse(ClientRequest request, String topic, List<AQjmsBytesMessage> messages, boolean disconnected, Exception exception) {
 		return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
-                request.createdTimeMs(), time.milliseconds(), disconnected, null,null,
-                new FetchResponse(topic, messages, exception));
+				request.createdTimeMs(), time.milliseconds(), disconnected, null,null,
+				new FetchResponse(topic, messages, exception));
 	}
-	
+
 	/**
 	 * Commit messages consumed by all sessions.
 	 */
@@ -285,7 +285,7 @@ public final class AQKafkaConsumer extends AQClient{
 						log.info("No valid session to commit for node " + node);
 					}
 					result.put(node.getKey(), null);
-				
+
 				} catch(JMSException exception) {
 					error = true;
 					result.put(node.getKey(), exception);
@@ -298,23 +298,23 @@ public final class AQKafkaConsumer extends AQClient{
 			else {
 				log.info("Not Committing on Node " + node);
 			}
-			
+
 		}
 
 		return createCommitResponse(request, nodes, offsets, result, error);
 	}
-	
+
 	private ClientResponse createCommitResponse(ClientRequest request, Map<Node, List<TopicPartition>> nodes,
 			Map<TopicPartition, OffsetAndMetadata> offsets, Map<Node, Exception> result, boolean error) {
 		return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
-                request.createdTimeMs(), time.milliseconds(), false, null,null,
-                new CommitResponse(result, nodes, offsets, error));
+				request.createdTimeMs(), time.milliseconds(), false, null,null,
+				new CommitResponse(result, nodes, offsets, error));
 	}
-	
+
 	private String getMsgIdFormat(Connection con, String topic )
 	{
 		String msgFormat = "66";
-		
+
 		PreparedStatement msgFrmtStmt = null;
 		ResultSet rs = null;
 		try{
@@ -332,51 +332,51 @@ public final class AQKafkaConsumer extends AQClient{
 		finally {
 			try { 
 				if(msgFrmtStmt != null) {msgFrmtStmt.close();}
-   			} catch(Exception e) {}
-   		}
+			} catch(Exception e) {}
+		}
 		return msgFormat;
 
 	}
-	
-	private class SeekInput {
-    	static final int SEEK_BEGIN = 1;
-    	static final int SEEK_END = 2;
-    	static final int SEEK_MSGID = 3;
-    	static final int NO_DISCARD_SKIPPED = 1;
-    	static final int DISCARD_SKIPPED = 2;
-    	int partition;
-    	int priority;
-    	int seekType;
-    	String seekMsgId;
-    	public SeekInput() {
-    		priority = -1;
-    	}
-    }
-    
 
-private static void validateMsgId(String msgId) throws IllegalArgumentException {
-    
-      if(msgId == null || msgId.length() !=32)
-        throw new IllegalArgumentException("Invalid Message Id " + ((msgId==null)?"null":msgId));
-    
-      try {
-        for(int i =0; i< 32 ; i+=4)
-        {
-          String msgIdPart = msgId.substring(i,i+4); 
-          Long.parseLong(msgIdPart,16);
-       }
-      }catch(Exception e) {
-        throw new IllegalArgumentException("Invalid Mesage Id " + msgId);
-      }   
-    }   
-    /*private static int getpriority(String msgId) {
+	private class SeekInput {
+		static final int SEEK_BEGIN = 1;
+		static final int SEEK_END = 2;
+		static final int SEEK_MSGID = 3;
+		static final int NO_DISCARD_SKIPPED = 1;
+		static final int DISCARD_SKIPPED = 2;
+		int partition;
+		int priority;
+		int seekType;
+		String seekMsgId;
+		public SeekInput() {
+			priority = -1;
+		}
+	}
+
+
+	private static void validateMsgId(String msgId) throws IllegalArgumentException {
+
+		if(msgId == null || msgId.length() !=32)
+			throw new IllegalArgumentException("Invalid Message Id " + ((msgId==null)?"null":msgId));
+
+		try {
+			for(int i =0; i< 32 ; i+=4)
+			{
+				String msgIdPart = msgId.substring(i,i+4); 
+				Long.parseLong(msgIdPart,16);
+			}
+		}catch(Exception e) {
+			throw new IllegalArgumentException("Invalid Mesage Id " + msgId);
+		}   
+	}   
+	/*private static int getpriority(String msgId) {
     	try {
-    		
+
     	}catch(Exception e) {
     		return 1;
     	}
     }*/
-	
+
 	public ClientResponse seek(ClientRequest request) {
 		Map<TopicPartition, Exception> responses = new HashMap<>();
 		CallableStatement seekStmt = null;
@@ -391,12 +391,12 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 				if ( !offsetResetTimeStampByTopic.containsKey(topic) ) {
 					offsetResetTimeStampByTopic.put(topic, new  HashMap<TopicPartition, Long>());
 				}
-				 offsetResetTimeStampByTopic.get(topic).put(offsetResetTimestamp.getKey(), offsetResetTimestamp.getValue());
+				offsetResetTimeStampByTopic.get(topic).put(offsetResetTimestamp.getKey(), offsetResetTimestamp.getValue());
 			}
 			TopicConsumers consumers = topicConsumersMap.get(node);
 			Connection con = ((AQjmsSession)consumers.getSession()).getDBConnection();
-			
-			
+
+
 			SeekInput[] seekInputs = null;
 			String[] inArgs = new String[5];
 			int indx =0;
@@ -404,13 +404,13 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 				String topic =  offsetResetTimestampOfTopic.getKey();
 				inArgs[0] = "Topic: " + topic + " ";
 				try {
-						if(msgIdFormat.equals("00") ) {
-							msgIdFormat = getMsgIdFormat(con, topic);
-						}
+					if(msgIdFormat.equals("00") ) {
+						msgIdFormat = getMsgIdFormat(con, topic);
+					}
 
 					int inputSize = offsetResetTimestampOfTopic.getValue().entrySet().size(); 
 					seekInputs = new SeekInput[inputSize];
-					
+
 					for(Map.Entry<TopicPartition, Long> offsets : offsetResetTimestampOfTopic.getValue().entrySet()) {
 						seekInputs[indx] = new SeekInput(); 
 						try {
@@ -430,7 +430,7 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 								inArgs[2]= "Seek Type: " + seekInputs[indx].seekType;
 								inArgs[3] ="Seek to Offset: " +  offsets.getValue();
 								seekInputs[indx].seekMsgId = MessageIdConverter.getMsgId(tp, offsets.getValue(), msgIdFormat, 0);
-							    inArgs[4] = "Seek To MsgId: "+seekInputs[indx].seekMsgId ;
+								inArgs[4] = "Seek To MsgId: "+seekInputs[indx].seekMsgId ;
 								validateMsgId(seekInputs[indx].seekMsgId);
 							}
 							indx++;
@@ -439,24 +439,24 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 							for(int i =0; i<inArgs.length; i++ ) {
 								if(inArgs[i] == null)
 									break;
-								
+
 								errorMsg += inArgs[i];
 							}
 							Exception newE  =  new IllegalArgumentException(errorMsg, e);
 							throw newE;
 						}
 					}
-					
+
 					StringBuilder sb = new StringBuilder();
 					sb.append("declare \n seek_output_array  dbms_aq.seek_output_array_t; \n ");
 					sb.append("begin \n dbms_aq.seek(queue_name => ?,");	
 					sb.append("consumer_name=>?,");
 					sb.append("seek_input_array =>  dbms_aq.seek_input_array_t( ") ;
-				    for(int i = 0; i < seekInputs.length; i++) {
-				    	sb.append("dbms_aq.seek_input_t( shard=> ?, priority => ?, seek_type => ?, seek_pos => dbms_aq.seek_pos_t( msgid => hextoraw(?))) ");
-				    	if(i != seekInputs.length-1)
-				    		sb.append(", ");
-				     }
+					for(int i = 0; i < seekInputs.length; i++) {
+						sb.append("dbms_aq.seek_input_t( shard=> ?, priority => ?, seek_type => ?, seek_pos => dbms_aq.seek_pos_t( msgid => hextoraw(?))) ");
+						if(i != seekInputs.length-1)
+							sb.append(", ");
+					}
 					sb.append("), ");
 					sb.append("skip_option => ?, seek_output_array => seek_output_array);\n");
 					sb.append("end;\n" );
@@ -464,19 +464,19 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 					int stmtIndx = 1;
 					seekStmt.setString(stmtIndx++, ConnectionUtils.enquote(topic));
 					seekStmt.setString(stmtIndx++, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
-					
+
 					for(int i=0; i < seekInputs.length; i++) {
 						if(seekInputs[i].partition == -1) {
-						  seekStmt.setInt(stmtIndx++, seekInputs[i].partition);
+							seekStmt.setInt(stmtIndx++, seekInputs[i].partition);
 						}else {
 							seekStmt.setInt(stmtIndx++, 2*seekInputs[i].partition);
 						}
 						if(seekInputs[i].seekType == SeekInput.SEEK_MSGID) {
-							  seekStmt.setInt(stmtIndx++, 0);
-					    }else {
-							  seekStmt.setInt(stmtIndx++, seekInputs[i].priority);
+							seekStmt.setInt(stmtIndx++, 0);
+						}else {
+							seekStmt.setInt(stmtIndx++, seekInputs[i].priority);
 						}
-						
+
 						seekStmt.setInt(stmtIndx++, seekInputs[i].seekType);
 						if(seekInputs[i].seekType == SeekInput.SEEK_MSGID){
 							seekStmt.setString(stmtIndx++, seekInputs[i].seekMsgId);
@@ -486,33 +486,33 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 					}
 					seekStmt.setInt(stmtIndx++, SeekInput.DISCARD_SKIPPED);
 					seekStmt.execute();
-			        
+
 					for(Map.Entry<TopicPartition, Long> offsets : offsetResetTimestampOfTopic.getValue().entrySet()) {
 						responses.put(offsets.getKey(), null);
 					}
-					
+
 				} catch(Exception e) {
 					for(Map.Entry<TopicPartition, Long> offsets : offsetResetTimestampOfTopic.getValue().entrySet()) {
 						responses.put(offsets.getKey(), e);
 					}
 				}finally {
-			    	if(seekStmt != null) {
-			    		try { 
-			    			seekStmt.close();
-			    			seekStmt = null;
-			    		}catch(Exception e) {}
-			    	}
-			    }
+					if(seekStmt != null) {
+						try { 
+							seekStmt.close();
+							seekStmt = null;
+						}catch(Exception e) {}
+					}
+				}
 			}// While Topics
-		
+
 		} catch(Exception e) {
 			return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
-	                request.createdTimeMs(), time.milliseconds(), true, null,null, new OffsetResetResponse(responses, e));
+					request.createdTimeMs(), time.milliseconds(), true, null,null, new OffsetResetResponse(responses, e));
 		}
 		return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
-                request.createdTimeMs(), time.milliseconds(), false, null,null, new OffsetResetResponse(responses, null));
+				request.createdTimeMs(), time.milliseconds(), false, null,null, new OffsetResetResponse(responses, null));
 	}
-	
+
 	private ClientResponse unsubscribe(ClientRequest request) {
 		HashMap<String, Exception> response = new HashMap<>();
 		for(Map.Entry<Node, TopicConsumers> topicConsumersByNode: topicConsumersMap.entrySet())
@@ -523,7 +523,7 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 					response.put(topicSubscriber.getKey(), null);
 					topicConsumersByNode.getValue().remove(topicSubscriber.getKey());
 				}catch(JMSException jms) {
-					 response.put(topicSubscriber.getKey(), jms);
+					response.put(topicSubscriber.getKey(), jms);
 				}
 			}
 			try {
@@ -533,21 +533,21 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 				topicConsumersByNode.getValue().setConnection(null);
 				// ToDo: Delete User_queue_partition_assignment_table entry for   this Consumer Session from Database
 				// Execute DBMS_TEQK.AQ$_REMOVE_SESSION()
-				
+
 			} 
-			
+
 			catch(JMSException jms) {
 				//log.error("Failed to close session: {} associated with connection: {} and node: {}  ", consumers.getSession(), topicConsumersMap.getConnection(), node );
 			}
 		}
-		
+
 		topicConsumersMap.clear();
 		return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
-                request.createdTimeMs(), time.milliseconds(), true,null,null, new UnsubscribeResponse(response));
+				request.createdTimeMs(), time.milliseconds(), true,null,null, new UnsubscribeResponse(response));
 	}
-	
+
 	private ClientResponse getMetadata(ClientRequest request) {
-	    Connection conn = null;
+		Connection conn = null;
 		Node node = null;
 		Cluster cluster = null;
 		//Cluster used for this metadata is still a bootstrap cluster and does not have all necessary information
@@ -585,11 +585,11 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 			TopicConsumers  tConsumer = topicConsumersMap.get(node);
 			if(tConsumer == null)
 				throw new NullPointerException("TConsumer for Node "+ node);
-			
+
 			TopicSession tSession = tConsumer.getSession();
 			if(tSession == null)
 				throw new NullPointerException ("TSesion for TConsumer for node" + node);
-			
+
 			conn = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();			
 		} catch(JMSException jmsExcp) {			
 			try {
@@ -606,7 +606,7 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 		MetadataResponse metadataresponse = (MetadataResponse)response.responseBody();
 
 		org.apache.kafka.common.Cluster updatedCluster = metadataresponse.cluster();
-		
+
 		for(String topic: updatedCluster.topics()) {
 			try {
 				super.fetchQueueParameters(topic, conn, metadata.topicParaMap);
@@ -622,13 +622,13 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 		}
 		return response;
 	}
-	
+
 	/** Sends a join_group request to TEQ. JOIN_GROUP call returns a list of sessions that are part of rebalancing and their previous assignment. 
 	 * @param request join group request
 	 * @return
 	 */
-    private ClientResponse joinGroup(ClientRequest request) {	
-    	log.debug("Sending  AQ Join Group Request");
+	private ClientResponse joinGroup(ClientRequest request) {	
+		log.debug("Sending  AQ Join Group Request");
 		JoinGroupRequest.Builder builder = (JoinGroupRequest.Builder)request.requestBuilder();
 		JoinGroupRequest  joinRequest= builder.build();
 		SessionData sessionData = joinRequest.getSessionData();
@@ -636,83 +636,87 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 		int sessionId = -1;
 		int instId = -1;
 		int joinGroupVersion = sessionData.getVersion();
-		
+
 		try {
-		Node node = metadata.getNodeById(Integer.parseInt(request.destination()));
-		log.debug("Destination Node : " + node.toString());
-		TopicConsumers consumers = topicConsumersMap.get(node);
-		Connection con = ((AQjmsSession)consumers.getSession()).getDBConnection();
-		
-		
-		 // First Join Group Request from any client or a group leader must attempt to clean the USER_QUEUE_PARTITION_ASSIGNMENT_TABLE
-		if(joinGroupVersion < 0 || sessionData.getLeader() ==1)
-			removeStaleEntries(con);
-		
-		final String qpimLstType = "SYS.AQ$_QPIM_INFO_LIST";
-		final String qpatLstType = "SYS.AQ$_QPAT_INFO_LIST";
-		log.debug("Assigned partition Size " + sessionData.getAssignedPartitions().size());
-		QPATInfo[] a = new QPATInfo[sessionData.getAssignedPartitions().size()];
-		int ind = 0;
-		for(PartitionData pData: sessionData.getAssignedPartitions()) {
-			QPATInfo qpat = new QPATInfo();
-			//qpat.setSchema(sessionData.getSchema() != null ? ConnectionUtils.enquote(sessionData.getSchema().toUpperCase()) : null);
-			qpat.setSchema(sessionData.getSchema() != null ? (sessionData.getSchema().toUpperCase()) : null);
-			//qpat.setQueueName(ConnectionUtils.enquote(pData.getTopicPartition().topic().toUpperCase()));
-			qpat.setQueueName((pData.getTopicPartition().topic().toUpperCase()));
-			qpat.setQueueId(pData.getQueueId());
-			String subscriberNameIn =pData.getSubName() == null ? configs.getString(ConsumerConfig.GROUP_ID_CONFIG).toUpperCase(): pData.getSubName().toUpperCase();
-			/*if(subscriberNameIn != null) {
+			Node node = metadata.getNodeById(Integer.parseInt(request.destination()));
+			log.debug("Destination Node : " + node.toString());
+			TopicConsumers consumers = topicConsumersMap.get(node);
+			Connection con = ((AQjmsSession)consumers.getSession()).getDBConnection();
+
+			sessionId = getSessionId(con);
+			instId = getInstId(con);
+
+			// First Join Group Request from all consumer and every join group request from group leader must attempt to clean the USER_QUEUE_PARTITION_ASSIGNMENT_TABLE
+			if(joinGroupVersion < 0 || sessionData.getLeader() == 1)
+			{
+				log.debug("Attempt to cleanup USER_QUEUE_PARTITION_ASSIGNMENT_TABLE by session " + sessionId +" at instance " + instId);
+				removeStaleEntries(con);
+			}
+
+			final String qpimLstType = "SYS.AQ$_QPIM_INFO_LIST";
+			final String qpatLstType = "SYS.AQ$_QPAT_INFO_LIST";
+			log.debug("Assigned partition Size " + sessionData.getAssignedPartitions().size());
+			QPATInfo[] a = new QPATInfo[sessionData.getAssignedPartitions().size()];
+			int ind = 0;
+			for(PartitionData pData: sessionData.getAssignedPartitions()) {
+				QPATInfo qpat = new QPATInfo();
+				//qpat.setSchema(sessionData.getSchema() != null ? ConnectionUtils.enquote(sessionData.getSchema().toUpperCase()) : null);
+				qpat.setSchema(sessionData.getSchema() != null ? (sessionData.getSchema().toUpperCase()) : null);
+				//qpat.setQueueName(ConnectionUtils.enquote(pData.getTopicPartition().topic().toUpperCase()));
+				qpat.setQueueName((pData.getTopicPartition().topic().toUpperCase()));
+				qpat.setQueueId(pData.getQueueId());
+				String subscriberNameIn =pData.getSubName() == null ? configs.getString(ConsumerConfig.GROUP_ID_CONFIG).toUpperCase(): pData.getSubName().toUpperCase();
+				/*if(subscriberNameIn != null) {
 				subscriberNameIn = ConnectionUtils.enquote(subscriberNameIn);
 			}*/
-			qpat.setSubscriberName(subscriberNameIn);
-			qpat.setSubscriberId(pData.getSubId());
-			qpat.setGroupLeader(sessionData.getLeader());
-			qpat.setPartitionId(pData.getTopicPartition().partition() == -1 ? -1 : pData.getTopicPartition().partition() *2);
-			//System.out.println("Setting partition for this qpat to " + qpat.getPartitionId());
-			qpat.setFlags(-1);
-			qpat.setVersion(sessionData.getVersion());
-			qpat.setInstId(sessionData.getInstanceId());
-			qpat.setSessionId(sessionData.getSessionId());
-			qpat.setAuditId(sessionData.getAuditId());
-			qpat.setTimeStamp(new java.sql.Time(System.currentTimeMillis()));
-			//qpat.setTimeStamp(new java.sql.Time(sessionData.createTime.getTime()));
-			a[ind] = qpat;
-			ind++;
-		}
-		
-		QPATInfoList qpatl = new QPATInfoList();
-		qpatl.setArray(a);
-		joinStmt = con.prepareCall("{call DBMS_TEQK.AQ$_JOIN_GROUP(?, ?, ?, ? )}");
-		joinStmt.setObject(1,  qpatl, OracleTypes.ARRAY);
-		joinStmt.setInt(4, joinGroupVersion);
-		joinStmt.registerOutParameter(1, OracleTypes.ARRAY, qpatLstType);
-		joinStmt.registerOutParameter(2, OracleTypes.ARRAY, qpimLstType);
-		joinStmt.registerOutParameter(3, Types.INTEGER);
-		joinStmt.registerOutParameter(4, Types.INTEGER);
-		log.debug("Executing DBMS_TEQK.AQ$_JOIN_GROUP");
-		joinStmt.execute();
-		
-		QPATInfo[] qpatInfo = ((QPATInfoList)qpatl.create(joinStmt.getObject(1), 2002)).getArray();
-		QPIMInfoList qpiml = new QPIMInfoList();
-		OracleData odata = ((QPIMInfoList)qpiml.create(joinStmt.getObject(2), 2002));
-		QPIMInfo[] qpimInfo = null;
-		if(odata != null) {
-			qpimInfo = ((QPIMInfoList)odata).getArray();
-		}
-		
-		log.debug("Return from DBMS_TEQK.AQ$_JOIN_GROUP. QPATINFO Size " +qpatInfo.length );
-		for(int i = 0; i < qpatInfo.length; i++)
-		{
-			
-			log.debug("QPAT[" +i +"]:(Inst,Session,GroupLeader,Partition,Flag,Version#) = ("+
-					qpatInfo[i].getInstId()+","+qpatInfo[i].getSessionId()+"," +
-					qpatInfo[i].getGroupLeader()+","+qpatInfo[i].getPartitionId()+"," +
-					qpatInfo[i].getFlags()+","+qpatInfo[i].getVersion());
-		}
-		
-		sessionId = getSessionId(con);
-		instId = getInstId(con);
-		return createJoinGroupResponse(request, sessionId, instId, qpatInfo, qpimInfo, joinStmt.getInt(4), null, false);
+				qpat.setSubscriberName(subscriberNameIn);
+				qpat.setSubscriberId(pData.getSubId());
+				qpat.setGroupLeader(sessionData.getLeader());
+				qpat.setPartitionId(pData.getTopicPartition().partition() == -1 ? -1 : pData.getTopicPartition().partition() *2);
+				//System.out.println("Setting partition for this qpat to " + qpat.getPartitionId());
+				qpat.setFlags(-1);
+				qpat.setVersion(sessionData.getVersion());
+				qpat.setInstId(sessionData.getInstanceId());
+				qpat.setSessionId(sessionData.getSessionId());
+				qpat.setAuditId(sessionData.getAuditId());
+				qpat.setTimeStamp(new java.sql.Time(System.currentTimeMillis()));
+				//qpat.setTimeStamp(new java.sql.Time(sessionData.createTime.getTime()));
+				a[ind] = qpat;
+				ind++;
+			}
+
+			QPATInfoList qpatl = new QPATInfoList();
+			qpatl.setArray(a);
+			joinStmt = con.prepareCall("{call DBMS_TEQK.AQ$_JOIN_GROUP(?, ?, ?, ? )}");
+			joinStmt.setObject(1,  qpatl, OracleTypes.ARRAY);
+			joinStmt.setInt(4, joinGroupVersion);
+			joinStmt.registerOutParameter(1, OracleTypes.ARRAY, qpatLstType);
+			joinStmt.registerOutParameter(2, OracleTypes.ARRAY, qpimLstType);
+			joinStmt.registerOutParameter(3, Types.INTEGER);
+			joinStmt.registerOutParameter(4, Types.INTEGER);
+			log.debug("Executing DBMS_TEQK.AQ$_JOIN_GROUP");
+			joinStmt.execute();
+
+			QPATInfo[] qpatInfo = ((QPATInfoList)qpatl.create(joinStmt.getObject(1), 2002)).getArray();
+			QPIMInfoList qpiml = new QPIMInfoList();
+			OracleData odata = ((QPIMInfoList)qpiml.create(joinStmt.getObject(2), 2002));
+			QPIMInfo[] qpimInfo = null;
+			if(odata != null) {
+				qpimInfo = ((QPIMInfoList)odata).getArray();
+			}
+
+			log.debug("Return from DBMS_TEQK.AQ$_JOIN_GROUP. QPATINFO Size " +qpatInfo.length );
+			for(int i = 0; i < qpatInfo.length; i++)
+			{
+
+				log.debug("QPAT[" +i +"]:(Inst,Session,GroupLeader,Partition,Flag,Version#) = ("+
+						qpatInfo[i].getInstId()+","+qpatInfo[i].getSessionId()+"," +
+						qpatInfo[i].getGroupLeader()+","+qpatInfo[i].getPartitionId()+"," +
+						qpatInfo[i].getFlags()+","+qpatInfo[i].getVersion());
+			}
+
+
+			return createJoinGroupResponse(request, sessionId, instId, qpatInfo, qpimInfo, joinStmt.getInt(4), null, false);
 		} catch(Exception exception) {
 			boolean disconnected = false;
 			log.error("Exception while executing JoinGroup " + exception.getMessage() , exception);
@@ -736,288 +740,289 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 			}	
 		}
 	}
-    
-    private void removeStaleEntries(Connection con)
-    {
-    	try {
-    		PreparedStatement prStmt = con.prepareStatement("DELETE FROM USER_QUEUE_PARTITION_ASSIGNMENT_TABLE where session_id = -1");
-    		prStmt.execute();
-    		con.commit();
-    	}catch(Exception e)
-    	{
-    		log.warn("Exception while deleting stale entries from USER_QUEUE_PARTITION_ASSIGNMENT_TABLE",e);
-    	}
-    }
-    
-    private int getSessionId(Connection con) throws SQLException {
-    	
-    	Statement st = null;
-    	ResultSet rs = null;
-    	
-    	try {
-    		String sessionIdStr =  ((oracle.jdbc.internal.OracleConnection)con).getServerSessionInfo().getProperty("AUTH_SESSION_ID");
-    		return Integer.parseInt(sessionIdStr);
-    	}catch(Exception e)
-    	{
-    		// Failed to get session id from  connection object. Execute query to find session id now
-    	}
-    	try {
-    		
-    		st = con.createStatement(); 
-        	rs = st.executeQuery("select sys_context('USERENV', 'SID') from dual");
-        	if(rs.next() ) {
-        		return rs.getInt(1);
-        	} 
-    	}catch(SQLException sqlException) {
-    		//do nothing
-    	} finally {
-    		try {
-    			if(rs != null)
-        			rs.close();
-    		}catch(SQLException exception) {
-    			
-    		}
-    		try {
-    			if(st != null)
-        			st.close();
-    		}catch(SQLException exception) {
-    			
-    		}  		
-    	}
 
-    	throw new SQLException("Error in fetching Session Id");
-    	
-    }
-    
-    private int getInstId(Connection con) throws SQLException {
-    	Statement st = null;
-    	ResultSet rs = null;
-    	try {
-    		String instIdStr = ((oracle.jdbc.internal.OracleConnection)con).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO");
-    		return Integer.parseInt(instIdStr);
-    	}catch(Exception e)
-    	{
-    		//Failed to get instance number from connection object. Do Query now
-    	}
-    	try {
-    		st = con.createStatement(); 
-        	rs = st.executeQuery("select sys_context('USERENV', 'INSTANCE') from dual");
-        	if(rs.next() ) {
-        		return rs.getInt(1);
-        	} 
-    	}catch(SQLException sqlException) {
-    		//do nothing
-    	} finally {
-    		try {
-    			if(rs != null)
-        			rs.close();
-    		}catch(SQLException exception) {
-    			
-    		}
-    		try {
-    			if(st != null)
-        			st.close();
-    		}catch(SQLException exception) {
-    			
-    		}
-    		
-    	}
-    	
-    	throw new SQLException("Error in fetching Instance Id");
-    	
-    }
+	private void removeStaleEntries(Connection con)
+	{
+		try {
+			PreparedStatement prStmt = con.prepareStatement("DELETE FROM USER_QUEUE_PARTITION_ASSIGNMENT_TABLE where session_id = -1");
+			prStmt.execute();
+			con.commit();
+			prStmt.close();
+		}catch(Exception e)
+		{
+			log.warn("Exception while deleting stale entries from USER_QUEUE_PARTITION_ASSIGNMENT_TABLE",e);
+		}
+	}
 
-    
-    public int getSubcriberCount(Node node, String topic) throws SQLException {
-		int count =0;
-		PreparedStatement Stmt = null;
-    	ResultSet rs = null;
-    	Connection con;
-    	try {
-    		  con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
-			  String query = "select count(*) from  user_durable_subs where name = :1 and queue_name = :2";
-			  Stmt = con.prepareStatement(query);
-			  Stmt.setString(1, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
-			  Stmt.setString(2, topic);
-			  rs = Stmt.executeQuery();
-					
-			  if(rs.next()) {
-				count = rs.getInt(1);
-				return count;
-			  }
-    	}catch(SQLException sqlException) {
-    		//do nothing
-    	} catch (JMSException e) {
+	private int getSessionId(Connection con) throws SQLException {
+
+		Statement st = null;
+		ResultSet rs = null;
+
+		try {
+			String sessionIdStr =  ((oracle.jdbc.internal.OracleConnection)con).getServerSessionInfo().getProperty("AUTH_SESSION_ID");
+			return Integer.parseInt(sessionIdStr);
+		}catch(Exception e)
+		{
+			// Failed to get session id from  connection object. Execute query to find session id now
+		}
+		try {
+
+			st = con.createStatement(); 
+			rs = st.executeQuery("select sys_context('USERENV', 'SID') from dual");
+			if(rs.next() ) {
+				return rs.getInt(1);
+			} 
+		}catch(SQLException sqlException) {
 			//do nothing
 		} finally {
-    		try {
-    			if(rs != null)
-        			rs.close();
-    		}catch(SQLException exception) {
-    			
-    		}
-    		try {
-    			if(Stmt != null)
-        			Stmt.close();
-    		}catch(SQLException exception) {
-    			
-    		}
-    		
-    	}
-    	
-    	throw new SQLException("Error in getting the subscriber count");
-    }
-    
-    public String getoffsetStartegy() {
+			try {
+				if(rs != null)
+					rs.close();
+			}catch(SQLException exception) {
+
+			}
+			try {
+				if(st != null)
+					st.close();
+			}catch(SQLException exception) {
+
+			}  		
+		}
+
+		throw new SQLException("Error in fetching Session Id");
+
+	}
+
+	private int getInstId(Connection con) throws SQLException {
+		Statement st = null;
+		ResultSet rs = null;
+		try {
+			String instIdStr = ((oracle.jdbc.internal.OracleConnection)con).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO");
+			return Integer.parseInt(instIdStr);
+		}catch(Exception e)
+		{
+			//Failed to get instance number from connection object. Do Query now
+		}
+		try {
+			st = con.createStatement(); 
+			rs = st.executeQuery("select sys_context('USERENV', 'INSTANCE') from dual");
+			if(rs.next() ) {
+				return rs.getInt(1);
+			} 
+		}catch(SQLException sqlException) {
+			//do nothing
+		} finally {
+			try {
+				if(rs != null)
+					rs.close();
+			}catch(SQLException exception) {
+
+			}
+			try {
+				if(st != null)
+					st.close();
+			}catch(SQLException exception) {
+
+			}
+
+		}
+
+		throw new SQLException("Error in fetching Instance Id");
+
+	}
+
+
+	public int getSubcriberCount(Node node, String topic) throws SQLException {
+		int count =0;
+		PreparedStatement Stmt = null;
+		ResultSet rs = null;
+		Connection con;
+		try {
+			con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
+			String query = "select count(*) from  user_durable_subs where name = :1 and queue_name = :2";
+			Stmt = con.prepareStatement(query);
+			Stmt.setString(1, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
+			Stmt.setString(2, topic);
+			rs = Stmt.executeQuery();
+
+			if(rs.next()) {
+				count = rs.getInt(1);
+				return count;
+			}
+		}catch(SQLException sqlException) {
+			//do nothing
+		} catch (JMSException e) {
+			//do nothing
+		} finally {
+			try {
+				if(rs != null)
+					rs.close();
+			}catch(SQLException exception) {
+
+			}
+			try {
+				if(Stmt != null)
+					Stmt.close();
+			}catch(SQLException exception) {
+
+			}
+
+		}
+
+		throw new SQLException("Error in getting the subscriber count");
+	}
+
+	public String getoffsetStartegy() {
 		return configs.getString(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG);
 	}
-    
-    /* Returns a list of sessions that are part of rebalancing and their previous assignment */
-    private ClientResponse createJoinGroupResponse(ClientRequest request, int sessionId, int instId, QPATInfo[] qpatInfo, QPIMInfo[] qpimInfo, int version, Exception exception, boolean disconnected) {
-    	
-    	Map<String, SessionData> memberPartitionMap = new HashMap<String, SessionData>();
-    	List<PartitionData> partitions = new ArrayList<>();
-    	int leader = 0;
-    	int length = 0;
-    	if(qpatInfo != null)
-    		length = qpatInfo.length;
-    	
-        log.debug("Creating Join Group Response. QPAT Length: " +length);
-        try {
-        	if(disconnected)
-        	{
-        		throw exception;
-        	}
-        	
-        	if(qpatInfo != null) {
-        		//Check if This session is Leader or not
-        		for(int ind = 0; ind < length; ind++) {
-                	if(qpatInfo[ind].getSessionId() == sessionId && qpatInfo[ind].getInstId() == instId ) {
-                		if(qpatInfo[ind].getGroupLeader() == 1)
-                			leader = 1;
-                		break;
-                	}
-                }
-        		log.debug("Leader of the group? " + leader);
-        		if(leader == 1)
-        		{
-        			//Set Partition ownership map
-        			Map<Integer, ArrayList<Integer>> instPListMap = new HashMap<Integer, ArrayList<Integer>>();
-        			Map<Integer,Integer> partitionInstMap = new HashMap<Integer,Integer>();
-        		
-        			String topic = qpatInfo[0]!=null?qpatInfo[0].getQueueName():null;
-        			
-        			if(qpimInfo != null && qpimInfo.length > 0) 
-        			{
-        				log.debug("Partitions Created for topic " 
-        						+qpatInfo[0].getSchema()+"."+qpatInfo[0].getQueueName()+ " = " +qpimInfo.length);
-        				for(QPIMInfo qpimNow : qpimInfo)
-        				{
-        					if(topic == null)
-        						topic = qpimNow.getQueueName();
 
-        					int instNow = qpimNow.getOwnerInstId();
-        					ArrayList<Integer> pInstListNow = instPListMap.get(instNow);
-        					if(pInstListNow == null)
-        					{
-        						pInstListNow = new ArrayList<Integer>();
-        						instPListMap.put(instNow, pInstListNow);
-        					}
-        					pInstListNow.add(qpimNow.getPartitionId()/2);
-        					partitionInstMap.put(qpimNow.getPartitionId()/2, instNow);
-        				}
-        			} 
-        			else
-        			{
-        				log.info("No partition yet created for Topic "+ 
-        						qpatInfo[0].getSchema()+"."+qpatInfo[0].getQueueName());
-        			}
-        			ArrayList<SessionData> membersList = new ArrayList<SessionData>();
-        			for(QPATInfo qpatNow: qpatInfo)
-        			{
-        				
-        				if(qpatNow.name == null )
-        				{
-        					qpatNow.name = qpatNow.getInstId() +"_"+ qpatNow.getSessionId();
-        				}
-        				
-        				try {
-        					//System.out.println("TxEQAssignor:Printing QPat " + qpatNow.name);
-        					//System.out.println("TxEQAssignor:"+ qpatNow.toString());
-        				}catch(Exception e)
-        				{
-        					log.error("Exception while printing qpat " + qpatNow.name + " exception: " + e.getMessage());
-        				}
-        				
-        				String name = qpatNow.name;
-        				SessionData teqSession = memberPartitionMap.get(name);
-        				List<PartitionData> teqPList = null;
-        				if(teqSession == null)
-        				{
-        					teqSession = new SessionData( qpatNow.getSessionId(), qpatNow.getInstId(), 
-        							       qpatNow.getSchema(),qpatNow.getQueueName(), qpatNow.getQueueId(), qpatNow.getSubscriberName(),
-        							qpatNow.getSubscriberId(), null, // qpatNow.getTimeStamp()== null?new java.util.Date():new java.util.Date(qpatNow.getTimeStamp().getTime()), 
-        							qpatNow.getGroupLeader(), qpatNow.getVersion(), qpatNow.getAuditId());
-        					//System.out.println("createJoinGroupResponse 1: qpat With queue Id and subscriber ID "  + qpatNow.getQueueId() + " " + qpatNow.getSubscriberId());
-        					log.debug("Member Added " + teqSession);
-        					membersList.add(teqSession);
-        					memberPartitionMap.put(name, teqSession);
-        				}
-        				if(qpatNow.getPartitionId() >= 0) 
-        				{
-        					teqPList = teqSession.getPreviousPartitions();
-        					int pIdNow = qpatNow.getPartitionId()/2;
-        					int ownerPid = partitionInstMap.get(pIdNow);
-        					//System.out.println("createJoinGroupResponse 2: Partition " + pIdNow  + "  Added to " +qpatNow.name); 
-        					teqPList.add(new PartitionData(qpatNow.getQueueName(), qpatNow.getQueueId(), pIdNow, qpatNow.getSubscriberName(), qpatNow.getSubscriberId(), ownerPid, ownerPid == qpatNow.getInstId()? true:false));
-        				}
-        			}
-        			log.debug("Invoking Assignors");
-        			for(ConsumerPartitionAssignor assignor : assignors)
-        			{
-        				if(assignor instanceof TxEQAssignor)
-        				{
-        					log.debug("Using TEQ Assignor. ");
-        					TxEQAssignor txEQAssignor = (TxEQAssignor) assignor;
-        					txEQAssignor.setInstPListMap(instPListMap);
-        					Map<String, ArrayList<SessionData>> topicMemberMap = new HashMap<String,ArrayList<SessionData>>();
-        					topicMemberMap.put(topic,membersList);
-        					log.debug("Setting topicMembership Map. Member List Size " + membersList.size() +" Map Size  " + topicMemberMap.size());
-        					txEQAssignor.setPartitionMemberMap(topicMemberMap);
-        				}
-        			}
-        		}
-        		if(qpimInfo != null)
-        		{
-        			for(int ind = 0; ind < qpimInfo.length; ind++) {
-        				partitions.add(new PartitionData(qpimInfo[ind].getQueueName(), qpatInfo[0].getQueueId(), qpimInfo[ind].getPartitionId()/2, qpatInfo[0].getSubscriberName(), qpatInfo[0].getSubscriberId(), qpimInfo[ind].getOwnerInstId() , false));
-        			}
-        		}
-        	}
-        } catch(Exception excp) {
-        	if(excp instanceof SQLException)
-        	{
-        		SQLException sqlEx = (SQLException)excp;
-        		log.error("Exception in creating Join Group response " + sqlEx.getMessage(), sqlEx);
-        	}
-        	memberPartitionMap.clear();
-        	partitions.clear();
-        	leader = -1;
-        }
-        JoinGroupResponse jgResponse = new JoinGroupResponse(memberPartitionMap, partitions, leader, version, exception);
-        log.debug("Join Group Response Created");
-        return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
-                request.createdTimeMs(), time.milliseconds(), disconnected, null,null, jgResponse);
-    }
-	
-    /** 
-     * Sends a SYNC request to TEQ. Leader session performs assignment to all sessions which are part of consumer group(or participating in rebalancing) from subscribed topic using partition assignor and this assignment is sent to TEQ in sync group request.
-     * Follower sends an empty request.
-     * @param request
-     * @return
-     */
-    private ClientResponse syncGroup(ClientRequest request) {
-        SyncGroupRequest.Builder builder = (SyncGroupRequest.Builder)request.requestBuilder();
+	/* Returns a list of sessions that are part of rebalancing and their previous assignment */
+	private ClientResponse createJoinGroupResponse(ClientRequest request, int sessionId, int instId, QPATInfo[] qpatInfo, QPIMInfo[] qpimInfo, int version, Exception exception, boolean disconnected) {
+
+		Map<String, SessionData> memberPartitionMap = new HashMap<String, SessionData>();
+		List<PartitionData> partitions = new ArrayList<>();
+		int leader = 0;
+		int length = 0;
+		if(qpatInfo != null)
+			length = qpatInfo.length;
+
+		log.debug("Creating Join Group Response. QPAT Length: " +length);
+		try {
+			if(disconnected)
+			{
+				throw exception;
+			}
+
+			if(qpatInfo != null) {
+				//Check if This session is Leader or not
+				for(int ind = 0; ind < length; ind++) {
+					if(qpatInfo[ind].getSessionId() == sessionId && qpatInfo[ind].getInstId() == instId ) {
+						if(qpatInfo[ind].getGroupLeader() == 1)
+							leader = 1;
+						break;
+					}
+				}
+				log.debug("Leader of the group? " + leader);
+				if(leader == 1)
+				{
+					//Set Partition ownership map
+					Map<Integer, ArrayList<Integer>> instPListMap = new HashMap<Integer, ArrayList<Integer>>();
+					Map<Integer,Integer> partitionInstMap = new HashMap<Integer,Integer>();
+
+					String topic = qpatInfo[0]!=null?qpatInfo[0].getQueueName():null;
+
+					if(qpimInfo != null && qpimInfo.length > 0) 
+					{
+						log.debug("Partitions Created for topic " 
+								+qpatInfo[0].getSchema()+"."+qpatInfo[0].getQueueName()+ " = " +qpimInfo.length);
+						for(QPIMInfo qpimNow : qpimInfo)
+						{
+							if(topic == null)
+								topic = qpimNow.getQueueName();
+
+							int instNow = qpimNow.getOwnerInstId();
+							ArrayList<Integer> pInstListNow = instPListMap.get(instNow);
+							if(pInstListNow == null)
+							{
+								pInstListNow = new ArrayList<Integer>();
+								instPListMap.put(instNow, pInstListNow);
+							}
+							pInstListNow.add(qpimNow.getPartitionId()/2);
+							partitionInstMap.put(qpimNow.getPartitionId()/2, instNow);
+						}
+					} 
+					else
+					{
+						log.info("No partition yet created for Topic "+ 
+								qpatInfo[0].getSchema()+"."+qpatInfo[0].getQueueName());
+					}
+					ArrayList<SessionData> membersList = new ArrayList<SessionData>();
+					for(QPATInfo qpatNow: qpatInfo)
+					{
+
+						if(qpatNow.name == null )
+						{
+							qpatNow.name = qpatNow.getInstId() +"_"+ qpatNow.getSessionId();
+						}
+
+						try {
+							//System.out.println("TxEQAssignor:Printing QPat " + qpatNow.name);
+							//System.out.println("TxEQAssignor:"+ qpatNow.toString());
+						}catch(Exception e)
+						{
+							log.error("Exception while printing qpat " + qpatNow.name + " exception: " + e.getMessage());
+						}
+
+						String name = qpatNow.name;
+						SessionData teqSession = memberPartitionMap.get(name);
+						List<PartitionData> teqPList = null;
+						if(teqSession == null)
+						{
+							teqSession = new SessionData( qpatNow.getSessionId(), qpatNow.getInstId(), 
+									qpatNow.getSchema(),qpatNow.getQueueName(), qpatNow.getQueueId(), qpatNow.getSubscriberName(),
+									qpatNow.getSubscriberId(), null, // qpatNow.getTimeStamp()== null?new java.util.Date():new java.util.Date(qpatNow.getTimeStamp().getTime()), 
+									qpatNow.getGroupLeader(), qpatNow.getVersion(), qpatNow.getAuditId());
+							//System.out.println("createJoinGroupResponse 1: qpat With queue Id and subscriber ID "  + qpatNow.getQueueId() + " " + qpatNow.getSubscriberId());
+							log.debug("Member Added " + teqSession);
+							membersList.add(teqSession);
+							memberPartitionMap.put(name, teqSession);
+						}
+						if(qpatNow.getPartitionId() >= 0) 
+						{
+							teqPList = teqSession.getPreviousPartitions();
+							int pIdNow = qpatNow.getPartitionId()/2;
+							int ownerPid = partitionInstMap.get(pIdNow);
+							//System.out.println("createJoinGroupResponse 2: Partition " + pIdNow  + "  Added to " +qpatNow.name); 
+							teqPList.add(new PartitionData(qpatNow.getQueueName(), qpatNow.getQueueId(), pIdNow, qpatNow.getSubscriberName(), qpatNow.getSubscriberId(), ownerPid, ownerPid == qpatNow.getInstId()? true:false));
+						}
+					}
+					log.debug("Invoking Assignors");
+					for(ConsumerPartitionAssignor assignor : assignors)
+					{
+						if(assignor instanceof TxEQAssignor)
+						{
+							log.debug("Using TEQ Assignor. ");
+							TxEQAssignor txEQAssignor = (TxEQAssignor) assignor;
+							txEQAssignor.setInstPListMap(instPListMap);
+							Map<String, ArrayList<SessionData>> topicMemberMap = new HashMap<String,ArrayList<SessionData>>();
+							topicMemberMap.put(topic,membersList);
+							log.debug("Setting topicMembership Map. Member List Size " + membersList.size() +" Map Size  " + topicMemberMap.size());
+							txEQAssignor.setPartitionMemberMap(topicMemberMap);
+						}
+					}
+				}
+				if(qpimInfo != null)
+				{
+					for(int ind = 0; ind < qpimInfo.length; ind++) {
+						partitions.add(new PartitionData(qpimInfo[ind].getQueueName(), qpatInfo[0].getQueueId(), qpimInfo[ind].getPartitionId()/2, qpatInfo[0].getSubscriberName(), qpatInfo[0].getSubscriberId(), qpimInfo[ind].getOwnerInstId() , false));
+					}
+				}
+			}
+		} catch(Exception excp) {
+			if(excp instanceof SQLException)
+			{
+				SQLException sqlEx = (SQLException)excp;
+				log.error("Exception in creating Join Group response " + sqlEx.getMessage(), sqlEx);
+			}
+			memberPartitionMap.clear();
+			partitions.clear();
+			leader = -1;
+		}
+		JoinGroupResponse jgResponse = new JoinGroupResponse(memberPartitionMap, partitions, leader, version, exception);
+		log.debug("Join Group Response Created");
+		return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
+				request.createdTimeMs(), time.milliseconds(), disconnected, null,null, jgResponse);
+	}
+
+	/** 
+	 * Sends a SYNC request to TEQ. Leader session performs assignment to all sessions which are part of consumer group(or participating in rebalancing) from subscribed topic using partition assignor and this assignment is sent to TEQ in sync group request.
+	 * Follower sends an empty request.
+	 * @param request
+	 * @return
+	 */
+	private ClientResponse syncGroup(ClientRequest request) {
+		SyncGroupRequest.Builder builder = (SyncGroupRequest.Builder)request.requestBuilder();
 		SyncGroupRequest  syncRequest= builder.build();
 		List<SessionData> sData = syncRequest.getSessionData();
 		CallableStatement syncStmt = null;
@@ -1027,20 +1032,20 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 			Node node = metadata.getNodeById(Integer.parseInt(request.destination()));
 			TopicConsumers consumers = topicConsumersMap.get(node);
 			con = ((AQjmsSession)consumers.getSession()).getDBConnection();
-			
+
 			final String typeList = "SYS.AQ$_QPAT_INFO_LIST";
 			int size = 0;
-			
+
 			for(SessionData data : sData) {
 				size += data.getAssignedPartitions().size();
 			}
 			log.debug("Before Sync, Assigned Partition List size "+ size);
 			QPATInfo[] a = new QPATInfo[size];
-			
+
 			int ind = 0;
 			for(SessionData sessionData : sData) {
 				for(PartitionData pData: sessionData.getAssignedPartitions()) {
-					
+
 					QPATInfo qpat = new QPATInfo();
 					//qpat.setSchema(sessionData.getSchema() != null ? ConnectionUtils.enquote(sessionData.getSchema().toUpperCase()) : null);
 					qpat.setSchema(sessionData.getSchema() != null ? (sessionData.getSchema().toUpperCase()) : null);
@@ -1059,20 +1064,20 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 					// If partitions assigned is -1 then keep it as it is, else multiply with 2 as for TEQ partitions are even numbered
 					if(pId > 0 )
 						pId *= 2;
-					
+
 					qpat.setPartitionId(pId);
 					qpat.setFlags(2); // DBMS_TEQK.ASSIGNED
 					qpat.setVersion(sessionData.getVersion());
 					qpat.setInstId(sessionData.getInstanceId());
 					qpat.setSessionId(sessionData.getSessionId());
 					qpat.setAuditId(sessionData.getAuditId());
-					
+
 					qpat.setTimeStamp(new java.sql.Time(System.currentTimeMillis()));
 					a[ind] = qpat;
 					ind++;
 				}
 			}
-			
+
 			QPATInfoList qpatl = new QPATInfoList();
 			if(a.length > 0)
 				qpatl.setArray(a);
@@ -1085,120 +1090,120 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 			syncStmt.execute();
 			//System.out.println("SyncGroup 9: Retrieved  Response. creating qpatInfo array now");
 			QPATInfo[] qpatInfo = ((QPATInfoList)qpatl.create(syncStmt.getObject(1), 2002)).getArray();
-			
+
 			log.debug("Return from DBMS_TEQK.AQ$_SYNC. QPATINFO Size " +qpatInfo.length );
 			for(int i = 0; i < qpatInfo.length; i++)
 			{
-				
+
 				log.debug("QPAT[" +i +"]:(Inst,Session,GroupLeader,Partition,Flag,Version#) = ("+
 						qpatInfo[i].getInstId()+","+qpatInfo[i].getSessionId()+"," +
 						qpatInfo[i].getGroupLeader()+","+qpatInfo[i].getPartitionId()+"," +
 						qpatInfo[i].getFlags()+","+qpatInfo[i].getVersion());
 			}
-			
-            //System.out.println("SyncGroup 10 : Sync Response Received. Assigned Partition count " + qpatInfo.length);
+
+			//System.out.println("SyncGroup 10 : Sync Response Received. Assigned Partition count " + qpatInfo.length);
 			return createSyncResponse(request, qpatInfo, syncStmt.getInt(2), null, false);
-            } catch(Exception exception) {
-            	boolean disconnected = false;
-            	log.error("Exception in syncGroup " + exception.getMessage(), exception);
-            	if(exception instanceof SQLException)
-            	{
-            		SQLException sqlExcp = (SQLException) exception;
-            		int sqlErrorCode = sqlExcp.getErrorCode();
-            		if(sqlErrorCode == 28 || sqlErrorCode == 17410)
-            			disconnected = true;
-            	}
-            	return createSyncResponse(request, null, -1, exception, disconnected);
-            } finally {
-            	try {
-            		if(syncStmt != null)
-            			syncStmt.close();
-            	}catch(SQLException sqlException) {
-            		//do nothing
-            	}
-            }
-    }
-    
-    /* Returns a list of partitions assigned to this session */
-    private ClientResponse createSyncResponse(ClientRequest request, QPATInfo[] qpatInfo, int version, Exception exception, boolean disconnected) {
-    	SessionData data = null;
-    	try {
-    		if(exception == null) {
-    			//System.out.println("Processing Sync Response. Printing Assigned Paritions");
-    			if(qpatInfo.length > 0) {
-    				//System.out.println("Response for session : "+ qpatInfo[0].getInstId()+"_"+qpatInfo[0].getSessionId());
+		} catch(Exception exception) {
+			boolean disconnected = false;
+			log.error("Exception in syncGroup " + exception.getMessage(), exception);
+			if(exception instanceof SQLException)
+			{
+				SQLException sqlExcp = (SQLException) exception;
+				int sqlErrorCode = sqlExcp.getErrorCode();
+				if(sqlErrorCode == 28 || sqlErrorCode == 17410)
+					disconnected = true;
+			}
+			return createSyncResponse(request, null, -1, exception, disconnected);
+		} finally {
+			try {
+				if(syncStmt != null)
+					syncStmt.close();
+			}catch(SQLException sqlException) {
+				//do nothing
+			}
+		}
+	}
 
-    				data = new SessionData(qpatInfo[0].getSessionId(), qpatInfo[0].getInstId(), qpatInfo[0].getSchema(), qpatInfo[0].getQueueName(),
-    						qpatInfo[0].getQueueId(), qpatInfo[0].getSubscriberName(), qpatInfo[0].getSubscriberId(), new java.util.Date(),
-    						/*new java.sql.Date(qpatInfo[0].getTimeStamp().getTime()), */ qpatInfo[0].getGroupLeader(), qpatInfo[0].getVersion(), qpatInfo[0].getAuditId());
-    			}
+	/* Returns a list of partitions assigned to this session */
+	private ClientResponse createSyncResponse(ClientRequest request, QPATInfo[] qpatInfo, int version, Exception exception, boolean disconnected) {
+		SessionData data = null;
+		try {
+			if(exception == null) {
+				//System.out.println("Processing Sync Response. Printing Assigned Paritions");
+				if(qpatInfo.length > 0) {
+					//System.out.println("Response for session : "+ qpatInfo[0].getInstId()+"_"+qpatInfo[0].getSessionId());
 
-    			for(int ind = 0; ind < qpatInfo.length; ind++) {
-    				int pId = qpatInfo[ind].getPartitionId();
-    				if(pId >0)
-    					pId = pId/2;
+					data = new SessionData(qpatInfo[0].getSessionId(), qpatInfo[0].getInstId(), qpatInfo[0].getSchema(), qpatInfo[0].getQueueName(),
+							qpatInfo[0].getQueueId(), qpatInfo[0].getSubscriberName(), qpatInfo[0].getSubscriberId(), new java.util.Date(),
+							/*new java.sql.Date(qpatInfo[0].getTimeStamp().getTime()), */ qpatInfo[0].getGroupLeader(), qpatInfo[0].getVersion(), qpatInfo[0].getAuditId());
+				}
 
-    				//System.out.println("TxEQAssignor:Assigned Partition :   " + pId);
-    				data.addAssignedPartitions(new PartitionData(qpatInfo[ind].getQueueName(), qpatInfo[ind].getQueueId(), pId,
-    						qpatInfo[ind].getSubscriberName(), qpatInfo[ind].getSubscriberId(), qpatInfo[ind].getInstId(), data.getInstanceId()==qpatInfo[ind].getInstId()?true:false ));
-    			}
-    		}
-    	} catch(Exception ex) {
-    		log.error("Exception from createSyncResponse " +ex, ex);
-    		ex.printStackTrace();
-    		exception = ex;
-    	}
-    	
-    	return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
-                request.createdTimeMs(), time.milliseconds(), disconnected, null,null, new SyncGroupResponse(data, version, exception));
-    }
-    
-    public ClientResponse connectMe(ClientRequest request)
-    {
-        ConnectMeRequest.Builder builder = (ConnectMeRequest.Builder)request.requestBuilder();
-        ConnectMeRequest  connectMeRequest= builder.build();
-        Node nodeNow = metadata.getNodeById(Integer.parseInt(request.destination()));
-        TopicConsumers consumers = topicConsumersMap.get(nodeNow);
-        ConnectMeResponse connMeResponse = null;
-		
-        if(consumers != null)
-        {
-        	try {
-        	Connection conn = ((AQjmsSession)consumers.getSession()).getDBConnection();
-        	connMeResponse = connectMe(connectMeRequest, conn);
-        	} catch(Exception e)
-        	{
-        		log.error("Exception while executing DBMS_TEQK.AQ$_connect_me " + e.getMessage(), e);
-        	}
-        }
-        
-        if(connMeResponse == null)
-        {
-        	connMeResponse = new ConnectMeResponse();
-    		connMeResponse.setInstId(0);
-        }
-        
-        return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
-                request.createdTimeMs(), time.milliseconds(), false, null,null, connMeResponse );
-    }
-    
-    
-    private ConnectMeResponse connectMe(ConnectMeRequest connMeRequest, Connection conn)
-    {
-    	int instId = 0;
+				for(int ind = 0; ind < qpatInfo.length; ind++) {
+					int pId = qpatInfo[ind].getPartitionId();
+					if(pId >0)
+						pId = pId/2;
+
+					//System.out.println("TxEQAssignor:Assigned Partition :   " + pId);
+					data.addAssignedPartitions(new PartitionData(qpatInfo[ind].getQueueName(), qpatInfo[ind].getQueueId(), pId,
+							qpatInfo[ind].getSubscriberName(), qpatInfo[ind].getSubscriberId(), qpatInfo[ind].getInstId(), data.getInstanceId()==qpatInfo[ind].getInstId()?true:false ));
+				}
+			}
+		} catch(Exception ex) {
+			log.error("Exception from createSyncResponse " +ex, ex);
+			ex.printStackTrace();
+			exception = ex;
+		}
+
+		return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
+				request.createdTimeMs(), time.milliseconds(), disconnected, null,null, new SyncGroupResponse(data, version, exception));
+	}
+
+	public ClientResponse connectMe(ClientRequest request)
+	{
+		ConnectMeRequest.Builder builder = (ConnectMeRequest.Builder)request.requestBuilder();
+		ConnectMeRequest  connectMeRequest= builder.build();
+		Node nodeNow = metadata.getNodeById(Integer.parseInt(request.destination()));
+		TopicConsumers consumers = topicConsumersMap.get(nodeNow);
+		ConnectMeResponse connMeResponse = null;
+
+		if(consumers != null)
+		{
+			try {
+				Connection conn = ((AQjmsSession)consumers.getSession()).getDBConnection();
+				connMeResponse = connectMe(connectMeRequest, conn);
+			} catch(Exception e)
+			{
+				log.error("Exception while executing DBMS_TEQK.AQ$_connect_me " + e.getMessage(), e);
+			}
+		}
+
+		if(connMeResponse == null)
+		{
+			connMeResponse = new ConnectMeResponse();
+			connMeResponse.setInstId(0);
+		}
+
+		return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
+				request.createdTimeMs(), time.milliseconds(), false, null,null, connMeResponse );
+	}
+
+
+	private ConnectMeResponse connectMe(ConnectMeRequest connMeRequest, Connection conn)
+	{
+		int instId = 0;
 		String url = "";
 		int flags = 0;
 		ConnectMeResponse connMeResponse = new ConnectMeResponse();
 		connMeResponse.setInstId(0);
-		
+
 		String connectProc = " call DBMS_TEQK.AQ$_CONNECT_ME( schema => :1 , queue_name => :2 , subscriber_name => :3 , inst_id => :4, url => :5, flags => :6, p_list => :7)  ";		
 		try (CallableStatement connectMeStmt = conn.prepareCall(connectProc)) {
-			
+
 			String schemaName = connMeRequest.getSchemaName();
 			if(schemaName == null)
 			{
 				try {
-				 schemaName = conn.getMetaData().getUserName();
+					schemaName = conn.getMetaData().getUserName();
 				}catch(Exception e)
 				{
 					schemaName = ""; // Oracle DB Server will pick the current schema
@@ -1218,18 +1223,18 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 			flags = connectMeStmt.getInt(6);
 			Array pArray = connectMeStmt.getArray(7);
 			BigDecimal[] partitionArr = (BigDecimal[])pArray.getArray();
-			
+
 			connMeResponse.setInstId(instId);
 			connMeResponse.setUrl(url);
 			connMeResponse.setFlags(flags);
 			connMeResponse.setPartitionList(partitionArr);
 			log.info("Preferred Broker: " + instId+ " URL " + url);
-			
+
 		} catch(Exception connMeEx)
 		{
 			log.error("Exception while executing DBMS_TEQK.AQ$_CONNECTME " + connMeEx, connMeEx);
 		}
-		
+
 		ArrayList<Node> nodeList = connMeResponse.processUrl();
 		String security = configs.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG);
 		boolean plainText = security.equalsIgnoreCase("PLAINTEXT")?true:false;
@@ -1245,10 +1250,10 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 				}
 			}
 		}
-		
+
 		return connMeResponse;
-    }
-    
+	}
+
 	public void connect(Node node) throws JMSException{
 		if(!topicConsumersMap.containsKey(node)) {
 			TopicConsumers nodeConsumers = null;
@@ -1262,20 +1267,20 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 				close(node, nodeConsumers);
 				throw e;
 			}
-        }
+		}
 	}
-	
+
 	public boolean isChannelReady(Node node) {
 		return topicConsumersMap.containsKey(node);
 	}
-	
+
 	public void close(Node node) {
 		if(topicConsumersMap.get(node) == null)
 			return;
 		close(node, topicConsumersMap.get(node));
 		topicConsumersMap.remove(node);
 	}
-	
+
 	/**
 	 * Closes AQKafkaConsumer
 	 */
@@ -1287,7 +1292,7 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 		log.trace("Closed AQ kafka consumer");
 		topicConsumersMap.clear();
 	}
-		
+
 	/**
 	 * Closes connection, session associated with each connection  and all topic consumers associated with session.
 	 */
@@ -1325,19 +1330,19 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 	 */
 	private void createTopicConnection(Node node) throws JMSException {
 		createTopicConnection(node, TopicSession.AUTO_ACKNOWLEDGE);
-		
+
 	}
 	private void createTopicConnection(Node node, int mode) throws JMSException {
-		
+
 		if(!topicConsumersMap.containsKey(node)) {
 			TopicConsumers consumers =null;
 			consumers = new TopicConsumers(node, mode);
 			topicConsumersMap.put(node, consumers);
 		}
 	}
-	
+
 	public ClientResponse subscribe(ClientRequest request) {
-		
+
 		for(Map.Entry<Node, TopicConsumers> topicConsumersByNode: topicConsumersMap.entrySet())
 		{
 			for(Map.Entry<String, TopicSubscriber> topicSubscriber : topicConsumersByNode.getValue().getTopicSubscriberMap().entrySet()) {
@@ -1345,7 +1350,7 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 					((AQjmsConsumer)topicSubscriber.getValue()).close();
 					topicConsumersByNode.getValue().remove(topicSubscriber.getKey());
 				}catch(JMSException jms) {
-					 //do nothing
+					//do nothing
 				}
 			}
 			// ToDo:Check if we need this or not. Ideally when consumer is closed, not committed messages should be rolled back.
@@ -1358,7 +1363,7 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 					sess.close();
 					topicConsumersByNode.getValue().setSession(null);
 				}
-				
+
 			} catch(JMSException jms) {
 				//log.error("Failed to close session: {} associated with connection: {} and node: {}  ", consumers.getSession(), consumers.getConnection(), node );
 			}
@@ -1383,14 +1388,14 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 		}
 		return createSubscribeResponse(request, topic, null, false);
 	}
-	
+
 	private ClientResponse createSubscribeResponse(ClientRequest request, String topic, JMSException exception, boolean disconnected) {
 		return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
-                request.createdTimeMs(), time.milliseconds(), disconnected, null,null,
-                new SubscribeResponse(topic, exception));
-		
+				request.createdTimeMs(), time.milliseconds(), disconnected, null,null,
+				new SubscribeResponse(topic, exception));
+
 	}
-	
+
 	public Connection getDBConnection(Node n) throws KafkaException
 	{
 		Connection dbConn = null;
@@ -1427,7 +1432,7 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 
 		return dbConn;
 	}
-	
+
 	public Connection getDBConnection() throws KafkaException
 	{
 		Connection dbConn = null;
@@ -1467,12 +1472,12 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 	{
 		return this.skipConnectMe;
 	}
-	
+
 	public void setSkipConnectMe(boolean skipConnectMe)
 	{
 		this.skipConnectMe = skipConnectMe;
 	}
-	
+
 	public boolean isExternalConn()
 	{
 		return this.externalConn;
@@ -1492,44 +1497,44 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 		public TopicConsumers(Node node,int mode) throws JMSException {
 			this.node = node;
 			conn = createTopicConnection(node);
-		
-        	sess = createTopicSession(mode);
-        	try {
-        		Connection oConn = ((AQjmsSession)sess).getDBConnection();
-        		int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
-        		String serviceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("SERVICE_NAME");
-        		String instanceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("INSTANCE_NAME");
-        		String user = oConn.getMetaData().getUserName();
-        		try {
-        			String sessionId = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SESSION_ID");
-        			String serialNum = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SERIAL_NUM");
-        			String serverPid = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SERVER_PID");
-        		
-        			log.info("Database Consumer Session Info: "+ sessionId +","+serialNum+". Process Id " + serverPid +" Instance Name "+ instanceName);
-        			
-        			try {
-                		this.dbVersion = ConnectionUtils.getDBVersion(oConn);
-                	}catch(Exception e)
-                	{
-                		log.error("Exception whle fetching DB Version " + e);
-                	}
-        			
-        		}catch(Exception e)
-        		{
-        			log.error("Exception wnile getting database session information " + e);
-        		}
 
-        		node.setId(instId);
-        		node.setService(serviceName);
-        		node.setInstanceName(instanceName);
-        		node.setUser(user);
-        		node.updateHashCode();
-        	}catch(Exception e)
-        	{
-        		log.error("Exception while getting instance id from conneciton " + e, e);
-        	}
-        	
-        	topicSubscribers = new HashMap<>();
+			sess = createTopicSession(mode);
+			try {
+				Connection oConn = ((AQjmsSession)sess).getDBConnection();
+				int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
+				String serviceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("SERVICE_NAME");
+				String instanceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("INSTANCE_NAME");
+				String user = oConn.getMetaData().getUserName();
+				try {
+					String sessionId = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SESSION_ID");
+					String serialNum = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SERIAL_NUM");
+					String serverPid = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SERVER_PID");
+
+					log.info("Database Consumer Session Info: "+ sessionId +","+serialNum+". Process Id " + serverPid +" Instance Name "+ instanceName);
+
+					try {
+						this.dbVersion = ConnectionUtils.getDBVersion(oConn);
+					}catch(Exception e)
+					{
+						log.error("Exception whle fetching DB Version " + e);
+					}
+
+				}catch(Exception e)
+				{
+					log.error("Exception wnile getting database session information " + e);
+				}
+
+				node.setId(instId);
+				node.setService(serviceName);
+				node.setInstanceName(instanceName);
+				node.setUser(user);
+				node.updateHashCode();
+			}catch(Exception e)
+			{
+				log.error("Exception while getting instance id from conneciton " + e, e);
+			}
+
+			topicSubscribers = new HashMap<>();
 		}
 		/**
 		 * Creates topic connection to node
@@ -1539,10 +1544,10 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 		 */
 		public TopicConnection createTopicConnection(Node node) throws JMSException {
 			if(conn == null)
-			    conn = ConnectionUtils.createTopicConnection(node, configs, log);
+				conn = ConnectionUtils.createTopicConnection(node, configs, log);
 			return conn;
 		}
-		
+
 		public TopicSubscriber getTopicSubscriber(String topic) throws JMSException {
 			TopicSubscriber subscriber = topicSubscribers.get(topic);
 			if(subscriber == null)
@@ -1559,12 +1564,12 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 		public TopicSession createTopicSession(int mode) throws JMSException {
 			if(sess != null) 
 				return sess;			
-			 sess= ConnectionUtils.createTopicSession(conn, mode, true);
-			 conn.start();
-			 return sess;
-				
+			sess= ConnectionUtils.createTopicSession(conn, mode, true);
+			conn.start();
+			return sess;
+
 		}
-		
+
 		/**
 		 * Creates topic consumer for given topic
 		 */
@@ -1575,19 +1580,19 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 			topicSubscribers.put(topic, subscriber);
 			return subscriber;
 		}
-		
+
 		private void refresh(Node node) throws JMSException {
 			conn = createTopicConnection(node);
-        	sess = createTopicSession(TopicSession.AUTO_ACKNOWLEDGE);
+			sess = createTopicSession(TopicSession.AUTO_ACKNOWLEDGE);
 		}
- 		public TopicConnection getConnection() {
+		public TopicConnection getConnection() {
 			return conn;
 		}
-		
+
 		public TopicSession getSession() {
 			return sess;
 		}
-		
+
 		public Connection getDBConnection() throws JMSException
 		{
 			if(sess == null)
@@ -1595,28 +1600,28 @@ private static void validateMsgId(String msgId) throws IllegalArgumentException 
 			else
 				return ((AQjmsSession)sess).getDBConnection();
 		}
-		
+
 		public Map<String, TopicSubscriber> getTopicSubscriberMap() {
 			return topicSubscribers;
 		}
-		
+
 		public void setSession(TopicSession sess) {
 			this.sess = sess;
 		}
-		
+
 		public void setConnection(TopicConnection conn) {
 			this.conn = conn;
 		}
-		
+
 		public void remove(String topic) {
 			topicSubscribers.remove(topic);
 		}
-		
+
 		public String getDBVersion()
 		{
 			return dbVersion;
 		}
-		
+
 	}
-	
-	}
+
+}
