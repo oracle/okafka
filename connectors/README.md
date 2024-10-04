@@ -68,11 +68,14 @@ exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'KEY_BASED_ENQUEUE', 2);
 exec sys.dbms_aqadm.start_queue('TxEventQ');
 exec sys.dbms_aqadm.add_subscriber('TxEventQ', SYS.AQ$_AGENT('SUB1', NULL, 0));
 ```
+### Oracle Database Automatic Memory Management 
+It is recommended that the database be configured to allow automatic memory management. Refer to [About Automatic Memory Management](https://docs.oracle.com/en/database/oracle/oracle-database/23/admin/managing-memory.html#GUID-0F348EAB-9970-4207-8EF3-0F58B64E959A)
+for information on how to allow the Oracle Database instance to automatically manage instance memory.
 
 ### Setup Oracle RAC Cluster for Cross Instance Enqueues
 If running an Oracle RAC cluster read the instructions here for [User Event Streaming](https://docs.oracle.com/en/database/oracle/oracle-database/23/adque/aq-performance-scalability.html#GUID-423633E9-9B72-45B5-9C3E-95386BBEDBA0)
 to properly configure the **REMOTE_LISTENER** parameter. The **REMOTE_LISTENER** configuration is necessary to produce messages to the event stream mapped to the respective Kafka partition. If the
-**REMOTE_LISTENER** parameter is not configured, the sink connector will fail with `ORA-25348`. **Note:** Also set the isRac property to true in the `connect-txeventq-sink.properties` file.
+**REMOTE_LISTENER** parameter is not configured, the sink connector will fail with `ORA-25348`.
 
 ### Steps to Create an Oracle Wallet
 
@@ -236,7 +239,8 @@ bootstrap.servers=<broker i.e localhost:9092>
 ### Running TxEventQ Kafka connect sink or source connectors
 
 Update Kafka's `connect-standalone.properties` or `connect-distributed.properties` configuration file located in Kafka's config directory `plugin.path=` property with the 
-directory path to where the jar file for the Sink Connector is located.
+directory path to where the jar file for the connectors is located. Add the `consumer.max.poll.records` property to either the `connect-standalone.properties` or `connect-distributed.properties`
+to increase the number of records that will be sent by the sink connector for each poll. The default value for the `consumer.max.poll.records` is 500. 
 
 In the Kafaka's config directory locate and open the zookeeper.properties file and update th dataDir property with the directory path where you installed Kafka.
 The property should have a value such as dataDir=c:/kafka/zookeeper-data if the path to Kafka is c:\kafka. The same file will need to be updated in a Linux environment,
