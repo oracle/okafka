@@ -40,4 +40,5 @@ clients/ojdbc.properties
 clientsafterConsumingOkafka.csv
 clientsafterProducingOkafka.csv
 examples/.externalToolBuilders/
+clients/src/test/java/org/oracle/okafka/tests/Ddfd.java
 /.gitignore/

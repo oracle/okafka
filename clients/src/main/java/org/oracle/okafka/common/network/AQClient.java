@@ -123,76 +123,127 @@ public abstract class AQClient {
 	 * Fetching partition count for the interested topics. 
 	 * Fetching information as to which topic-partition is owned at what database instance.
 	 * */
-	public ClientResponse getMetadataNow(ClientRequest request, Connection con, Node currentNode, boolean metadataRequested) {
-		
+	public ClientResponse getMetadataNow(ClientRequest request, Connection con, Node currentNode,
+			boolean metadataRequested) {
 		log.debug("AQClient: Getting Metadata now");
-		
-		MetadataRequest.Builder builder= (MetadataRequest.Builder)request.requestBuilder();
-		MetadataRequest metadataRequest = builder.build();	
+
+		MetadataRequest.Builder builder = (MetadataRequest.Builder) request.requestBuilder();
+		MetadataRequest metadataRequest = builder.build();
+
 		List<Node> nodes = new ArrayList<>();
 		List<PartitionInfo> partitionInfo = new ArrayList<>();
 		Map<String, Exception> errorsPerTopic = new HashMap<>();
-		List<String> metadataTopics = new ArrayList<String>(metadataRequest.topics());
+		List<String> metadataTopics = null;
+		List<String> teqParaList = null;
 		boolean disconnected = false;
 		String clusterId = "";
 		boolean getPartitioninfo = false;
-		Map<String , TopicTeqParameters> topiParameterMap = null;
+		Map<String, TopicTeqParameters> topicParameterMap = null;
 		try {
-			if(con == null)
-			{
+
+			if (con == null) {
 				disconnected = true;
 				throw new NullPointerException("Database connection to fetch metadata is null");
 			}
-			//Database Name to be set as Cluster ID
-			clusterId = ((oracle.jdbc.internal.OracleConnection)con).getServerSessionInfo().getProperty("DATABASE_NAME");
-		
-			getPartitioninfo = getNodes(nodes, con, currentNode, metadataRequested); 
-			
-            if(getPartitioninfo || metadataRequested) 
-            {		 			
-				getPartitionInfo(metadataRequest.topics(), metadataTopics, con,
-						nodes, metadataRequest.allowAutoTopicCreation(), partitionInfo, errorsPerTopic);
-            }
-            
-            List<String> teqParaList = metadataRequest.teqParaTopics();
-            topiParameterMap = new HashMap<String, TopicTeqParameters>(teqParaList.size());
-            for(String teqTopic : teqParaList)
-            {
-            	TopicTeqParameters teqPara =  fetchQueueParameters(teqTopic, con);
-            	topiParameterMap.put(teqTopic, teqPara);
-            }
-            
-    		            
-		} catch(Exception exception) {
-			log.error("Exception while getting metadata "+ exception.getMessage(), exception );
-			//exception.printStackTrace();
 
-			if(exception instanceof SQLException) 
-				if(((SQLException)exception).getErrorCode() == 6550) {
-					log.error("Not all privileges granted to the database user.", ((SQLException)exception).getMessage());
+			if (metadataRequest.topics() == null && metadataRequest.teqParaTopics() == null) {
+
+				metadataTopics = new ArrayList<>();
+				teqParaList = new ArrayList<>();
+				String query = "select name from user_queues where sharded='TRUE'";
+				PreparedStatement stmt = null;
+				try {
+					stmt = con.prepareStatement(query);
+					ResultSet result = stmt.executeQuery();
+
+					if (result.isBeforeFirst()) {
+						while (result.next()) {
+							String topic = result.getString("name");
+							metadataTopics.add(topic);
+							teqParaList.add(topic);
+						}
+					}
+					result.close();
+
+				} catch (SQLException sqe) {
+					log.error("Error while getting list of all topics" + sqe);
+				}
+
+				finally {
+					try {
+						if (stmt != null)
+							stmt.close();
+					} catch (Exception ex) {
+						// do nothing
+					}
+				}
+
+			} else {
+				metadataTopics = new ArrayList<String>(metadataRequest.topics());
+				teqParaList = metadataRequest.teqParaTopics();
+				topicParameterMap = new HashMap<String, TopicTeqParameters>(teqParaList.size());
+				for (String teqTopic : teqParaList) {
+					TopicTeqParameters teqPara = fetchQueueParameters(teqTopic, con);
+					topicParameterMap.put(teqTopic, teqPara);
+				}
+			}
+
+			if (builder.isListTopics()) {
+				topicParameterMap = new HashMap<String, TopicTeqParameters>(teqParaList.size());
+				for (String teqTopic : teqParaList) {
+					TopicTeqParameters teqPara = new TopicTeqParameters();
+					teqPara.setStickyDeq(getQueueParameter(STICKYDEQ_PARAM, teqTopic, con));
+					topicParameterMap.put(teqTopic, teqPara);
+
+				}
+				return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
+						request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null,
+						new MetadataResponse(null, null, null, null, topicParameterMap));
+			}
+
+			// Database Name to be set as Cluster ID
+			clusterId = ((oracle.jdbc.internal.OracleConnection) con).getServerSessionInfo()
+					.getProperty("DATABASE_NAME");
+
+			getPartitioninfo = getNodes(nodes, con, currentNode, metadataRequested);
+
+			if (getPartitioninfo || metadataRequested) {
+				getPartitionInfo(metadataRequest.topics(), metadataTopics, con, nodes,
+						metadataRequest.allowAutoTopicCreation(), partitionInfo, errorsPerTopic);
+			}
+
+		} catch (Exception exception) {
+			log.error("Exception while getting metadata " + exception.getMessage(), exception);
+			// exception.printStackTrace();
+
+			if (exception instanceof SQLException)
+				if (((SQLException) exception).getErrorCode() == 6550) {
+					log.error("Not all privileges granted to the database user.",
+							((SQLException) exception).getMessage());
 					log.info("Please grant all the documented privileges to database user.");
 				}
-			if(exception instanceof SQLSyntaxErrorException)
+			if (exception instanceof SQLSyntaxErrorException)
 				log.trace("Please grant all the documented privileges to database user.");
-			for(String topic : metadataTopics) {
+			for (String topic : metadataTopics) {
 				errorsPerTopic.put(topic, exception);
 			}
-			disconnected = true;			
+			disconnected = true;
 			try {
-				log.debug("Unexcepted error occured with connection to node {}, closing the connection", request.destination());
-				if(con != null)
+				log.debug("Unexcepted error occured with connection to node {}, closing the connection",
+						request.destination());
+				if (con != null)
 					con.close();
-				
+
 				log.trace("Connection with node {} is closed", request.destination());
-			} catch(SQLException sqlEx) {
+			} catch (SQLException sqlEx) {
 				log.trace("Failed to close connection with node {}", request.destination());
 			}
-       }
-		return  new ClientResponse(request.makeHeader((short)1),
-				request.callback(), request.destination(), request.createdTimeMs(),
-				System.currentTimeMillis(), disconnected, null,null, new MetadataResponse(clusterId, all_nodes, partitionInfoList, errorsPerTopic, topiParameterMap));
+		}
+		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
+				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null,
+				new MetadataResponse(clusterId, all_nodes, partitionInfoList, errorsPerTopic, topicParameterMap));
 	}
-
+	
 	// Fetches existing cluster nodes 
 	// Returns TRUE if new node is added, existing node went down, or if the startup time changed for the nodes
 	// otherwise return false
@@ -586,7 +637,6 @@ public abstract class AQClient {
 				} catch(Exception ex) {
 					//do nothing
 				}
-				System.out.println(userQueueShardsQueryIndex);
 			}
 		} 
 		while(qryIndex<2);

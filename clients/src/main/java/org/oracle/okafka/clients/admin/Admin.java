@@ -227,7 +227,7 @@ public interface Admin extends org.apache.kafka.clients.admin.Admin {
     static org.apache.kafka.clients.admin.Admin create(Properties props) {
         return KafkaAdminClient.createInternal(new AdminClientConfig(props, true), null);
     }
-
+   
     /**
      * Create a new Admin with the given configuration.
      *

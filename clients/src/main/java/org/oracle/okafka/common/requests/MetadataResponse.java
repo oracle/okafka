@@ -68,6 +68,10 @@ public class MetadataResponse extends AbstractResponse {
 		return partitionInfo;
 	}
 	
+	public Map<String, TopicTeqParameters> teqParameters(){
+		return teqParams;
+	}
+	
 	/**
      * Get a snapshot of the cluster metadata from this response
      * @return the cluster snapshot
@@ -110,5 +114,6 @@ public class MetadataResponse extends AbstractResponse {
 	public void maybeSetThrottleTimeMs(int arg0) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");		
 	}
+	
 }
 

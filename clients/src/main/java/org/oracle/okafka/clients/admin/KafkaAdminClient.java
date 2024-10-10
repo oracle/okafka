@@ -116,6 +116,7 @@ import org.apache.kafka.clients.admin.ListOffsetsOptions;
 import org.apache.kafka.clients.admin.ListOffsetsResult;
 import org.apache.kafka.clients.admin.ListPartitionReassignmentsOptions;
 import org.apache.kafka.clients.admin.ListPartitionReassignmentsResult;
+import org.apache.kafka.clients.admin.ListTopicsOptions;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.admin.ListTransactionsOptions;
 import org.apache.kafka.clients.admin.ListTransactionsResult;
@@ -129,12 +130,16 @@ import org.apache.kafka.clients.admin.RemoveMembersFromConsumerGroupOptions;
 import org.apache.kafka.clients.admin.RemoveMembersFromConsumerGroupResult;
 import org.apache.kafka.clients.admin.RenewDelegationTokenOptions;
 import org.apache.kafka.clients.admin.RenewDelegationTokenResult;
+import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.clients.admin.TopicListing;
 import org.apache.kafka.clients.admin.UnregisterBrokerOptions;
 import org.apache.kafka.clients.admin.UnregisterBrokerResult;
 import org.apache.kafka.clients.admin.UpdateFeaturesOptions;
 import org.apache.kafka.clients.admin.UpdateFeaturesResult;
 import org.apache.kafka.clients.admin.UserScramCredentialAlteration;
 import org.apache.kafka.clients.admin.CreateTopicsResult.TopicMetadataAndConfig;
+//import org.apache.kafka.clients.admin.KafkaAdminClient.LeastLoadedNodeProvider;
+//import org.apache.kafka.clients.admin.KafkaAdminClient.LeastLoadedNodeProvider;
 /*
 import org.apache.kafka.clients.admin.KafkaAdminClient.Call;
 import org.apache.kafka.clients.admin.KafkaAdminClient.ControllerNodeProvider;
@@ -145,6 +150,7 @@ import org.apache.kafka.clients.admin.KafkaAdminClient.TimeoutProcessor;
 import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.clients.KafkaClient;
 import org.oracle.okafka.clients.NetworkClient;
+import org.oracle.okafka.clients.TopicTeqParameters;
 import org.apache.kafka.clients.admin.internals.AdminMetadataManager;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.oracle.okafka.clients.producer.ProducerConfig;
@@ -155,10 +161,14 @@ import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.Metric;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.Node;
+import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicCollection;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.TopicPartitionInfo;
 import org.apache.kafka.common.TopicPartitionReplica;
 import org.apache.kafka.common.Uuid;
+import org.apache.kafka.common.TopicCollection.TopicIdCollection;
+import org.apache.kafka.common.TopicCollection.TopicNameCollection;
 import org.apache.kafka.common.acl.AclBinding;
 import org.apache.kafka.common.acl.AclBindingFilter;
 import org.apache.kafka.common.annotation.InterfaceStability;
@@ -172,8 +182,10 @@ import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
 import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.RetriableException;
 import org.apache.kafka.common.errors.TimeoutException;
+import org.apache.kafka.common.errors.UnknownTopicIdException;
 import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.internals.KafkaFutureImpl;
+import org.apache.kafka.common.message.MetadataRequestData;
 import org.apache.kafka.common.metrics.JmxReporter;
 import org.apache.kafka.common.metrics.MetricConfig;
 import org.apache.kafka.common.metrics.Metrics;
@@ -182,6 +194,7 @@ import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.quota.ClientQuotaAlteration;
 import org.apache.kafka.common.quota.ClientQuotaFilter;
+import org.apache.kafka.common.requests.AbstractResponse;
 import org.oracle.okafka.common.requests.AbstractRequest;
 import org.oracle.okafka.common.requests.CreateTopicsRequest;
 import org.oracle.okafka.common.requests.CreateTopicsResponse;
@@ -195,16 +208,21 @@ import org.apache.kafka.common.utils.KafkaThread;
 import org.apache.kafka.common.utils.LogContext;
 import org.oracle.okafka.common.utils.TNSParser;
 import org.apache.kafka.common.utils.Time;
+import org.apache.kafka.common.KafkaFuture;
 import org.oracle.okafka.clients.admin.internals.AQKafkaAdmin;
 import org.oracle.okafka.clients.consumer.ConsumerConfig;
 import org.slf4j.Logger;
 
+import static org.apache.kafka.common.requests.MetadataRequest.convertTopicIdsToMetadataRequestTopic;
 import static org.apache.kafka.common.utils.Utils.closeQuietly;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.net.InetSocketAddress;
 import java.sql.SQLException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -1000,6 +1018,7 @@ public class KafkaAdminClient extends AdminClient {
 		 * @return The minimum timeout we need for poll().
 		 */
 		private long sendEligibleCalls(long now) {
+			
 			long pollTimeout = Long.MAX_VALUE;
 			for (Iterator<Map.Entry<Node, List<Call>>> iter = callsToSend.entrySet().iterator(); iter.hasNext();) {
 				Map.Entry<Node, List<Call>> entry = iter.next();
@@ -1041,6 +1060,7 @@ public class KafkaAdminClient extends AdminClient {
 				correlationIdToCalls.remove(clientRequest.correlationId());
 
 			}
+			
 			return pollTimeout;
 		}
 
@@ -1299,12 +1319,12 @@ public class KafkaAdminClient extends AdminClient {
 					if (!maybeDrainPendingCall(metadataCall, now))
 						pendingCalls.add(metadataCall);
 				}
+				
 				pollTimeout = Math.min(pollTimeout, sendEligibleCalls(now));
 
 				if (metadataFetchDelayMs > 0) {
 					pollTimeout = Math.min(pollTimeout, metadataFetchDelayMs);
 				}
-
 				// Ensure that we use a small poll timeout if there are pending calls which need
 				// to be sent
 				if (!pendingCalls.isEmpty())
@@ -1680,32 +1700,24 @@ public class KafkaAdminClient extends AdminClient {
 	}
 
 	@Override
-	public DeleteTopicsResult deleteTopics(Collection<String> topicNames, DeleteTopicsOptions options) {
-		org.oracle.okafka.clients.admin.DeleteTopicsResult delResult = deleteTopics(topicNames,
-				new org.oracle.okafka.clients.admin.DeleteTopicsOptions());
-		KafkaFuture<Void> ftr = delResult.all();
-		try {
-			ftr.get();
-		} catch (Exception e) {
-			log.error("Exception from deleteTopics", e);
-		}
-		return null;
-	}
+	public DeleteTopicsResult deleteTopics(final TopicCollection topics, DeleteTopicsOptions options) {
 
-	public org.oracle.okafka.clients.admin.DeleteTopicsResult deleteTopics(Collection<String> topicNames,
-			org.oracle.okafka.clients.admin.DeleteTopicsOptions options) {
-		
+		if (topics instanceof TopicIdCollection) {
+			throw new FeatureNotSupportedException("This feature is not suported for this release.");
+		}
+
+		final Collection<String> topicNames = ((TopicCollection.TopicNameCollection) topics).topicNames();
 		final Map<String, KafkaFutureImpl<Void>> topicFutures = new HashMap<>(topicNames.size());
 		final List<String> validTopicNames = new ArrayList<>(topicNames.size());
-		
+
 		for (String topicName : topicNames) {
 			if (topicNameIsUnrepresentable(topicName)) {
-				
+
 				KafkaFutureImpl<Void> future = new KafkaFutureImpl<>();
 				future.completeExceptionally(new InvalidTopicException(
 						"The given topic name '" + topicName + "' cannot be represented in a request."));
 				topicFutures.put(topicName.toUpperCase(), future);
-				
+
 			} else if (!topicFutures.containsKey(topicName.toUpperCase())) {
 				topicFutures.put(topicName.toUpperCase(), new KafkaFutureImpl<Void>());
 				validTopicNames.add(topicName.toUpperCase());
@@ -1760,6 +1772,7 @@ public class KafkaAdminClient extends AdminClient {
 		}
 		return new org.oracle.okafka.clients.admin.DeleteTopicsResult(
 				new HashMap<String, KafkaFuture<Void>>(topicFutures));
+
 	}
 
 	private void handleNotControllerError(org.apache.kafka.common.requests.AbstractResponse response)
@@ -1774,15 +1787,157 @@ public class KafkaAdminClient extends AdminClient {
 		metadataManager.requestUpdate();
 		throw error.exception();
 	}
-
+	
 	@Override
-	public ListTopicsResult listTopics(final org.apache.kafka.clients.admin.ListTopicsOptions options) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	public ListTopicsResult listTopics(final ListTopicsOptions options) {
+		final KafkaFutureImpl<Map<String, TopicListing>> topicListingFuture = new KafkaFutureImpl<>();
+		final long now = time.milliseconds();
+		runnable.call(new Call("listTopics", calcDeadlineMs(now, options.timeoutMs()), new LeastLoadedNodeProvider()) {
+
+			@Override
+			MetadataRequest.Builder createRequest(int timeoutMs) {
+				return MetadataRequest.Builder.listAllTopics();
+			}
+
+			@Override
+			void handleResponse(AbstractResponse abstractResponse) {
+				MetadataResponse response = (MetadataResponse) abstractResponse;
+				Map<String, TopicListing> topicListing = new HashMap<>();
+				Map<String, TopicTeqParameters> topicTeqParameters = response.teqParameters();
+
+				for (Map.Entry<String, TopicTeqParameters> entry : topicTeqParameters.entrySet()) {
+					String topicName = entry.getKey();
+					if (entry.getValue().getStickyDeq() == 2)
+						topicListing.put(topicName, new TopicListing(topicName, null, false));
+				}
+
+				topicListingFuture.complete(topicListing);
+
+			}
+
+			@Override
+			void handleFailure(Throwable throwable) {
+				topicListingFuture.completeExceptionally(throwable);
+			}
+		}, now);
+
+		Constructor<ListTopicsResult> constructor;
+		ListTopicsResult ltr;
+		try {
+			constructor = ListTopicsResult.class.getDeclaredConstructor(KafkaFuture.class);
+
+			constructor.setAccessible(true);
+			try {
+				ltr = constructor.newInstance(topicListingFuture);
+				return ltr;
+			} catch (InstantiationException | IllegalAccessException | IllegalArgumentException
+					| InvocationTargetException e) {
+				ltr = null;
+				e.printStackTrace();
+			}
+		} catch (NoSuchMethodException | SecurityException e) {
+			e.printStackTrace();
+			constructor = null;
+			ltr = null;
+		}
+		return ltr;
 	}
-
+	
+	
 	@Override
-	public DescribeTopicsResult describeTopics(final Collection<String> topicNames, DescribeTopicsOptions options) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	public DescribeTopicsResult describeTopics(final TopicCollection topics, DescribeTopicsOptions options) {
+
+		if (topics instanceof TopicIdCollection) {
+			throw new FeatureNotSupportedException("This feature is not suported for this release.");
+		}
+
+		final Collection<String> topicNames = ((TopicCollection.TopicNameCollection) topics).topicNames();
+		final Map<String, KafkaFutureImpl<org.apache.kafka.clients.admin.TopicDescription>> topicFutures = new HashMap<>(
+				topicNames.size());
+		final List<String> validTopicNames = new ArrayList<>(topicNames.size());
+
+		for (String topicName : topicNames) {
+			if (topicNameIsUnrepresentable(topicName)) {
+
+				KafkaFutureImpl<org.apache.kafka.clients.admin.TopicDescription> future = new KafkaFutureImpl<>();
+				future.completeExceptionally(new InvalidTopicException(
+						"The given topic name '" + topicName + "' cannot be represented in a request."));
+				topicFutures.put(topicName.toUpperCase(), future);
+
+			} else if (!topicFutures.containsKey(topicName.toUpperCase())) {
+				topicFutures.put(topicName.toUpperCase(),
+						new KafkaFutureImpl<org.apache.kafka.clients.admin.TopicDescription>());
+				validTopicNames.add(topicName.toUpperCase());
+			}
+		}
+		if (validTopicNames.isEmpty()) {
+			org.apache.kafka.clients.admin.DescribeTopicsResult describeTopicsResult = new org.oracle.okafka.clients.admin.DescribeTopicsResult(
+					new HashMap<String, KafkaFuture<org.apache.kafka.clients.admin.TopicDescription>>(topicFutures));
+			return describeTopicsResult;
+		}
+		final long now = time.milliseconds();
+
+		runnable.call(
+				new Call("describeTopics", calcDeadlineMs(now, options.timeoutMs()), new LeastLoadedNodeProvider()) {
+
+					@Override
+					MetadataRequest.Builder createRequest(int timeoutMs) {
+						return new MetadataRequest.Builder(validTopicNames, false, validTopicNames);
+					}
+
+					@Override
+					void handleResponse(AbstractResponse abstractResponse) {
+						MetadataResponse response = (MetadataResponse) abstractResponse;
+						List<PartitionInfo> partitionInfo = response.partitions();
+						Map<String, Exception> errorsPerTopic = response.topicErrors();
+						Map<String, TopicTeqParameters> topicTeqParameters = response.teqParameters();
+
+						Map<String, List<TopicPartitionInfo>> topicPartitions = new HashMap<>();
+
+						for (int i = 0; i < partitionInfo.size(); i++) {
+
+							String name = partitionInfo.get(i).topic();
+							int partition = partitionInfo.get(i).partition();
+							Node leader = partitionInfo.get(i).leader();
+							Node[] replicas = partitionInfo.get(i).replicas();
+							Node[] inSyncReplicas = partitionInfo.get(i).inSyncReplicas();
+
+							TopicPartitionInfo topicPartitionInfo = new TopicPartitionInfo(partition, leader,
+									replicas != null ? new ArrayList<>(Arrays.asList(replicas)) : new ArrayList<>(),
+									inSyncReplicas != null ? new ArrayList<>(Arrays.asList(inSyncReplicas))
+											: new ArrayList<>());
+							if (topicPartitions.containsKey(name)) {
+								topicPartitions.get(name).add(topicPartitionInfo);
+							} else {
+								topicPartitions.put(name, new ArrayList<>(Arrays.asList(topicPartitionInfo)));
+							}
+						}
+
+						for (Map.Entry<String, KafkaFutureImpl<org.apache.kafka.clients.admin.TopicDescription>> entry : topicFutures
+								.entrySet()) {
+
+							KafkaFutureImpl<TopicDescription> future = entry.getValue();
+
+							if (errorsPerTopic.get(entry.getKey()) != null) {
+								future.completeExceptionally(errorsPerTopic.get(entry.getKey()));
+							}
+
+							TopicDescription topicDescription = new org.oracle.okafka.clients.admin.TopicDescription(
+									entry.getKey(), false, topicPartitions.get(entry.getKey()),
+									topicTeqParameters.get(entry.getKey()));
+
+							future.complete((org.apache.kafka.clients.admin.TopicDescription) topicDescription);
+						}
+					}
+
+					@Override
+					void handleFailure(Throwable throwable) {
+						completeAllExceptionally(topicFutures.values(), throwable);
+					}
+				}, now);
+		DescribeTopicsResult describeTopicsResult = new org.oracle.okafka.clients.admin.DescribeTopicsResult(
+				new HashMap<String, KafkaFuture<TopicDescription>>(topicFutures));
+		return describeTopicsResult;
 	}
 
 	@Override
@@ -1994,16 +2149,6 @@ public class KafkaAdminClient extends AdminClient {
 	}
 
 	@Override
-	public DeleteTopicsResult deleteTopics(TopicCollection topics, DeleteTopicsOptions options) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-	}
-
-	@Override
-	public DescribeTopicsResult describeTopics(TopicCollection topics, DescribeTopicsOptions options) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-	}
-
-	@Override
 	public ListConsumerGroupOffsetsResult listConsumerGroupOffsets(Map<String, ListConsumerGroupOffsetsSpec> groupSpecs,
 			ListConsumerGroupOffsetsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
@@ -2050,4 +2195,28 @@ public class KafkaAdminClient extends AdminClient {
 	public ListClientMetricsResourcesResult listClientMetricsResources(ListClientMetricsResourcesOptions arg0) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
+
+	@Override
+	public DescribeTopicsResult describeTopics(Collection<String> topicNames, DescribeTopicsOptions options) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public DeleteTopicsResult deleteTopics(Collection<String> topics, DeleteTopicsOptions options) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+//	@Override
+//	public ListTopicsResult listTopics(ListTopicsOptions options) {
+//		// TODO Auto-generated method stub
+//		return null;
+//	}
+
+//	@Override
+//	public ListTopicsResult listTopics(ListTopicsOptions options) {
+//		// TODO Auto-generated method stub
+//		return null;
+//	}
 }

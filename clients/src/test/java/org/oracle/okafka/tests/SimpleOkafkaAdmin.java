@@ -28,6 +28,7 @@ public class SimpleOkafkaAdmin {
 				throw new IllegalStateException(e);
 			}
 			System.out.println("Auto Closing admin now");
+        
 		}
 		catch(Exception e)
 		{

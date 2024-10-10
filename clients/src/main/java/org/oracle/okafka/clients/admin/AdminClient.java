@@ -98,7 +98,7 @@ import org.apache.kafka.common.config.ConfigResource;
  * </p>
  */
 @InterfaceStability.Evolving
-public abstract class AdminClient  implements Admin {
+public abstract class AdminClient implements Admin {
 
     /**
      * Create a new AdminClient with the given configuration.
