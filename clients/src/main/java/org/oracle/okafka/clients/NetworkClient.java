@@ -729,7 +729,6 @@ public class NetworkClient implements KafkaClient {
 				} else return reconnectBackoffMs;            
 			}
 			this.metadataFetchInProgress = true;
-			
 			MetadataRequest.Builder metadataRequest;
 			if (metadata.needMetadataForAllTopics()) {
 				metadataRequest = MetadataRequest.Builder.allTopics();
@@ -742,13 +741,7 @@ public class NetworkClient implements KafkaClient {
 			}
 			log.debug("Sending metadata request {} to node {}", metadataRequest, node);
 			sendInternalMetadataRequest(metadataRequest, node, now);
-			
-			MetadataRequest.Builder mr;
-			mr=new MetadataRequest.Builder(null,
-					metadata.allowAutoTopicCreation(), null);
-			sendInternalMetadataRequest(mr,node,now);
-			
-			return defaultRequestTimeoutMs;
+			return defaultRequestTimeoutMs; 
 		}
 
 		@Override

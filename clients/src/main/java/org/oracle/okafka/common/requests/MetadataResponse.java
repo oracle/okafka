@@ -49,14 +49,16 @@ public class MetadataResponse extends AbstractResponse {
 	private final List<Node> nodes;
 	private final List<PartitionInfo> partitionInfo;
 	private final Map<String, Exception> errorsPerTopic;
+	private Exception exception;
 	private final Map<String, TopicTeqParameters> teqParams;
 	
-	public MetadataResponse(String clusterId, List<Node> nodes, List<PartitionInfo> partitionInfo, Map<String, Exception> errorsPerTopic, Map<String, TopicTeqParameters> _teqParams) {
+	public MetadataResponse(String clusterId, List<Node> nodes, List<PartitionInfo> partitionInfo, Map<String, Exception> errorsPerTopic,Map<String, TopicTeqParameters> _teqParams) {
 		super(ApiKeys.METADATA);
 		this.clusterId = clusterId;
 		this.nodes = nodes;
 		this.partitionInfo = partitionInfo;
 		this.errorsPerTopic = errorsPerTopic;
+		this.exception = null;
 		this.teqParams = _teqParams;
 	}
 	
@@ -70,6 +72,14 @@ public class MetadataResponse extends AbstractResponse {
 	
 	public Map<String, TopicTeqParameters> teqParameters(){
 		return teqParams;
+	}
+	
+	public void setException(Exception exception) {
+		this.exception = exception;
+	}
+	
+	public Exception getException() {
+		return this.exception;
 	}
 	
 	/**

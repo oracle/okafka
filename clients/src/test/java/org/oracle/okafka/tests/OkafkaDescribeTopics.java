@@ -2,9 +2,13 @@ package org.oracle.okafka.tests;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.DescribeTopicsResult;
+import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.TopicCollection;
 import org.junit.Test;
 import org.oracle.okafka.clients.admin.AdminClient;
@@ -21,13 +25,11 @@ public class OkafkaDescribeTopics {
         	KafkaAdminClient kAdminClient = (((org.oracle.okafka.clients.admin.KafkaAdminClient)admin));
         	DescribeTopicsResult res=kAdminClient.describeTopics
         			(TopicCollection.TopicNameCollection.ofTopicNames(new ArrayList<String> (Arrays.asList("KTOPIC1"))));
-        	Thread.sleep(20000);
-//        	TopicDescription td= res.topicNameValues().get("TEQ").get();
-//        	List<TopicPartitionInfo> ls=td.partitions();
-//        	for(int i=0;i<ls.size();i++) {
-//        		System.out.println(ls.get(i).partition()+"---");
-//        	}
-        	System.out.println(res.topicNameValues());
+
+        	Map<String,KafkaFuture<TopicDescription>> description=res.topicNameValues();
+        	for(Map.Entry<String,KafkaFuture<TopicDescription>> entry : description.entrySet()) {
+        		System.out.println("Description - "+entry.getValue().get());
+        	}
         	
 		}
 		catch(Exception e)

@@ -117,7 +117,6 @@ public abstract class AQClient {
 	/* Closes all connection to all the database nodes */
 	public abstract void close();
 	
-	
 	/* Get Metadata from Oracle Database.
 	 * This involves fetching information for all the available database instances.
 	 * Fetching partition count for the interested topics. 
@@ -133,8 +132,7 @@ public abstract class AQClient {
 		List<Node> nodes = new ArrayList<>();
 		List<PartitionInfo> partitionInfo = new ArrayList<>();
 		Map<String, Exception> errorsPerTopic = new HashMap<>();
-		List<String> metadataTopics = null;
-		List<String> teqParaList = null;
+		List<String> metadataTopics=null;
 		boolean disconnected = false;
 		String clusterId = "";
 		boolean getPartitioninfo = false;
@@ -146,61 +144,17 @@ public abstract class AQClient {
 				throw new NullPointerException("Database connection to fetch metadata is null");
 			}
 
-			if (metadataRequest.topics() == null && metadataRequest.teqParaTopics() == null) {
-
-				metadataTopics = new ArrayList<>();
-				teqParaList = new ArrayList<>();
-				String query = "select name from user_queues where sharded='TRUE'";
-				PreparedStatement stmt = null;
-				try {
-					stmt = con.prepareStatement(query);
-					ResultSet result = stmt.executeQuery();
-
-					if (result.isBeforeFirst()) {
-						while (result.next()) {
-							String topic = result.getString("name");
-							metadataTopics.add(topic);
-							teqParaList.add(topic);
-						}
-					}
-					result.close();
-
-				} catch (SQLException sqe) {
-					log.error("Error while getting list of all topics" + sqe);
-				}
-
-				finally {
-					try {
-						if (stmt != null)
-							stmt.close();
-					} catch (Exception ex) {
-						// do nothing
-					}
-				}
-
-			} else {
-				metadataTopics = new ArrayList<String>(metadataRequest.topics());
-				teqParaList = metadataRequest.teqParaTopics();
-				topicParameterMap = new HashMap<String, TopicTeqParameters>(teqParaList.size());
-				for (String teqTopic : teqParaList) {
-					TopicTeqParameters teqPara = fetchQueueParameters(teqTopic, con);
-					topicParameterMap.put(teqTopic, teqPara);
-				}
-			}
-
 			if (builder.isListTopics()) {
-				topicParameterMap = new HashMap<String, TopicTeqParameters>(teqParaList.size());
-				for (String teqTopic : teqParaList) {
-					TopicTeqParameters teqPara = new TopicTeqParameters();
-					teqPara.setStickyDeq(getQueueParameter(STICKYDEQ_PARAM, teqTopic, con));
-					topicParameterMap.put(teqTopic, teqPara);
+				return listTopicsResponse(request,con);
+			}  
 
-				}
-				return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
-						request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null,
-						new MetadataResponse(null, null, null, null, topicParameterMap));
+			metadataTopics = new ArrayList<String>(metadataRequest.topics());
+			List<String> teqParaList = metadataRequest.teqParaTopics();
+			topicParameterMap = new HashMap<String, TopicTeqParameters>(teqParaList.size());
+			for (String teqTopic : teqParaList) {
+				TopicTeqParameters teqPara = fetchQueueParameters(teqTopic, con);
+				topicParameterMap.put(teqTopic, teqPara);	
 			}
-
 			// Database Name to be set as Cluster ID
 			clusterId = ((oracle.jdbc.internal.OracleConnection) con).getServerSessionInfo()
 					.getProperty("DATABASE_NAME");
@@ -214,7 +168,6 @@ public abstract class AQClient {
 
 		} catch (Exception exception) {
 			log.error("Exception while getting metadata " + exception.getMessage(), exception);
-			// exception.printStackTrace();
 
 			if (exception instanceof SQLException)
 				if (((SQLException) exception).getErrorCode() == 6550) {
@@ -242,6 +195,78 @@ public abstract class AQClient {
 		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
 				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null,
 				new MetadataResponse(clusterId, all_nodes, partitionInfoList, errorsPerTopic, topicParameterMap));
+	}
+	
+	private ClientResponse listTopicsResponse (ClientRequest request, Connection con) {
+		MetadataRequest.Builder builder = (MetadataRequest.Builder) request.requestBuilder();
+		Map<String, TopicTeqParameters> topicParameterMap = null;
+		Exception listTopicsException=null;
+		boolean disconnected=false;
+		
+		try {
+			List<String> allTopics = getAllTopics(con);
+			topicParameterMap = new HashMap<String, TopicTeqParameters>(allTopics.size());
+			for (String teqTopic : allTopics) {
+				TopicTeqParameters teqPara = new TopicTeqParameters();
+				teqPara.setStickyDeq(getQueueParameter(STICKYDEQ_PARAM, teqTopic, con));
+				topicParameterMap.put(teqTopic, teqPara);
+
+			}
+
+			}catch (Exception exception) {
+				log.error("Exception while listing topics " + exception.getMessage(), exception);
+
+				if (exception instanceof SQLException)
+					if (((SQLException) exception).getErrorCode() == 6550) {
+						log.error("Not all privileges granted to the database user.",
+								((SQLException) exception).getMessage());
+						log.info("Please grant all the documented privileges to database user.");
+					}
+				if (exception instanceof SQLSyntaxErrorException)
+					log.trace("Please grant all the documented privileges to database user.");
+					
+				listTopicsException=exception;
+				disconnected=true;
+				try {
+					log.debug("Unexcepted error occured with connection to node {}, closing the connection",
+							request.destination());
+					if (con != null)
+						con.close();
+
+					log.trace("Connection with node {} is closed", request.destination());
+				} catch (SQLException sqlEx) {
+					log.trace("Failed to close connection with node {}", request.destination());
+				}
+				
+			}
+		MetadataResponse metadataResponse = new MetadataResponse(null, null, null, null, topicParameterMap);
+		metadataResponse.setException(listTopicsException);
+		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
+				request.createdTimeMs(), System.currentTimeMillis(), disconnected , null, null, metadataResponse);
+			}
+	
+	private List<String> getAllTopics(Connection con) throws Exception{
+		List<String> allTopics = new ArrayList<String>();
+		String query = "select name from user_queues where sharded='TRUE'";
+		PreparedStatement stmt = null;
+		
+		stmt = con.prepareStatement(query);
+		ResultSet result = stmt.executeQuery();
+
+		 while (result.next()) {
+			String topic = result.getString("name");
+			allTopics.add(topic);
+		}
+		result.close();
+
+		try
+		{
+			if (stmt != null)
+				stmt.close();
+		}catch(Exception ex){
+			// do nothing
+		}
+		return allTopics;
 	}
 	
 	// Fetches existing cluster nodes 

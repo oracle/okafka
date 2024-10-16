@@ -1703,7 +1703,7 @@ public class KafkaAdminClient extends AdminClient {
 	public DeleteTopicsResult deleteTopics(final TopicCollection topics, DeleteTopicsOptions options) {
 
 		if (topics instanceof TopicIdCollection) {
-			throw new FeatureNotSupportedException("This feature is not suported for this release.");
+			throw new FeatureNotSupportedException("Topic Id's are not supported for deleteTopics request");
 		}
 
 		final Collection<String> topicNames = ((TopicCollection.TopicNameCollection) topics).topicNames();
@@ -1802,6 +1802,7 @@ public class KafkaAdminClient extends AdminClient {
 			@Override
 			void handleResponse(AbstractResponse abstractResponse) {
 				MetadataResponse response = (MetadataResponse) abstractResponse;
+				if(response.getException()==null) {
 				Map<String, TopicListing> topicListing = new HashMap<>();
 				Map<String, TopicTeqParameters> topicTeqParameters = response.teqParameters();
 
@@ -1812,7 +1813,9 @@ public class KafkaAdminClient extends AdminClient {
 				}
 
 				topicListingFuture.complete(topicListing);
-
+				}else {
+					handleFailure(response.getException());
+				}
 			}
 
 			@Override
@@ -1848,7 +1851,7 @@ public class KafkaAdminClient extends AdminClient {
 	public DescribeTopicsResult describeTopics(final TopicCollection topics, DescribeTopicsOptions options) {
 
 		if (topics instanceof TopicIdCollection) {
-			throw new FeatureNotSupportedException("This feature is not suported for this release.");
+			throw new FeatureNotSupportedException("Topic Id's are not supported for describeTopics request");
 		}
 
 		final Collection<String> topicNames = ((TopicCollection.TopicNameCollection) topics).topicNames();
@@ -2196,27 +2199,4 @@ public class KafkaAdminClient extends AdminClient {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
-	@Override
-	public DescribeTopicsResult describeTopics(Collection<String> topicNames, DescribeTopicsOptions options) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public DeleteTopicsResult deleteTopics(Collection<String> topics, DeleteTopicsOptions options) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-//	@Override
-//	public ListTopicsResult listTopics(ListTopicsOptions options) {
-//		// TODO Auto-generated method stub
-//		return null;
-//	}
-
-//	@Override
-//	public ListTopicsResult listTopics(ListTopicsOptions options) {
-//		// TODO Auto-generated method stub
-//		return null;
-//	}
 }

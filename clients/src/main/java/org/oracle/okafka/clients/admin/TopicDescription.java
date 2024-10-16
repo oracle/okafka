@@ -46,22 +46,21 @@ public class TopicDescription extends org.apache.kafka.clients.admin.TopicDescri
 	}
 	
 	@Override
-    public boolean equals(final Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        final TopicDescription that = (TopicDescription) o;
-        return this.isInternal() == that.isInternal() &&
-            Objects.equals(name, that.name) &&
-            Objects.equals(this.partitions(), that.partitions()) &&
-            Objects.equals(this.topicParameters,that.topicParameters);
-    }
+	public boolean equals(final Object o) {
+		Boolean superEqual = super.equals(o);
+		if (superEqual) {
+			final TopicDescription that = (TopicDescription) o;
+			return this.topicParameters.equals(that.topicParameters);
+		}
+		return false;
+	}
 	
 	@Override
     public int hashCode() {
         return Objects.hash(name, this.isInternal(), this.partitions(),topicParameters);
     }
 	
-	public TopicTeqParameters topicTeqParameters() {
+	private TopicTeqParameters topicTeqParameters() {
 		return this.topicParameters;
 	}
 	

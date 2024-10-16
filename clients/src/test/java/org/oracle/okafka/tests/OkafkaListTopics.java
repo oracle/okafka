@@ -17,9 +17,9 @@ public class OkafkaListTopics {
         	KafkaAdminClient kAdminClient = (((org.oracle.okafka.clients.admin.KafkaAdminClient)admin));
         	
         	ListTopicsResult res=kAdminClient.listTopics(new ListTopicsOptions());
-        	Thread.sleep(20000);
+        	
+        	System.out.println(res.names().get());
 
-        	System.out.println(res.namesToListings());
 		}
 		catch(Exception e)
 		{
