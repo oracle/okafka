@@ -80,6 +80,7 @@ public abstract class AQClient {
 	private Map<Integer, Timestamp> instancesTostarttime;
 	public List<Node> all_nodes = new ArrayList<>();
 	public List<PartitionInfo> partitionInfoList = new ArrayList<>();
+	private  int userQueueShardsQueryIndex = 0;
 	
 	public static final String PARTITION_PROPERTY = "AQINTERNAL_PARTITION";
 	public static final String HEADERCOUNT_PROPERTY = "AQINTERNAL_HEADERCOUNT";
@@ -468,111 +469,127 @@ public abstract class AQClient {
 		if(nodes.size() <= 0 || topics == null || topics.isEmpty())
 			return;
 
-		//String queryQShard = "select shard_id, enqueue_instance from user_queue_shards where  name = ? ";
-		String queryQShard = "select SHARD_ID, ENQUEUE_INSTANCE from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) ";
+		String queryQShard[] = {"select SHARD_ID, OWNER_INSTANCE from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) ",
+		"select SHARD_ID, ENQUEUE_INSTANCE from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) "};
+		
 		PreparedStatement stmt1 = null;
-		try {
-			stmt1 = con.prepareStatement(queryQShard);
-			int nodeIndex = 0 ;
-			int nodesSize = nodes.size();
-			ResultSet result1 = null;
-			Node[] nodesArray = null;
-			if(nodesSize > 1) {
-				int max = -1;
-				for(Node nodeNew : nodes)  {
-					if(nodeNew.id() > max)
-						max = nodeNew.id();
+		int qryIndex=userQueueShardsQueryIndex;
+		do {
+			try {
+				stmt1 = con.prepareStatement(queryQShard[qryIndex]);
+				int nodeIndex = 0 ;
+				int nodesSize = nodes.size();
+				ResultSet result1 = null;
+				Node[] nodesArray = null;
+				if(nodesSize > 1) {
+					int max = -1;
+					for(Node nodeNew : nodes)  {
+						if(nodeNew.id() > max)
+							max = nodeNew.id();
+					}
+
+					nodesArray = new Node[max];
+					for(Node nodeNew : nodes) 
+						nodesArray[nodeNew.id()-1] = nodeNew;
 				}
 
-				nodesArray = new Node[max];
-				for(Node nodeNew : nodes) 
-					nodesArray[nodeNew.id()-1] = nodeNew;
-			}
-
-			for(String topic : topics) {
-				boolean topicDone = false;
-				int partCnt = 0;
-				try {
-					//Get number of partitions
-					partCnt = getQueueParameter(SHARDNUM_PARAM, ConnectionUtils.enquote(topic), con);	
-				} catch(SQLException sqlE) {
-					int errorNo = sqlE.getErrorCode();
-					if(errorNo == 24010)  {
-						//Topic does not exist, it will be created
+				for(String topic : topics) {
+					boolean topicDone = false;
+					int partCnt = 0;
+					try {
+						//Get number of partitions
+						partCnt = getQueueParameter(SHARDNUM_PARAM, ConnectionUtils.enquote(topic), con);	
+					} catch(SQLException sqlE) {
+						int errorNo = sqlE.getErrorCode();
+						if(errorNo == 24010)  {
+							//Topic does not exist, it will be created
+							continue;
+						}
+					}catch(Exception excp) {
+						// Topic May or may not exists. We will not attempt to create it again
+						topicsRem.remove(topic);
 						continue;
 					}
-				}catch(Exception excp) {
-					// Topic May or may not exists. We will not attempt to create it again
-					topicsRem.remove(topic);
+
+					boolean partArr[] =  new boolean[partCnt];
+					for(int i =0; i < partCnt ;i++)
+						partArr[i] = false;
+
+					// If more than one RAC node then check who is owner Node for which partition
+					if(nodes.size()  > 1) {
+
+						stmt1.clearParameters();
+						stmt1.setString(1, topic);
+						result1 = stmt1.executeQuery(); 
+						// If any row exist 
+						if(result1.isBeforeFirst()) {
+							while(result1.next() ) {
+								int partNum = result1.getInt(1)/2;
+								int nodeNum = result1.getInt(2);
+								partitionInfo.add(new PartitionInfo(topic, partNum , nodesArray[nodeNum-1], new Node[0], new Node[0]));	
+								partArr[partNum] = true;
+							}
+
+							result1.close();
+							// For the partitions not yet mapped to an instance 
+							for(int i = 0; i < partCnt ; i++) {
+								if( partArr[i] == false ) {
+									partitionInfo.add(new PartitionInfo(topic, i , nodes.get(nodeIndex++%nodesSize), null, null));	
+								}
+							}
+							topicDone = true;
+						} // Entry Existed in USER_QUEUE_SHARD
+					}// Nodes > 1
+
+					// No Record in USER_QUEUE_SHARD or Node =1 check if topic exist		   	
+					if(!topicDone){
+						for(int i = 0; i < partCnt ; i++) {
+							//When nodeSize > 1 but the partition is not yet created, then we distribute this partition across 
+							// available nodes by assigning the partition to node in round robin manner.
+							partitionInfo.add(new PartitionInfo(topic, i , nodes.get(nodeIndex++%nodesSize), null, null));
+						}
+						topicDone =true;
+					}
+					if(topicDone)
+						topicsRem.remove(topic);
+				} // For all Topics
+
+				if(allowAutoTopicCreation && topicsRem.size() > 0) {
+					Map<String, TopicDetails> topicDetails = new HashMap<String, TopicDetails>();
+					for(String topicRem : topicsRem) {
+						topicDetails.put(topicRem, new TopicDetails(1, (short)0 , Collections.<String, String>emptyMap()));
+					}
+					Map<String, Exception> errors= CreateTopics.createTopics(con, topicDetails);
+					for(String topicRem : topicsRem) {
+						if(errors.get(topicRem) == null) {
+							partitionInfo.add(new PartitionInfo(topicRem, 0, nodes.get(nodeIndex++%nodesSize), null, null));
+						} else {
+							errorsPerTopic.put(topicRem, errors.get(topicRem));
+						}
+					}
+				}
+				partitionInfoList = partitionInfo;
+				break;
+			} 
+			catch(SQLException sqe){
+				if(sqe.getErrorCode() == 904) {
+					qryIndex++;
+					userQueueShardsQueryIndex = qryIndex;
 					continue;
 				}
-
-				boolean partArr[] =  new boolean[partCnt];
-				for(int i =0; i < partCnt ;i++)
-					partArr[i] = false;
-
-				// If more than one RAC node then check who is owner Node for which partition
-				if(nodes.size()  > 1) {
-
-					stmt1.clearParameters();
-					stmt1.setString(1, topic);
-					result1 = stmt1.executeQuery(); 
-					// If any row exist 
-					if(result1.isBeforeFirst()) {
-						while(result1.next() ) {
-							int partNum = result1.getInt(1)/2;
-							int nodeNum = result1.getInt(2);
-							partitionInfo.add(new PartitionInfo(topic, partNum , nodesArray[nodeNum-1], new Node[0], new Node[0]));	
-							partArr[partNum] = true;
-						}
-
-						result1.close();
-						// For the partitions not yet mapped to an instance 
-						for(int i = 0; i < partCnt ; i++) {
-							if( partArr[i] == false ) {
-								partitionInfo.add(new PartitionInfo(topic, i , nodes.get(nodeIndex++%nodesSize), null, null));	
-							}
-						}
-						topicDone = true;
-					} // Entry Existed in USER_QUEUE_SHARD
-				}// Nodes > 1
-
-				// No Record in USER_QUEUE_SHARD or Node =1 check if topic exist		   	
-				if(!topicDone){
-					for(int i = 0; i < partCnt ; i++) {
-						//When nodeSize > 1 but the partition is not yet created, then we distribute this partition across 
-						// available nodes by assigning the partition to node in round robin manner.
-						partitionInfo.add(new PartitionInfo(topic, i , nodes.get(nodeIndex++%nodesSize), null, null));
-					}
-					topicDone =true;
-				}
-				if(topicDone)
-					topicsRem.remove(topic);
-			} // For all Topics
-
-			if(allowAutoTopicCreation && topicsRem.size() > 0) {
-				Map<String, TopicDetails> topicDetails = new HashMap<String, TopicDetails>();
-				for(String topicRem : topicsRem) {
-					topicDetails.put(topicRem, new TopicDetails(1, (short)0 , Collections.<String, String>emptyMap()));
-				}
-				Map<String, Exception> errors= CreateTopics.createTopics(con, topicDetails);
-				for(String topicRem : topicsRem) {
-					if(errors.get(topicRem) == null) {
-						partitionInfo.add(new PartitionInfo(topicRem, 0, nodes.get(nodeIndex++%nodesSize), null, null));
-					} else {
-						errorsPerTopic.put(topicRem, errors.get(topicRem));
-					}
-				}
 			}
-			partitionInfoList = partitionInfo;
-		} finally {
-			try {
-				if(stmt1 != null) 
-					stmt1.close();		
-			} catch(Exception ex) {
-				//do nothing
+			finally {
+			
+				try {
+					if(stmt1 != null) 
+						stmt1.close();		
+				} catch(Exception ex) {
+					//do nothing
+				}
+				System.out.println(userQueueShardsQueryIndex);
 			}
-		}
+		} 
+		while(qryIndex<2);
 	}
 	
 	// returns the value for a queue Parameter

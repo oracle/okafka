@@ -7,3 +7,4 @@
 
 rootProject.name = 'okafka'
 include(':clients', 'examples:consumer', 'examples:producer')
+
