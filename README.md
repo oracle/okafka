@@ -37,6 +37,24 @@ GRANT SELECT on USER_QUEUE_PARTITION_ASSIGNMENT_TABLE to user;
 GRANT SELECT on SYS.DBA_RSRC_PLAN_DIRECTIVES to user;
 EXEC DBMS_AQADM.GRANT_PRIV_FOR_RM_PLAN('user');
 ```
+For Oracle database user created on Oracle Autonomous Cloud, below privileges needs to be granted. 
+
+```roomsql
+GRANT AQ_USER_ROLE to user;
+GRANT CONNECT, RESOURCE, unlimited tablespace to user;
+GRANT EXECUTE on DBMS_AQ to user;
+GRANT EXECUTE on DBMS_AQADM to user;
+GRANT EXECUTE on DBMS_AQIN to user;
+GRANT EXECUTE on DBMS_TEQK to user;
+GRANT SELECT on GV$SESSION to user;
+GRANT SELECT on V$SESSION to user;
+GRANT SELECT on GV$INSTANCE to user;
+GRANT SELECT on GV$LISTENER_NETWORK to user;
+GRANT SELECT on GV$PDBS to user;
+GRANT SELECT on SYS.DBA_RSRC_PLAN_DIRECTIVES to user;
+EXEC DBMS_AQADM.GRANT_PRIV_FOR_RM_PLAN('user');
+```
+
 
 Note:
 It is preferred in general to assign or grant a specific quota on a tablespace to a database user instead of granting unlimited quota in default tablespace. One can create a table space and use the following command to grant quota on a specific tablespace to a database user.
