@@ -1598,14 +1598,15 @@ public class KafkaAdminClient extends AdminClient {
 	public CreateTopicsResult createTopics(final Collection<NewTopic> newTopics, final CreateTopicsOptions options) {
 		final Map<String, KafkaFutureImpl<TopicMetadataAndConfig>> topicFutures = new HashMap<>(newTopics.size());
 		final Map<String, CreateTopicsRequest.TopicDetails> topicsMap = new HashMap<>(newTopics.size());
+		
 		for (NewTopic newTopic : newTopics) {
 			if (topicNameIsUnrepresentable(newTopic.name())) {
 				KafkaFutureImpl<TopicMetadataAndConfig> future = new KafkaFutureImpl<>();
 				future.completeExceptionally(new InvalidTopicException(
 						"The given topic name '" + newTopic.name() + "' cannot be represented in a request."));
-				topicFutures.put(newTopic.name(), future);
-			} else if (!topicFutures.containsKey(newTopic.name())) {
-				topicFutures.put(newTopic.name(), new KafkaFutureImpl<TopicMetadataAndConfig>());
+				topicFutures.put(newTopic.name().toUpperCase(), future);
+			} else if (!topicFutures.containsKey(newTopic.name().toUpperCase())) {
+				topicFutures.put(newTopic.name().toUpperCase(), new KafkaFutureImpl<TopicMetadataAndConfig>());
 				TopicDetails topicDetails = null;
 
 				if (newTopic.replicasAssignments() != null) {
@@ -1622,7 +1623,7 @@ public class KafkaAdminClient extends AdminClient {
 						topicDetails = new TopicDetails(newTopic.numPartitions(), newTopic.replicationFactor());
 					}
 				}
-				topicsMap.put(newTopic.name(), topicDetails);
+				topicsMap.put(newTopic.name().toUpperCase(), topicDetails);
 			}
 		}
 		final long now = time.milliseconds();
@@ -1693,17 +1694,21 @@ public class KafkaAdminClient extends AdminClient {
 
 	public org.oracle.okafka.clients.admin.DeleteTopicsResult deleteTopics(Collection<String> topicNames,
 			org.oracle.okafka.clients.admin.DeleteTopicsOptions options) {
+		
 		final Map<String, KafkaFutureImpl<Void>> topicFutures = new HashMap<>(topicNames.size());
 		final List<String> validTopicNames = new ArrayList<>(topicNames.size());
+		
 		for (String topicName : topicNames) {
 			if (topicNameIsUnrepresentable(topicName)) {
+				
 				KafkaFutureImpl<Void> future = new KafkaFutureImpl<>();
 				future.completeExceptionally(new InvalidTopicException(
 						"The given topic name '" + topicName + "' cannot be represented in a request."));
-				topicFutures.put(topicName, future);
-			} else if (!topicFutures.containsKey(topicName)) {
-				topicFutures.put(topicName, new KafkaFutureImpl<Void>());
-				validTopicNames.add(topicName);
+				topicFutures.put(topicName.toUpperCase(), future);
+				
+			} else if (!topicFutures.containsKey(topicName.toUpperCase())) {
+				topicFutures.put(topicName.toUpperCase(), new KafkaFutureImpl<Void>());
+				validTopicNames.add(topicName.toUpperCase());
 			}
 		}
 		final long now = time.milliseconds();

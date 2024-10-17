@@ -359,7 +359,7 @@ public final class AQKafkaProducer extends AQClient {
 			int msgVersion = topicTeqParam.getMsgVersion();
 
 			BytesMessage byteMessage = createBytesMessage(topicPbs.sess, tp, 
-					ByteBuffer.wrap(serializedKey), ByteBuffer.wrap(serializedValue), headers, msgVersion);
+					serializedKey != null ? ByteBuffer.wrap(serializedKey) : null, serializedValue != null ? ByteBuffer.wrap(serializedValue) : null , headers, msgVersion);
 
 			try {
 				tps.publish(byteMessage, DeliveryMode.PERSISTENT, 0, AQjmsConstants.EXPIRATION_NEVER);
@@ -387,7 +387,7 @@ public final class AQKafkaProducer extends AQClient {
 					Collections.singletonList(thisOffset), publishException);
 
 			frm = new FutureRecordMetadata(produceResult, 0, System.currentTimeMillis(),
-					serializedKey.length,  serializedValue.length,time );
+					serializedKey != null ? serializedKey.length : 0,  serializedValue != null ? serializedValue.length : 0 ,time );
 
 			produceResult.done();
 			this.oTxm.addRecordToTransaction(frm);
@@ -398,7 +398,7 @@ public final class AQKafkaProducer extends AQClient {
 			produceResult = new ProduceRequestResult(tp);
 			produceResult.set(-1L, -1L, null, new RuntimeException(e));
 			frm = new FutureRecordMetadata(produceResult, -1l, System.currentTimeMillis(),
-					serializedKey.length,  serializedValue.length,time );
+					serializedKey != null ? serializedKey.length : 0,  serializedValue != null ? serializedValue.length : 0 ,time );
 			produceResult.done();
 		}
 		return frm;

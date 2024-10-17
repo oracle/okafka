@@ -1778,7 +1778,8 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 	 */
 	@Override
 	public Future<RecordMetadata> send(ProducerRecord<K, V> record) {
-		return send(record, null);
+		ProducerRecord<K,V> recordUp = new ProducerRecord<K,V>(record.topic().toUpperCase(),record.partition(), record.timestamp(),  record.key(), record.value(), record.headers());
+		return send(recordUp, null);
 	}
 
 	/**

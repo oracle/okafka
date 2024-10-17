@@ -739,19 +739,25 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 		try {
 			if (topics == null) {
 				throw new IllegalArgumentException("Topic collection to subscribe to cannot be null");
-
 			} else if (topics.isEmpty()) {
 				// treat subscribing to empty topic list as the same as unsubscribing
 				this.unsubscribe();
 			} else {
 				if (topics.size() > 1)
 					throw new IllegalArgumentException("Only one topic can be subscribed");
-
+				
+				Collection<String> topicsUp = new ArrayList<String>(topics.size());
+				
 				for (String topic : topics) {
 					if (topic == null || topic.trim().isEmpty())
 						throw new IllegalArgumentException(
 								"Topic collection to subscribe to cannot contain null or empty topic");
+					
+					topicsUp.add(topic.toUpperCase());
 				}
+				
+				topics = topicsUp;
+				
 				// Only one topic can be subscribed, unsubcribe to previous topics before
 				// subscribing to new topic
 				Set<String> Alltopics = subscriptions.metadataTopics();
@@ -765,7 +771,6 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 				// metadata.setTopics(subscriptions.groupSubscription());
 				// Change for 2.8.1 groupSubscription() is not present any more
 				metadata.setTopics(subscribedTopicSet);
-
 			}
 		} finally {
 			release();
