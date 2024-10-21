@@ -1703,7 +1703,7 @@ public class KafkaAdminClient extends AdminClient {
 	public DeleteTopicsResult deleteTopics(final TopicCollection topics, DeleteTopicsOptions options) {
 
 		if (topics instanceof TopicIdCollection) {
-			throw new FeatureNotSupportedException("Topic Id's are not supported for deleteTopics request");
+			throw new FeatureNotSupportedException("Topic Ids are not supported for this release of OKafka.");
 		}
 
 		final Collection<String> topicNames = ((TopicCollection.TopicNameCollection) topics).topicNames();
@@ -1851,7 +1851,7 @@ public class KafkaAdminClient extends AdminClient {
 	public DescribeTopicsResult describeTopics(final TopicCollection topics, DescribeTopicsOptions options) {
 
 		if (topics instanceof TopicIdCollection) {
-			throw new FeatureNotSupportedException("Topic Id's are not supported for describeTopics request");
+			throw new FeatureNotSupportedException("Topic Ids are not supported for this release of OKafka.");
 		}
 
 		final Collection<String> topicNames = ((TopicCollection.TopicNameCollection) topics).topicNames();
