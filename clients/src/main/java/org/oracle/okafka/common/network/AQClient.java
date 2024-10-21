@@ -218,9 +218,7 @@ public abstract class AQClient {
 
 				if (exception instanceof SQLException)
 					if (((SQLException) exception).getErrorCode() == 6550) {
-						log.error("Not all privileges granted to the database user.",
-								((SQLException) exception).getMessage());
-						log.info("Please grant all the documented privileges to database user.");
+						log.error("Not all privileges granted to the database user.",exception);
 					}
 				if (exception instanceof SQLSyntaxErrorException)
 					log.trace("Please grant all the documented privileges to database user.");

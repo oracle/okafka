@@ -20,11 +20,8 @@ public class OkafkaDescribeTopics {
 	public void AdminTest() {
         try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
         	
-
-
-        	KafkaAdminClient kAdminClient = (((org.oracle.okafka.clients.admin.KafkaAdminClient)admin));
-        	DescribeTopicsResult res=kAdminClient.describeTopics
-        			(TopicCollection.TopicNameCollection.ofTopicNames(new ArrayList<String> (Arrays.asList("KTOPIC1"))));
+        	DescribeTopicsResult res=admin.describeTopics
+        			(TopicCollection.TopicNameCollection.ofTopicNames(new ArrayList<String> (Arrays.asList("TEQ"))));
 
         	Map<String,KafkaFuture<TopicDescription>> description=res.topicNameValues();
         	for(Map.Entry<String,KafkaFuture<TopicDescription>> entry : description.entrySet()) {
@@ -34,11 +31,11 @@ public class OkafkaDescribeTopics {
 		}
 		catch(Exception e)
 		{
-			System.out.println("Exception while creating topic " + e);
+			System.out.println("Exception while Describing topic " + e);
 			e.printStackTrace();
 		}
 		
-		System.out.println("Main thread complete ");
+		System.out.println("Test: OkafkaDescribeTopic Complete");
 
 	}
 }
