@@ -42,6 +42,7 @@ public class MetadataRequest extends AbstractRequest {
 		private final List<String> topics;
 		private final boolean allowAutoTopicCreation;
 		private final List<String> teqParaTopic;
+		private boolean listTopics=false;
 		
 		public Builder(List<String> topics, boolean allowAutoTopicCreation, List<String> paraTopic) {
 			super(ApiKeys.METADATA);
@@ -50,9 +51,21 @@ public class MetadataRequest extends AbstractRequest {
 			this.teqParaTopic = paraTopic;
 		}
 		
+		public Builder(List<String> topics, boolean allowAutoTopicCreation, List<String> paraTopic, boolean listTopics) {
+			super(ApiKeys.METADATA);
+			this.topics = topics;
+			this.allowAutoTopicCreation = allowAutoTopicCreation;
+			this.teqParaTopic = paraTopic;
+			this.listTopics=listTopics;
+		}
+		
 		 public static Builder allTopics() {
 	            return new Builder(ALL_TOPICS, false, ALL_TOPICS);
 	     }
+		 
+		 public static Builder listAllTopics() {
+			 return new Builder(ALL_TOPICS, false, ALL_TOPICS, true);
+		 }
 		 
 		 public List<String> topics() {
 	            return this.topics;
@@ -60,6 +73,10 @@ public class MetadataRequest extends AbstractRequest {
 
 	     public boolean isAllTopics() {
 	            return this.topics == ALL_TOPICS;
+	     }
+	     
+	     public boolean isListTopics() {
+	    	 return listTopics;
 	     }
 	     
 	   
@@ -72,7 +89,7 @@ public class MetadataRequest extends AbstractRequest {
         public String toString() {
             StringBuilder bld = new StringBuilder();
             bld.append("(type=metadataRequest").
-            append(", topics=(").append(Utils.join(topics, ", "))
+            append(", topics=(").append( (topics==null) ? "null" :  Utils.join(topics, ", "))
             .append(")");
             return bld.toString();
         }
