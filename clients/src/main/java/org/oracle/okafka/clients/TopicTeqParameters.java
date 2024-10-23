@@ -10,6 +10,8 @@ package org.oracle.okafka.clients;
 
 import java.util.HashMap;
 
+import org.oracle.okafka.clients.admin.TopicDescription;
+
 public class TopicTeqParameters {
 
 	int keyBased;
@@ -65,4 +67,18 @@ public class TopicTeqParameters {
 		}
 		return this.msgVersion;
 	}
+	
+	@Override
+    public boolean equals(final Object o) {
+		if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        final TopicTeqParameters that = (TopicTeqParameters) o;
+        return this.keyBased == that.keyBased &&
+        		this.stickyDeq == that.stickyDeq &&
+        		this.shardNum == that.shardNum &&
+        		this.dbMajorVersion == that.dbMajorVersion &&
+        		this.dbMinorVersion == that.dbMinorVersion &&
+        		this.msgVersion == that.msgVersion; 		
+	}
+	
 }

@@ -24,22 +24,15 @@
 
 package org.oracle.okafka.clients.admin;
 
-import org.apache.kafka.common.KafkaFuture;
-import org.apache.kafka.common.annotation.InterfaceStability;
-
-import java.util.Collection;
 import java.util.Map;
 
-/**
- * The result of the {@link Admin#deleteTopics(Collection)} call.
- *
- * The API of this class is evolving, see {@link Admin} for details.
- */
-@InterfaceStability.Evolving
-public class DeleteTopicsResult extends org.apache.kafka.clients.admin.DeleteTopicsResult {
+import org.apache.kafka.clients.admin.TopicDescription;
+import org.apache.kafka.common.KafkaFuture;
 
-    DeleteTopicsResult(Map<String, KafkaFuture<Void>> futures) {
-        super(null,futures);
-    }
+public class DescribeTopicsResult extends org.apache.kafka.clients.admin.DescribeTopicsResult {
+
+	protected DescribeTopicsResult(Map<String, KafkaFuture<TopicDescription>> futures) {
+		super(futures);	
+	}
 
 }

@@ -24,22 +24,47 @@
 
 package org.oracle.okafka.clients.admin;
 
-import org.apache.kafka.common.KafkaFuture;
-import org.apache.kafka.common.annotation.InterfaceStability;
-
-import java.util.Collection;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
-/**
- * The result of the {@link Admin#deleteTopics(Collection)} call.
- *
- * The API of this class is evolving, see {@link Admin} for details.
- */
-@InterfaceStability.Evolving
-public class DeleteTopicsResult extends org.apache.kafka.clients.admin.DeleteTopicsResult {
+import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.TopicPartitionInfo;
+import org.oracle.okafka.clients.TopicTeqParameters;
 
-    DeleteTopicsResult(Map<String, KafkaFuture<Void>> futures) {
-        super(null,futures);
+public class TopicDescription extends org.apache.kafka.clients.admin.TopicDescription{
+	
+	private final String name;
+	private final TopicTeqParameters topicParameters;
+	
+	public TopicDescription(String name, boolean internal, List<TopicPartitionInfo> partitions, TopicTeqParameters topicTeqParameters) {
+		super(name, internal, partitions);
+		
+		this.name=name;
+		this.topicParameters=topicTeqParameters;
+		
+	}
+	
+	@Override
+	public boolean equals(final Object o) {
+		Boolean superEqual = super.equals(o);
+		if (superEqual) {
+			final TopicDescription that = (TopicDescription) o;
+			return this.topicParameters.equals(that.topicParameters);
+		}
+		return false;
+	}
+	
+	@Override
+    public int hashCode() {
+        return Objects.hash(name, this.isInternal(), this.partitions(),topicParameters);
     }
+	
+	private TopicTeqParameters topicTeqParameters() {
+		return this.topicParameters;
+	}
+	
+	
+
 
 }

@@ -98,7 +98,7 @@ import org.apache.kafka.common.config.ConfigResource;
  * </p>
  */
 @InterfaceStability.Evolving
-public abstract class AdminClient  implements Admin {
+public abstract class AdminClient implements Admin {
 
     /**
      * Create a new AdminClient with the given configuration.
@@ -174,6 +174,7 @@ public abstract class AdminClient  implements Admin {
      * @param newTopics         The new topics to create.
      * @return                  The CreateTopicsResult.
      */
+    
     public CreateTopicsResult createTopics(Collection<NewTopic> newTopics) {
         return createTopics(newTopics, new CreateTopicsOptions());
     }
@@ -189,59 +190,6 @@ public abstract class AdminClient  implements Admin {
      */
     public abstract CreateTopicsResult createTopics(Collection<NewTopic> newTopics,
                                                     CreateTopicsOptions options);
-
-    /**
-     * Delete a batch of topics. This call doen't consider options for topic deletion.
-     * This operation is not transactional so it may succeed for some topics while fail for others.
-     *
-     * @param topics            The topic names to delete.
-     * @return                  The DeleteTopicsResult.
-     */
-    public DeleteTopicsResult deleteTopics(Collection<String> topics) {
-        return deleteTopics(topics, new DeleteTopicsOptions());
-    }
-
-    /**
-     * Delete a batch of topics. This call doen't consider options for topic deletion.
-     *
-     * This operation is not transactional so it may succeed for some topics while fail for others.
-     *
-     * <code>delete.topic.enable</code> is true in Oracle TEQ.
-     *
-     * @param topics            The topic names to delete.
-     * @param options           The options to use when deleting the topics.
-     * @return                  The DeleteTopicsResult.
-     */
-    public abstract DeleteTopicsResult deleteTopics(Collection<String> topics, DeleteTopicsOptions options);
-
-    /**
-     * @hidden
-     * This method is not yet supported.
-     */
-    public ListTopicsResult listTopics() {
-        return listTopics(new ListTopicsOptions());
-    }
-
-    /**
-     * @hidden
-     * This method is not yet supported.
-     */
-    public abstract ListTopicsResult listTopics(ListTopicsOptions options);
-
-    /**
-     * @hidden
-     * This method is not yet supported.
-     */
-    public DescribeTopicsResult describeTopics(Collection<String> topicNames) {
-        return describeTopics(topicNames, new DescribeTopicsOptions());
-    }
-
-    /**
-     * @hidden
-     * This method is not yet supported.
-     */
-    public abstract DescribeTopicsResult describeTopics(Collection<String> topicNames,
-                                                         DescribeTopicsOptions options);
 
     /**
      * @hidden
