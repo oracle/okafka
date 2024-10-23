@@ -28,9 +28,9 @@ public class OkafkaDeleteTopic {
 		}
 		catch(Exception e)
 		{
-			System.out.println("Exception while creating topic " + e);
+			System.out.println("Exception while deleting topic " + e);
 			e.printStackTrace();
 		}
-		System.out.println("Main thread completed ");
+		System.out.println("Test: OkafkaDeleteTopic Test completed ");
 	}
 }
