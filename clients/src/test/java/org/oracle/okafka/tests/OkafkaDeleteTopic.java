@@ -15,8 +15,7 @@ public class OkafkaDeleteTopic {
 	@Test
 	public void DeleteTopicTest() {
 		try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
-			KafkaAdminClient kAdminClient = (((org.oracle.okafka.clients.admin.KafkaAdminClient)admin));
-			DeleteTopicsResult delResult = kAdminClient.deleteTopics(TopicCollection.TopicNameCollection.ofTopicNames(new ArrayList<String> (Arrays.asList("TEQ"))));
+			DeleteTopicsResult delResult = admin.deleteTopics(TopicCollection.TopicNameCollection.ofTopicNames(new ArrayList<String> (Arrays.asList("TEQ"))));
 			try {
 				KafkaFuture<Void> ftr =  delResult.all();
 				ftr.get();
@@ -29,9 +28,9 @@ public class OkafkaDeleteTopic {
 		}
 		catch(Exception e)
 		{
-			System.out.println("Exception while creating topic " + e);
+			System.out.println("Exception while deleting topic " + e);
 			e.printStackTrace();
 		}
-		System.out.println("Main thread completed ");
+		System.out.println("Test: OkfakaDeleteTopic completed");
 	}
 }
