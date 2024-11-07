@@ -26,7 +26,7 @@ public class SimpleOkafkaProducer{
 			Future<RecordMetadata> lastFuture = null;
 			int msgCnt = 1000;
 			for(int i=0;i<msgCnt;i++) {
-				ProducerRecord<String, String> producerRecord = new ProducerRecord<String, String>("TEQ", i+"", "Test message # " + i);
+				ProducerRecord<String, String> producerRecord = new ProducerRecord<String, String>("TE1", i+"", "Test message # " + i);
 				lastFuture =producer.send(producerRecord);
 			}
 			System.out.println("Produced "+ msgCnt +" messages.");

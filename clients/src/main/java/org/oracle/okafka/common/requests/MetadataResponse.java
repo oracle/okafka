@@ -40,6 +40,7 @@ import org.oracle.okafka.common.Node;
 import org.oracle.okafka.common.errors.FeatureNotSupportedException;
 import org.oracle.okafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.protocol.ApiMessage;
 import org.apache.kafka.common.protocol.Errors;
@@ -49,17 +50,24 @@ public class MetadataResponse extends AbstractResponse {
 	private final List<Node> nodes;
 	private final List<PartitionInfo> partitionInfo;
 	private final Map<String, Exception> errorsPerTopic;
+	private final Map<Uuid, Exception> errorsPerTopicId;
 	private Exception exception;
 	private final Map<String, TopicTeqParameters> teqParams;
+	private final Map<String,Uuid> topicsIdMap;
 	
-	public MetadataResponse(String clusterId, List<Node> nodes, List<PartitionInfo> partitionInfo, Map<String, Exception> errorsPerTopic,Map<String, TopicTeqParameters> _teqParams) {
+	
+	public MetadataResponse(String clusterId, List<Node> nodes, List<PartitionInfo> partitionInfo,
+			Map<String, Exception> errorsPerTopic, Map<Uuid,Exception> errorsPerTopicId, Map<String, TopicTeqParameters> _teqParams, Map<String,Uuid> topicsIdMap) {
 		super(ApiKeys.METADATA);
 		this.clusterId = clusterId;
 		this.nodes = nodes;
 		this.partitionInfo = partitionInfo;
 		this.errorsPerTopic = errorsPerTopic;
+		this.errorsPerTopicId = errorsPerTopicId;
 		this.exception = null;
 		this.teqParams = _teqParams;
+		this.topicsIdMap = topicsIdMap;
+
 	}
 	
 	public List<Node> nodes() {
@@ -82,6 +90,10 @@ public class MetadataResponse extends AbstractResponse {
 		return this.exception;
 	}
 	
+	public Map<String,Uuid> getTopicsIdMap(){
+		return this.topicsIdMap;
+		
+	}
 	/**
      * Get a snapshot of the cluster metadata from this response
      * @return the cluster snapshot
@@ -101,6 +113,11 @@ public class MetadataResponse extends AbstractResponse {
     public Map<String, Exception> topicErrors() {
     	return  this.errorsPerTopic;
     }
+    
+    public Map<Uuid, Exception> topicIdErrors(){
+    	return this.errorsPerTopicId;
+    }
+    
 
 	@Override
 	public ApiMessage data() {

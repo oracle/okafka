@@ -13,9 +13,11 @@ import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.errors.InvalidConfigurationException;
 import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.TopicExistsException;
+import org.oracle.okafka.common.network.AQClient;
 import org.oracle.okafka.common.requests.CreateTopicsRequest.TopicDetails;
 
 public class CreateTopics {
@@ -70,7 +72,7 @@ public class CreateTopics {
 		setQueueParameter(jdbcConn, topic, "STICKY_DEQUEUE", 1);
 	}
 	
-	public static Map<String, Exception> createTopics(Connection jdbcConn, Map<String, TopicDetails> topics) throws SQLException { 
+	public static Map<String, Exception> createTopics(Connection jdbcConn, Map<String, TopicDetails> topics, Map<String, Uuid> topicIdMap) throws SQLException { 
 		 CallableStatement cStmt = null;
 		 Map<String, Exception> result = new HashMap<>();
 		 try {		 
@@ -93,6 +95,12 @@ public class CreateTopics {
 					 cStmt.setInt(2, details.numPartitions);
 					 cStmt.setLong(3,retentionSec);
 					 cStmt.execute();
+					 try {
+						 topicIdMap.put(topic, AQClient.getIdByTopic(jdbcConn,topic));
+					 } catch(Exception e){
+						 topicIdMap.put(topic, Uuid.ZERO_UUID);
+					 }
+					 
 				 } catch(SQLException sqlEx) {
 					 if ( sqlEx.getErrorCode() == 24019 || sqlEx.getErrorCode() == 44003 ) {
 						 result.put(topic, new InvalidTopicException(sqlEx)); 

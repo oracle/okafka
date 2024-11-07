@@ -86,6 +86,7 @@ import org.oracle.okafka.clients.consumer.internals.NoOpConsumerRebalanceListene
 
 import org.oracle.okafka.clients.consumer.internals.SubscriptionState;
 import org.oracle.okafka.clients.consumer.internals.SubscriptionState.FetchPosition;
+import org.oracle.okafka.clients.consumer.internals.TopicMetadataFetcher;
 import org.apache.kafka.clients.Metadata.LeaderAndEpoch;
 import org.oracle.okafka.clients.consumer.internals.AQKafkaConsumer;
 import org.apache.kafka.common.Cluster;
@@ -388,6 +389,8 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 	private final Deserializer<K> keyDeserializer;
 	private final Deserializer<V> valueDeserializer;
 	private final ConsumerInterceptors<K, V> interceptors;
+    private final TopicMetadataFetcher topicMetadataFetcher;
+
 
 	private final Time time;
 	private final SubscriptionState subscriptions;
@@ -665,6 +668,8 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 					config.getInt(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG), time, retryBackoffMs,
 					maxPollIntervalMs, this.requestTimeoutMs, sessionTimeoutMs, defaultApiTimeoutMs, aqConsumer,
 					metrics);
+			
+			this.topicMetadataFetcher = new TopicMetadataFetcher(logContext,this.client);
 
 			this.okcMetrics = new OkafkaConsumerMetrics(metrics, metricGrpPrefix);
 
@@ -1473,6 +1478,21 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 			release();
 		}
 	}
+	
+	@Override
+	public Map<String, List<PartitionInfo>> listTopics() {
+		return listTopics(Duration.ofMillis(defaultApiTimeoutMs));
+	}
+
+	@Override
+	public Map<String, List<PartitionInfo>> listTopics(Duration timeout) {
+		acquireAndEnsureOpen();
+		try {
+			return topicMetadataFetcher.getAllTopicMetadata(time.timer(timeout));
+		} finally {
+			release();
+		}
+	}
 
 	/**
 	 * This method is not yet supported.
@@ -1529,22 +1549,6 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 	 */
 	@Override
 	public List<PartitionInfo> partitionsFor(String topic, Duration timeout) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-	}
-
-	/**
-	 * This method is not yet supported.
-	 */
-	@Override
-	public Map<String, List<PartitionInfo>> listTopics() {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-	}
-
-	/**
-	 * This method is not yet supported.
-	 */
-	@Override
-	public Map<String, List<PartitionInfo>> listTopics(Duration timeout) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 

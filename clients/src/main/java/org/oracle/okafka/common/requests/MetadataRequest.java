@@ -32,6 +32,7 @@ package org.oracle.okafka.common.requests;
 import java.util.List;
 
 import org.oracle.okafka.common.protocol.ApiKeys;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.protocol.ApiMessage;
 import org.apache.kafka.common.requests.AbstractResponse;
 import org.apache.kafka.common.utils.Utils;
@@ -40,49 +41,68 @@ public class MetadataRequest extends AbstractRequest {
     public static class Builder extends AbstractRequest.Builder<MetadataRequest> {
     	private static final List<String> ALL_TOPICS = null;
 		private final List<String> topics;
+		private final List<Uuid> topicIds;
 		private final boolean allowAutoTopicCreation;
 		private final List<String> teqParaTopic;
 		private boolean listTopics=false;
+		private boolean needPartitionInfo=false;
+		
 		
 		public Builder(List<String> topics, boolean allowAutoTopicCreation, List<String> paraTopic) {
 			super(ApiKeys.METADATA);
 			this.topics = topics;
+			this.topicIds=null;
 			this.allowAutoTopicCreation = allowAutoTopicCreation;
 			this.teqParaTopic = paraTopic;
 		}
 		
-		public Builder(List<String> topics, boolean allowAutoTopicCreation, List<String> paraTopic, boolean listTopics) {
+		public Builder(boolean listTopics, boolean needPartitionInfo) {
 			super(ApiKeys.METADATA);
-			this.topics = topics;
-			this.allowAutoTopicCreation = allowAutoTopicCreation;
-			this.teqParaTopic = paraTopic;
+			this.topics = null;
+			this.topicIds=null;
+			this.allowAutoTopicCreation = false;
+			this.teqParaTopic = null;
 			this.listTopics=listTopics;
+			this.needPartitionInfo=needPartitionInfo;
+		}
+		
+		public Builder(List<Uuid> topicIds) {
+			super(ApiKeys.METADATA);
+			this.topicIds=topicIds;
+			this.topics=null;
+			this.allowAutoTopicCreation=false;
+			this.teqParaTopic=null;
+			
 		}
 		
 		 public static Builder allTopics() {
 	            return new Builder(ALL_TOPICS, false, ALL_TOPICS);
 	     }
 		 
-		 public static Builder listAllTopics() {
-			 return new Builder(ALL_TOPICS, false, ALL_TOPICS, true);
+		 public static Builder listAllTopics(boolean needPartitionInfo) {
+			 return new Builder(true, needPartitionInfo);
 		 }
 		 
 		 public List<String> topics() {
 	            return this.topics;
 	     }
-
+		 
 	     public boolean isAllTopics() {
 	            return this.topics == ALL_TOPICS;
 	     }
 	     
 	     public boolean isListTopics() {
-	    	 return listTopics;
+	    	 return this.listTopics;
+	     }
+	     
+	     public boolean needPartitionInfo() {
+	    	 return this.needPartitionInfo;
 	     }
 	     
 	   
 		@Override
         public MetadataRequest build() {
-            return new MetadataRequest(topics, allowAutoTopicCreation, teqParaTopic);
+            return new MetadataRequest(topics, topicIds, allowAutoTopicCreation, teqParaTopic);
         }
 		
 		@Override
@@ -101,10 +121,12 @@ public class MetadataRequest extends AbstractRequest {
 	}
 	private final List<String> teqParaTopic;
     private final List<String> topics;
+    private final List<Uuid> topicIds;
     private final boolean allowAutoTopicCreation;
-	private MetadataRequest(List<String> topics, boolean allowAutoTopicCreation, List<String> teqParaTopic) {
+	private MetadataRequest(List<String> topics, List<Uuid> topicIds, boolean allowAutoTopicCreation, List<String> teqParaTopic) {
 		super(ApiKeys.METADATA, (short)1);
 		this.topics = topics;
+		this.topicIds=topicIds;
 		this.allowAutoTopicCreation = allowAutoTopicCreation;
 		this.teqParaTopic = teqParaTopic;
 	}
@@ -113,13 +135,18 @@ public class MetadataRequest extends AbstractRequest {
 		return this.topics;
 	}
 	
+	 public List<Uuid> topidIds(){
+		 return this.topicIds;
+	 }
+	
 	public boolean allowAutoTopicCreation() {
 		return this.allowAutoTopicCreation;
 	}
 	
-	  public List<String> teqParaTopics() {
-	    	 return this.teqParaTopic;
-	     }
+	public List<String> teqParaTopics() {
+	    return this.teqParaTopic;
+	}
+	
 
 
 	@Override

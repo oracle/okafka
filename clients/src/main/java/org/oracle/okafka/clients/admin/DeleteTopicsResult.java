@@ -25,6 +25,7 @@
 package org.oracle.okafka.clients.admin;
 
 import org.apache.kafka.common.KafkaFuture;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.annotation.InterfaceStability;
 
 import java.util.Collection;
@@ -38,8 +39,8 @@ import java.util.Map;
 @InterfaceStability.Evolving
 public class DeleteTopicsResult extends org.apache.kafka.clients.admin.DeleteTopicsResult {
 
-    DeleteTopicsResult(Map<String, KafkaFuture<Void>> futures) {
-        super(null,futures);
+    DeleteTopicsResult(Map<Uuid,KafkaFuture<Void>> topicIdFutures, Map<String, KafkaFuture<Void>> nameFutures) {
+        super(topicIdFutures, nameFutures);
     }
-
+    
 }

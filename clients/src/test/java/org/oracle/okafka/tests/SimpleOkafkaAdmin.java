@@ -1,12 +1,10 @@
 package org.oracle.okafka.tests;
 
 import java.util.Arrays;
-import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
-import org.apache.kafka.clients.admin.CreateTopicsResult.TopicMetadataAndConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.common.KafkaFuture;
 import org.junit.Test;
@@ -16,9 +14,10 @@ public class SimpleOkafkaAdmin {
 
 	@Test
 	public void AdminTest() {
+		
         try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
 			CreateTopicsResult result = admin.createTopics(Arrays.asList(
-					new NewTopic("TEQ",5, (short)1)));
+					new NewTopic("topic",5, (short)1)));
 			try {
 				KafkaFuture<Void> ftr =  result.all();
 				ftr.get();

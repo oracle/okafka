@@ -11,6 +11,7 @@ import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -25,6 +26,7 @@ import org.oracle.okafka.clients.admin.AdminClientConfig;
 import org.oracle.okafka.common.Node;
 import org.oracle.okafka.common.errors.ConnectionException;
 import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
+import org.oracle.okafka.common.errors.RecordNotFoundSQLException;
 import org.oracle.okafka.common.network.AQClient;
 import org.oracle.okafka.common.protocol.ApiKeys;
 import org.oracle.okafka.common.requests.CreateTopicsRequest;
@@ -34,6 +36,7 @@ import org.oracle.okafka.common.requests.DeleteTopicsResponse;
 import org.oracle.okafka.common.requests.CreateTopicsRequest.TopicDetails;
 import org.oracle.okafka.common.utils.ConnectionUtils;
 import org.oracle.okafka.common.utils.CreateTopics;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.Time;
 
@@ -96,9 +99,10 @@ public class AQKafkaAdmin extends AQClient{
 		 Map<String, TopicDetails> topics = builder.build().topics();
 		 Connection jdbcConn = connections.get(node);		 
 		 Map<String, Exception> result = new HashMap<String, Exception>();
+		 Map<String, Uuid> topicIdMap = new HashMap<>();
 		 SQLException exception = null;
 		 try {			 			 
-			 result = CreateTopics.createTopics(jdbcConn, topics) ;
+			 result = CreateTopics.createTopics(jdbcConn, topics, topicIdMap) ;
 		 } catch(SQLException sql) {
 			 sql.printStackTrace();
 			 exception = sql;
@@ -112,7 +116,7 @@ public class AQKafkaAdmin extends AQClient{
 				 log.trace("Failed to close connection with node {}", request.destination());
 			 }
 		 } 
-		 return createTopicsResponse(result, exception, exception != null, request);	 
+		 return createTopicsResponse(result, exception, exception != null, request, topicIdMap);	 
 	}
 	
 	@Override
@@ -123,8 +127,10 @@ public class AQKafkaAdmin extends AQClient{
 	/**
 	 * Generates a response for create topics request.
 	 */
-	private ClientResponse createTopicsResponse(Map<String, Exception> errors, Exception result, boolean disconnected, ClientRequest request) {
-		CreateTopicsResponse topicResponse = new CreateTopicsResponse(errors);
+	private ClientResponse createTopicsResponse(Map<String, Exception> errors, Exception result, boolean disconnected,
+			ClientRequest request, Map<String, Uuid> topicIdMap) {
+				
+		CreateTopicsResponse topicResponse = new CreateTopicsResponse(errors,topicIdMap);
 		if(result != null)
 			topicResponse.setResult(result);
 		ClientResponse response = new ClientResponse(request.makeHeader((short)1),
@@ -142,7 +148,11 @@ public class AQKafkaAdmin extends AQClient{
 	private ClientResponse deleteTopics(ClientRequest request) {
 		 Node node =(org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
 		 DeleteTopicsRequest.Builder builder= (DeleteTopicsRequest.Builder)request.requestBuilder();
-		 Set<String> topics = builder.build().topics();
+		 DeleteTopicsRequest deleteTopicRequest = builder.build();
+		 if(deleteTopicRequest.topicIds()!=null) {
+			 return deleteTopicsById(request);
+		 }
+		 Set<String> topics =deleteTopicRequest.topics();
 		 Connection jdbcConn = connections.get(node);
 		 String query = "begin dbms_aqadm.drop_sharded_queue(queue_name=>?, force =>(case ? when 1 then true else false end)); end;";
 		 CallableStatement cStmt = null;
@@ -176,21 +186,72 @@ public class AQKafkaAdmin extends AQClient{
 			 } catch(SQLException sqlException) {
 				 log.trace("Failed to close connection with node {}", node);
 			 }
-			 return deleteTopicsResponse(result, sql,true, request);
+			 return deleteTopicsResponse(result,Collections.emptyMap(), sql,true, request);
 		 }
 		 try {
 			 cStmt.close();
 		 } catch(SQLException sql) {
 			 //do nothing
 		 }
-		 return deleteTopicsResponse(result, null, false, request);
+		 return deleteTopicsResponse(result,Collections.emptyMap(), null, false, request);
+	}
+	
+	private ClientResponse deleteTopicsById(ClientRequest request) {
+		 Node node =(org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
+		 DeleteTopicsRequest.Builder builder= (DeleteTopicsRequest.Builder)request.requestBuilder();
+		 DeleteTopicsRequest deleteTopicRequest = builder.build();
+		 Set<Uuid> topicIds =deleteTopicRequest.topicIds();
+		 Connection jdbcConn = connections.get(node);
+		 Map<Uuid, SQLException> result = new HashMap<>();
+		 Set<Uuid> topicIdSet = new HashSet<>(topicIds);
+		 String query = "begin dbms_aqadm.drop_sharded_queue(queue_name=>?, force =>(case ? when 1 then true else false end)); end;";
+		 CallableStatement cStmt = null;
+		 try {			 
+			 cStmt = jdbcConn.prepareCall(query);
+			 for(Uuid id: topicIds) {
+				 String topic;
+				 try {
+					 topic = getTopicById(jdbcConn,id);
+					 cStmt.setString(1, topic);
+					 cStmt.setInt(2, 1);
+					 cStmt.execute();  
+				 } catch(SQLException sql) {
+					 log.trace("Failed to delete topic with id : {}", id);
+					 result.put(id, sql);
+				 }
+				 if(result.get(id) == null) {
+					 topicIdSet.remove(id);
+					 log.trace("Deleted a topic with id : {}", id);
+					 result.put(id, null);
+				 }
+				 
+			 } 
+		 } catch(SQLException sql) {
+			 log.trace("Unexcepted error occured with connection to node {}, closing the connection", node);
+			 log.trace("Failed to delete topics with Ids : {}", topicIdSet);
+			 try {
+				 connections.remove(node);
+				 jdbcConn.close(); 
+				 log.trace("Connection with node {} is closed", request.destination());
+			 } catch(SQLException sqlException) {
+				 log.trace("Failed to close connection with node {}", node);
+			 }
+			 return deleteTopicsResponse(Collections.emptyMap(), result, sql,true, request);
+		 }
+		 try {
+			 cStmt.close();
+		 } catch(SQLException sql) {
+			 //do nothing
+		 }
+		 return deleteTopicsResponse(Collections.emptyMap(),result, null, false, request);
+		 
 	}
 	
 	/**
 	 * Generates a response for delete topics request.
 	 */
-	private ClientResponse deleteTopicsResponse(Map<String, SQLException> errors, Exception result, boolean disconnected, ClientRequest request) {
-		DeleteTopicsResponse topicResponse = new DeleteTopicsResponse(errors);
+	private ClientResponse deleteTopicsResponse(Map<String, SQLException> topicErrorMap, Map<Uuid, SQLException> topicIdErrorMap,  Exception result, boolean disconnected, ClientRequest request) {
+		DeleteTopicsResponse topicResponse = new DeleteTopicsResponse(topicErrorMap, topicIdErrorMap);
 		if(result != null)
 			topicResponse.setResult(result);
 		ClientResponse response = new ClientResponse(request.makeHeader((short)1),
