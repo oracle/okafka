@@ -22,7 +22,11 @@ public class OkafkaDeleteTopicById {
 			CreateTopicsResult result = admin.createTopics(Arrays.asList(
 						new NewTopic("TOPIC",5, (short)1)));
 			Uuid createdTopicId = result.topicId("TOPIC").get();
-			DeleteTopicsResult delResult = admin.deleteTopics(TopicCollection.TopicNameCollection.ofTopicIds(new ArrayList<Uuid> (Arrays.asList(createdTopicId))));
+			admin.close();
+			
+			Admin admin1 = AdminClient.create(OkafkaSetup.setup());
+			
+			DeleteTopicsResult delResult = admin1.deleteTopics(TopicCollection.TopicNameCollection.ofTopicIds(new ArrayList<Uuid> (Arrays.asList(createdTopicId))));
 			try {
 				KafkaFuture<Void> ftr =  delResult.all();
 				ftr.get();

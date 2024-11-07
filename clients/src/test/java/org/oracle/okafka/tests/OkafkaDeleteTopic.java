@@ -16,9 +16,9 @@ public class OkafkaDeleteTopic {
 	
 	@Test
 	public void DeleteTopicTest() {
-		 try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
 
-			DeleteTopicsResult delResult = admin.deleteTopics(TopicCollection.TopicNameCollection.ofTopicNames(new ArrayList<String> (Arrays.asList("topic"))));
+		try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
+			DeleteTopicsResult delResult = admin.deleteTopics(TopicCollection.TopicNameCollection.ofTopicNames(new ArrayList<String> (Arrays.asList("TOPIC"))));
 			try {
 				KafkaFuture<Void> ftr =  delResult.all();
 				ftr.get();

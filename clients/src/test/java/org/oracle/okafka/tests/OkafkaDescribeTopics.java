@@ -21,7 +21,7 @@ public class OkafkaDescribeTopics {
 	public void AdminTest() {
         try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
         	DescribeTopicsResult res=admin.describeTopics
-        			(TopicCollection.TopicNameCollection.ofTopicNames(new ArrayList<String> (Arrays.asList("TE1"))));
+        			(TopicCollection.TopicNameCollection.ofTopicNames(new ArrayList<String> (Arrays.asList("TEQ"))));
         
         	Map<String,KafkaFuture<TopicDescription>> description=res.topicNameValues();
         	

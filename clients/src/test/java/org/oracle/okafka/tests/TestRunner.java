@@ -11,10 +11,12 @@ class TestRunner {
 		
 		Result result = new Result();
 	
-		result = JUnitCore.runClasses(SimpleOkafkaAdmin.class, OkafkaDescribeTopics.class, OkafkaListTopics.class, SimpleOkafkaProducer.class, OkafkaAutoOffsetReset.class,
-				  SimpleOkafkaProducer.class, OkafkaSeekToEnd.class, OkafkaSeekToBeginning.class, SimpleOkafkaProducer.class,
-				  OkafkaUnsubscribe.class,ProducerMetricsTest.class, ConsumerMetricsTest.class, OkafkaDeleteTopic.class);
-		
+		result = JUnitCore.runClasses(SimpleOkafkaAdmin.class, OkafkaDescribeTopics.class, OkafkaListTopics.class,
+				SimpleOkafkaProducer.class, OkafkaAutoOffsetReset.class, SimpleOkafkaProducer.class,
+				OkafkaSeekToEnd.class, OkafkaSeekToBeginning.class, SimpleOkafkaProducer.class, OkafkaUnsubscribe.class,
+				ProducerMetricsTest.class, ConsumerMetricsTest.class, OkafkaDeleteTopic.class,
+				OkafkaDeleteTopicById.class, OkafkaDescribeTopicsById.class);
+
 		for (Failure failure : result.getFailures()) {
 	        System.out.println("Test failure : "+ failure.toString());
 	    }
