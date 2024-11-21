@@ -161,7 +161,7 @@ public abstract class AQClient {
 					try {
 						String topicName = getTopicById(con, id);
 						topicIdNameMap.put(id, topicName);
-						topicNameIdMap.put(topicName, id);
+//						topicNameIdMap.put(topicName, id);
 					} catch (SQLException sqle) {
 						if (sqle instanceof RecordNotFoundSQLException && !metadataRequest.allowAutoTopicCreation()) {
 							errorsPerTopicId.put(id, sqle);
@@ -181,29 +181,6 @@ public abstract class AQClient {
 			} else {
 				metadataTopics = metadataRequest.topics();
 				teqParaList = metadataTopics;
-				for (String topic : metadataTopics) {
-					try {
-						Uuid topicId = getIdByTopic(con, topic);
-						topicNameIdMap.put(topic, topicId);
-					} catch (SQLException sqle) {
-						if (sqle instanceof RecordNotFoundSQLException && !metadataRequest.allowAutoTopicCreation()) {
-							errorsPerTopic.put(topic, sqle);
-							log.error("topic: " + topic + " doesn't exist");
-						} else {
-							throw sqle;
-						}
-					}
-				}
-				
-			}
-			int topicCount=metadataTopics.size();
-			for(int i=0;i<topicCount;i++) {
-				try {
-					Uuid id = getIdByTopic(con,metadataTopics.get(i));
-					
-				}catch(SQLException sqle){
-					 //do nothing;
-				}
 			}
 			
 			topicParameterMap = new HashMap<String, TopicTeqParameters>(teqParaList.size());
@@ -220,7 +197,7 @@ public abstract class AQClient {
 
 			if (getPartitioninfo || metadataRequested) {
 				getPartitionInfo(metadataTopics, new ArrayList<>(metadataTopics), con, nodes,
-						metadataRequest.allowAutoTopicCreation(), partitionInfo, errorsPerTopic);
+						metadataRequest.allowAutoTopicCreation(), partitionInfo, errorsPerTopic, topicNameIdMap);
 			}
 			
 			if(topicIds!=null) {
@@ -284,7 +261,7 @@ public abstract class AQClient {
 			}
 			if(builder.needPartitionInfo()) {
 				getNodes(nodes, con, currentNode, true);
-				getPartitionInfo(allTopics, new ArrayList<>(allTopics), con, nodes, false, partitionInfo, errorsPerTopic);
+				getPartitionInfo(allTopics, new ArrayList<>(allTopics), con, nodes, false, partitionInfo, errorsPerTopic, new HashMap<>());
 			}
 
 			}catch (Exception exception) {
@@ -668,13 +645,15 @@ public abstract class AQClient {
 
 	private void getPartitionInfo(List<String> topics, List<String> topicsRem, Connection con,
 			List<Node> nodes, boolean allowAutoTopicCreation, 
-			List<PartitionInfo> partitionInfo, Map<String, Exception> errorsPerTopic) throws Exception {
+			List<PartitionInfo> partitionInfo, Map<String, Exception> errorsPerTopic, Map<String,Uuid> topicNameIdMap) throws Exception {
 		
 		if(nodes.size() <= 0 || topics == null || topics.isEmpty())
 			return;
 
-		String queryQShard[] = {"select SHARD_ID, OWNER_INSTANCE from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) ",
-		"select SHARD_ID, ENQUEUE_INSTANCE from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) "};
+//		String queryQShard[] = {"select SHARD_ID, OWNER_INSTANCE from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) ",
+//		"select SHARD_ID, ENQUEUE_INSTANCE from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) "};
+		String queryQShard[] = {"select SHARD_ID, OWNER_INSTANCE, QUEUE_ID from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) ",
+		"select SHARD_ID, ENQUEUE_INSTANCE, QUEUE_ID from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) "};
 		
 		PreparedStatement stmt1 = null;
 		int qryIndex=userQueueShardsQueryIndex;
@@ -706,11 +685,16 @@ public abstract class AQClient {
 					} catch(SQLException sqlE) {
 						int errorNo = sqlE.getErrorCode();
 						if(errorNo == 24010)  {
+							if (!allowAutoTopicCreation) {
+								errorsPerTopic.put(topic, sqlE);
+								log.error("topic: " + topic + " doesn't exist");
+							}
 							//Topic does not exist, it will be created
 							continue;
 						}
 					}catch(Exception excp) {
 						// Topic May or may not exists. We will not attempt to create it again
+						errorsPerTopic.put(topic, excp);
 						topicsRem.remove(topic);
 						continue;
 					}
@@ -730,8 +714,10 @@ public abstract class AQClient {
 							while(result1.next() ) {
 								int partNum = result1.getInt(1)/2;
 								int nodeNum = result1.getInt(2);
+								Uuid queue_id = new Uuid(0,result1.getInt(3));
 								partitionInfo.add(new PartitionInfo(topic, partNum , nodesArray[nodeNum-1], new Node[0], new Node[0]));	
 								partArr[partNum] = true;
+								topicNameIdMap.put(topic,queue_id);
 							}
 
 							result1.close();

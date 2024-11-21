@@ -204,7 +204,17 @@ public class AQKafkaAdmin extends AQClient{
 		 Connection jdbcConn = connections.get(node);
 		 Map<Uuid, SQLException> result = new HashMap<>();
 		 Set<Uuid> topicIdSet = new HashSet<>(topicIds);
-		 String query = "begin dbms_aqadm.drop_sharded_queue(queue_name=>?, force =>(case ? when 1 then true else false end)); end;";
+		 
+		 String query = "DECLARE\r\n"
+		 		+ "   id NUMBER := ?;\r\n"
+		 		+ "   queue_name VARCHAR2(100);\r\n"
+		 		+ "BEGIN\r\n"
+		 		+ "   SELECT name INTO queue_name\r\n"
+		 		+ "   FROM user_queues\r\n"
+		 		+ "   WHERE qid = id;\r\n"
+		 		+ "\r\n"
+		 		+ "   DBMS_AQADM.DROP_SHARDED_QUEUE(queue_name => queue_name, force => (CASE ? WHEN 1 THEN TRUE ELSE FALSE END));\r\n"
+		 		+ "END;";
 		 CallableStatement cStmt = null;
 		 try {			 
 			 cStmt = jdbcConn.prepareCall(query);
@@ -212,7 +222,7 @@ public class AQKafkaAdmin extends AQClient{
 				 String topic;
 				 try {
 					 topic = getTopicById(jdbcConn,id);
-					 cStmt.setString(1, topic);
+					 cStmt.setInt(1, (int)id.getLeastSignificantBits());
 					 cStmt.setInt(2, 1);
 					 cStmt.execute();  
 				 } catch(SQLException sql) {
