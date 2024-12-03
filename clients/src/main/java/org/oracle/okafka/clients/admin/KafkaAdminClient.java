@@ -1893,7 +1893,7 @@ public class KafkaAdminClient extends AdminClient {
 
 			@Override
 			MetadataRequest.Builder createRequest(int timeoutMs) {
-				return MetadataRequest.Builder.listAllTopics(false);
+				return MetadataRequest.Builder.listAllTopics();
 			}
 
 			@Override
@@ -1948,7 +1948,6 @@ public class KafkaAdminClient extends AdminClient {
 	public DescribeTopicsResult describeTopics(final TopicCollection topics, DescribeTopicsOptions options) {
 		
 		if (topics instanceof TopicIdCollection) {
-			System.out.println();
 			return handleDescribeTopicsByIds(((TopicIdCollection) topics).topicIds(), options);}
 		else if (topics instanceof TopicNameCollection)
 			return handleDescribeTopicsByNames(((TopicNameCollection) topics).topicNames(), options);
@@ -2004,7 +2003,6 @@ public class KafkaAdminClient extends AdminClient {
 						Map<String,Uuid> topicNameIdMap = response.getTopicsIdMap();
 						Map<Uuid,String> topicIdNameMap =new HashMap<>();
 						topicNameIdMap.forEach((key, value) -> topicIdNameMap.put(value, key));
-						
 						Map<String, List<TopicPartitionInfo>> topicPartitions = new HashMap<>();
 
 						for (int i = 0; i < partitionInfo.size(); i++) {
@@ -2033,7 +2031,6 @@ public class KafkaAdminClient extends AdminClient {
 							if (errorsPerTopicId.get(entry.getKey()) != null) {
 								future.completeExceptionally(errorsPerTopicId.get(entry.getKey()));
 							}
-
 							TopicDescription topicDescription = new org.oracle.okafka.clients.admin.TopicDescription(
 									topicIdNameMap.get(entry.getKey()), false, topicPartitions.get(topicIdNameMap.get(entry.getKey())),
 									topicTeqParameters.get(topicIdNameMap.get(entry.getKey())),entry.getKey());

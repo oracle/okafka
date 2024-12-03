@@ -153,15 +153,14 @@ public abstract class AQClient {
 			}
 
 			if (builder.isListTopics()) {
-				return listTopicsResponse(request,con,currentNode);
-			}  
-			
+				return listTopicsResponse(request, con, currentNode);
+			}
+
 			if (topicIds != null) {
 				for (Uuid id : topicIds) {
 					try {
 						String topicName = getTopicById(con, id);
 						topicIdNameMap.put(id, topicName);
-//						topicNameIdMap.put(topicName, id);
 					} catch (SQLException sqle) {
 						if (sqle instanceof RecordNotFoundSQLException && !metadataRequest.allowAutoTopicCreation()) {
 							errorsPerTopicId.put(id, sqle);
@@ -171,7 +170,7 @@ public abstract class AQClient {
 						}
 					}
 				}
-				metadataTopics = new ArrayList<>(topicNameIdMap.keySet());
+				metadataTopics = new ArrayList<>(topicIdNameMap.values());
 				teqParaList = metadataTopics;
 			} else if (metadataRequest.topics() == null && metadataRequest.teqParaTopics() == null) {
 				metadataTopics = metadataRequest.topics() != null ? new ArrayList<String>(metadataRequest.topics())
@@ -182,27 +181,26 @@ public abstract class AQClient {
 				metadataTopics = metadataRequest.topics();
 				teqParaList = metadataTopics;
 			}
-			
+
 			topicParameterMap = new HashMap<String, TopicTeqParameters>(teqParaList.size());
 			for (String teqTopic : teqParaList) {
-				
+
 				TopicTeqParameters teqPara = fetchQueueParameters(teqTopic, con);
-				topicParameterMap.put(teqTopic, teqPara);	
+				topicParameterMap.put(teqTopic, teqPara);
 			}
 			// Database Name to be set as Cluster ID
 			clusterId = ((oracle.jdbc.internal.OracleConnection) con).getServerSessionInfo()
 					.getProperty("DATABASE_NAME");
-
 			getPartitioninfo = getNodes(nodes, con, currentNode, metadataRequested);
-
-			if (getPartitioninfo || metadataRequested) {
-				getPartitionInfo(metadataTopics, new ArrayList<>(metadataTopics), con, nodes,
-						metadataRequest.allowAutoTopicCreation(), partitionInfo, errorsPerTopic, topicNameIdMap);
+			if (getPartitioninfo || metadataRequested || builder.needPartitionInfo()) {
+				getPartitionInfo(metadataTopics, new ArrayList<>(metadataTopics), con,
+						nodes.isEmpty() ? all_nodes : nodes, metadataRequest.allowAutoTopicCreation(), partitionInfo,
+						errorsPerTopic, topicNameIdMap);
 			}
-			
-			if(topicIds!=null) {
-				for(String topic:metadataTopics) {
-					if(errorsPerTopic.containsKey(topic)) {
+
+			if (topicIds != null) {
+				for (String topic : metadataTopics) {
+					if (errorsPerTopic.containsKey(topic)) {
 						errorsPerTopicId.put(topicNameIdMap.get(topic), errorsPerTopic.get(topic));
 					}
 				}
@@ -233,7 +231,6 @@ public abstract class AQClient {
 				log.trace("Failed to close connection with node {}", request.destination());
 			}
 		}
-		
 		MetadataResponse metadataResponse = new MetadataResponse(clusterId, all_nodes, partitionInfoList, errorsPerTopic, errorsPerTopicId, topicParameterMap, topicNameIdMap);
 		metadataResponse.setException(metadataException);
 		
@@ -260,8 +257,8 @@ public abstract class AQClient {
 
 			}
 			if(builder.needPartitionInfo()) {
-				getNodes(nodes, con, currentNode, true);
-				getPartitionInfo(allTopics, new ArrayList<>(allTopics), con, nodes, false, partitionInfo, errorsPerTopic, new HashMap<>());
+				getNodes(nodes,con, currentNode, true);
+				getPartitionInfo(allTopics, new ArrayList<>(allTopics), con, nodes.isEmpty()?all_nodes:nodes , false, partitionInfo, errorsPerTopic, new HashMap<>());
 			}
 
 			}catch (Exception exception) {
@@ -402,7 +399,7 @@ public abstract class AQClient {
 			}
 			result.close();
 			result = null;
-
+			
 			if (instance_names.size()==1)
 			{
 				// Connected Node is :
@@ -431,9 +428,8 @@ public abstract class AQClient {
 			if(onlyOneNode) {
 				return furtherMetadata;
 			}
-
+	
 			if (furtherMetadata || metadataRequested) {
-
 				query = "select inst_id, TYPE, value from gv$listener_network order by inst_id";
 				result = stmt.executeQuery(query);
 				Map<Integer, ArrayList<String>> services = new HashMap<>();
@@ -646,12 +642,8 @@ public abstract class AQClient {
 	private void getPartitionInfo(List<String> topics, List<String> topicsRem, Connection con,
 			List<Node> nodes, boolean allowAutoTopicCreation, 
 			List<PartitionInfo> partitionInfo, Map<String, Exception> errorsPerTopic, Map<String,Uuid> topicNameIdMap) throws Exception {
-		
 		if(nodes.size() <= 0 || topics == null || topics.isEmpty())
 			return;
-
-//		String queryQShard[] = {"select SHARD_ID, OWNER_INSTANCE from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) ",
-//		"select SHARD_ID, ENQUEUE_INSTANCE from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) "};
 		String queryQShard[] = {"select SHARD_ID, OWNER_INSTANCE, QUEUE_ID from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) ",
 		"select SHARD_ID, ENQUEUE_INSTANCE, QUEUE_ID from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) "};
 		
@@ -681,7 +673,7 @@ public abstract class AQClient {
 					int partCnt = 0;
 					try {
 						//Get number of partitions
-						partCnt = getQueueParameter(SHARDNUM_PARAM, ConnectionUtils.enquote(topic), con);	
+						partCnt = getQueueParameter(SHARDNUM_PARAM, ConnectionUtils.enquote(topic), con);
 					} catch(SQLException sqlE) {
 						int errorNo = sqlE.getErrorCode();
 						if(errorNo == 24010)  {
@@ -705,13 +697,12 @@ public abstract class AQClient {
 
 					// If more than one RAC node then check who is owner Node for which partition
 					if(nodes.size()  > 1) {
-
 						stmt1.clearParameters();
 						stmt1.setString(1, topic);
 						result1 = stmt1.executeQuery(); 
 						// If any row exist 
 						if(result1.isBeforeFirst()) {
-							while(result1.next() ) {
+							while(result1.next()) {
 								int partNum = result1.getInt(1)/2;
 								int nodeNum = result1.getInt(2);
 								Uuid queue_id = new Uuid(0,result1.getInt(3));

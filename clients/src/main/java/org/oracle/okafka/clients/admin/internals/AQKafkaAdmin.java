@@ -33,6 +33,7 @@ import org.oracle.okafka.common.requests.CreateTopicsRequest;
 import org.oracle.okafka.common.requests.CreateTopicsResponse;
 import org.oracle.okafka.common.requests.DeleteTopicsRequest;
 import org.oracle.okafka.common.requests.DeleteTopicsResponse;
+import org.oracle.okafka.common.requests.MetadataRequest;
 import org.oracle.okafka.common.requests.CreateTopicsRequest.TopicDetails;
 import org.oracle.okafka.common.utils.ConnectionUtils;
 import org.oracle.okafka.common.utils.CreateTopics;

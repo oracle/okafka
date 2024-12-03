@@ -17,28 +17,23 @@ import org.oracle.okafka.clients.admin.AdminClient;
 public class OkafkaDeleteTopicById {
 	@Test
 	public void DeleteTopicByIdTest() {
-		 try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
-			 
-			CreateTopicsResult result = admin.createTopics(Arrays.asList(
-						new NewTopic("TOPIC",5, (short)1)));
-			Uuid createdTopicId = result.topicId("TOPIC").get();
-			admin.close();
-			
-			Admin admin1 = AdminClient.create(OkafkaSetup.setup());
-			
-			DeleteTopicsResult delResult = admin1.deleteTopics(TopicCollection.TopicNameCollection.ofTopicIds(new ArrayList<Uuid> (Arrays.asList(createdTopicId))));
+		try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
+
+			CreateTopicsResult result = admin.createTopics(Arrays.asList(new NewTopic("TEQ", 5, (short) 1)));
+			Uuid createdTopicId = result.topicId("TEQ").get();
+
+			DeleteTopicsResult delResult = admin.deleteTopics(
+					TopicCollection.TopicNameCollection.ofTopicIds(new ArrayList<Uuid>(Arrays.asList(createdTopicId))));
 			try {
-				KafkaFuture<Void> ftr =  delResult.all();
+				KafkaFuture<Void> ftr = delResult.all();
 				ftr.get();
 				System.out.println("Main Thread Out of wait now");
-			} catch ( InterruptedException | ExecutionException e ) {
+			} catch (InterruptedException | ExecutionException e) {
 
 				throw new IllegalStateException(e);
 			}
 			System.out.println("Auto Closing admin now");
-		}
-		catch(Exception e)
-		{
+		} catch (Exception e) {
 			System.out.println("Exception while deleting topic " + e);
 			e.printStackTrace();
 		}
