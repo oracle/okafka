@@ -644,6 +644,7 @@ public abstract class AQClient {
 			List<PartitionInfo> partitionInfo, Map<String, Exception> errorsPerTopic, Map<String,Uuid> topicNameIdMap) throws Exception {
 		if(nodes.size() <= 0 || topics == null || topics.isEmpty())
 			return;
+		
 		String queryQShard[] = {"select SHARD_ID, OWNER_INSTANCE, QUEUE_ID from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) ",
 		"select SHARD_ID, ENQUEUE_INSTANCE, QUEUE_ID from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) "};
 		

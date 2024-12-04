@@ -69,10 +69,10 @@ public class MetadataRequest extends AbstractRequest {
 
 		public Builder(List<Uuid> topicIds) {
 			super(ApiKeys.METADATA);
-			this.topicIds = topicIds;
-			this.topics = null;
-			this.allowAutoTopicCreation = false;
-			this.teqParaTopic = null;
+			this.topicIds=topicIds;
+			this.topics=null;
+			this.allowAutoTopicCreation=false;
+			this.teqParaTopic=null;
 		}
 
 		public static Builder allTopics() {

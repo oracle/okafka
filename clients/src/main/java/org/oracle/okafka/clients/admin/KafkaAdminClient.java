@@ -138,6 +138,11 @@ import org.apache.kafka.clients.admin.UpdateFeaturesOptions;
 import org.apache.kafka.clients.admin.UpdateFeaturesResult;
 import org.apache.kafka.clients.admin.UserScramCredentialAlteration;
 import org.apache.kafka.clients.admin.CreateTopicsResult.TopicMetadataAndConfig;
+import org.apache.kafka.clients.admin.KafkaAdminClient.ConstantNodeIdProvider;
+import org.apache.kafka.clients.admin.KafkaAdminClient.LeastLoadedNodeProvider;
+import org.apache.kafka.clients.admin.KafkaAdminClient.NodeProvider;
+import org.apache.kafka.clients.admin.ListOffsetsResult.ListOffsetsResultInfo;
+import org.apache.kafka.clients.admin.OffsetSpec.TimestampSpec;
 //import org.apache.kafka.clients.admin.KafkaAdminClient.LeastLoadedNodeProvider;
 //import org.apache.kafka.clients.admin.KafkaAdminClient.LeastLoadedNodeProvider;
 /*
@@ -151,7 +156,11 @@ import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.clients.KafkaClient;
 import org.oracle.okafka.clients.NetworkClient;
 import org.oracle.okafka.clients.TopicTeqParameters;
+import org.apache.kafka.clients.admin.internals.AdminApiDriver;
+import org.apache.kafka.clients.admin.internals.AdminApiFuture;
+import org.apache.kafka.clients.admin.internals.AdminApiHandler;
 import org.apache.kafka.clients.admin.internals.AdminMetadataManager;
+import org.apache.kafka.clients.admin.internals.ListOffsetsHandler;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.oracle.okafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.Cluster;
@@ -195,6 +204,7 @@ import org.apache.kafka.common.protocol.Errors;
 import org.apache.kafka.common.quota.ClientQuotaAlteration;
 import org.apache.kafka.common.quota.ClientQuotaFilter;
 import org.apache.kafka.common.requests.AbstractResponse;
+import org.apache.kafka.common.requests.ListOffsetsRequest;
 import org.oracle.okafka.common.requests.AbstractRequest;
 import org.oracle.okafka.common.requests.CreateTopicsRequest;
 import org.oracle.okafka.common.requests.CreateTopicsResponse;
@@ -204,6 +214,7 @@ import org.oracle.okafka.common.requests.MetadataRequest;
 import org.oracle.okafka.common.requests.MetadataResponse;
 import org.oracle.okafka.common.requests.CreateTopicsRequest.TopicDetails;
 import org.apache.kafka.common.utils.AppInfoParser;
+import org.apache.kafka.common.utils.ExponentialBackoff;
 import org.apache.kafka.common.utils.KafkaThread;
 import org.apache.kafka.common.utils.LogContext;
 import org.oracle.okafka.common.utils.TNSParser;
@@ -218,6 +229,7 @@ import static org.apache.kafka.common.utils.Utils.closeQuietly;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -237,6 +249,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * The default implementation of {@link AdminClient}. An instance of this class
@@ -272,7 +285,8 @@ public class KafkaAdminClient extends AdminClient {
 	static final String NETWORK_THREAD_PREFIX = "kafka-admin-client-thread";
 
 	private final Logger log;
-
+	private final LogContext logContext;
+	
 	/**
 	 * The default timeout to use for an operation.
 	 */
@@ -333,6 +347,8 @@ public class KafkaAdminClient extends AdminClient {
 	private final int maxRetries;
 
 	private final long retryBackoffMs;
+    private final long retryBackoffMaxMs;
+    private final ExponentialBackoff retryBackoff;
 
 	/**
 	 * Get or create a list value from a map.
@@ -492,6 +508,7 @@ public class KafkaAdminClient extends AdminClient {
 		this.defaultTimeoutMs = config.getInt(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG);
 		this.clientId = clientId;
 		this.log = logContext.logger(KafkaAdminClient.class);
+        this.logContext = logContext;
 		this.time = time;
 		this.metadataManager = metadataManager;
 		this.requestTimeoutMs = config.getInt(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG);
@@ -562,6 +579,12 @@ public class KafkaAdminClient extends AdminClient {
 				: timeoutProcessorFactory;
 		this.maxRetries = config.getInt(AdminClientConfig.RETRIES_CONFIG);
 		this.retryBackoffMs = config.getLong(AdminClientConfig.RETRY_BACKOFF_MS_CONFIG);
+        this.retryBackoffMaxMs = config.getLong(AdminClientConfig.RETRY_BACKOFF_MAX_MS_CONFIG);
+        this.retryBackoff = new ExponentialBackoff(
+            retryBackoffMs,
+            CommonClientConfigs.RETRY_BACKOFF_EXP_BASE,
+            retryBackoffMaxMs,
+            CommonClientConfigs.RETRY_BACKOFF_JITTER);
 		config.logUnused();
 		AppInfoParser.registerAppInfo(JMX_PREFIX, clientId, metrics, time.milliseconds());
 		log.debug("Kafka admin client initialized");
@@ -682,21 +705,37 @@ public class KafkaAdminClient extends AdminClient {
 		private final String callName;
 		private final long deadlineMs;
 		private final NodeProvider nodeProvider;
-		private int tries = 0;
+		private int tries;
 		private boolean aborted = false;
 		private Node curNode = null;
-		private long nextAllowedTryMs = 0;
+		private long nextAllowedTryMs;
 
+		Call(boolean internal,
+	             String callName,
+	             long nextAllowedTryMs,
+	             int tries,
+	             long deadlineMs,
+	             NodeProvider nodeProvider
+	        ) {
+	            this.internal = internal;
+	            this.callName = callName;
+	            this.nextAllowedTryMs = nextAllowedTryMs;
+	            this.tries = tries;
+	            this.deadlineMs = deadlineMs;
+	            this.nodeProvider = nodeProvider;
+	        }
+		
 		Call(boolean internal, String callName, long deadlineMs, NodeProvider nodeProvider) {
-			this.internal = internal;
-			this.callName = callName;
-			this.deadlineMs = deadlineMs;
-			this.nodeProvider = nodeProvider;
-		}
+            this(internal, callName, 0, 0, deadlineMs, nodeProvider);
+        }
 
-		Call(String callName, long deadlineMs, NodeProvider nodeProvider) {
-			this(false, callName, deadlineMs, nodeProvider);
-		}
+        Call(String callName, long deadlineMs, NodeProvider nodeProvider) {
+            this(false, callName, 0, 0, deadlineMs, nodeProvider);
+        }
+
+        Call(String callName, long nextAllowedTryMs, int tries, long deadlineMs, NodeProvider nodeProvider) {
+            this(false, callName, nextAllowedTryMs, tries, deadlineMs, nodeProvider);
+        }
 
 		protected Node curNode() {
 			return curNode;
@@ -759,16 +798,25 @@ public class KafkaAdminClient extends AdminClient {
 			if (log.isDebugEnabled()) {
 				log.debug("{} failed: {}. Beginning retry #{}", this, prettyPrintException(throwable), tries);
 			}
-			runnable.enqueue(this, now);
+			maybeRetry(now, throwable);
 		}
+		
+		void maybeRetry(long now, Throwable throwable) {
+            runnable.pendingCalls.add(this);
+        }
 
 		private void failWithTimeout(long now, Throwable cause) {
 			if (log.isDebugEnabled()) {
 				log.debug("{} timed out at {} after {} attempt(s)", this, now, tries,
 						new Exception(prettyPrintException(cause)));
 			}
-			handleFailure(
-					new TimeoutException(this + " timed out at " + now + " after " + tries + " attempt(s)", cause));
+			
+			if (cause instanceof TimeoutException) {
+				handleFailure(cause);
+			} else {
+				handleFailure(
+						new TimeoutException(this + " timed out at " + now + " after " + tries + " attempt(s)", cause));
+			}
 		}
 
 		/**
@@ -2141,6 +2189,105 @@ public class KafkaAdminClient extends AdminClient {
 				new HashMap<String, KafkaFuture<TopicDescription>>(topicFutures));
 		return describeTopicsResult;
 	}
+	
+	@Override
+	public ListOffsetsResult listOffsets(Map<TopicPartition, OffsetSpec> topicPartitionOffsets,
+			ListOffsetsOptions options) {
+		AdminApiFuture.SimpleAdminApiFuture<TopicPartition, ListOffsetsResultInfo> future = ListOffsetsHandler
+				.newFuture(topicPartitionOffsets.keySet());
+		Map<TopicPartition, Long> offsetQueriesByPartition = topicPartitionOffsets.entrySet().stream()
+				.collect(Collectors.toMap(Map.Entry::getKey, e -> getOffsetFromSpec(e.getValue())));
+		ListOffsetsHandler handler = new ListOffsetsHandler(offsetQueriesByPartition, options, logContext);
+		invokeDriver(handler, future, options.timeoutMs());
+		return new ListOffsetsResult(future.all());
+	}
+	
+	private <K, V> void invokeDriver(
+	        AdminApiHandler<K, V> handler,
+	        AdminApiFuture<K, V> future,
+	        Integer timeoutMs
+	    ) {
+	        long currentTimeMs = time.milliseconds();
+	        long deadlineMs = calcDeadlineMs(currentTimeMs, timeoutMs);
+
+	        AdminApiDriver<K, V> driver = new AdminApiDriver<>(
+	            handler,
+	            future,
+	            deadlineMs,
+	            retryBackoffMs,
+	            retryBackoffMaxMs,
+	            logContext
+	        );
+
+	        maybeSendRequests(driver, currentTimeMs);
+	    }
+
+	    private <K, V> void maybeSendRequests(AdminApiDriver<K, V> driver, long currentTimeMs) {
+	        for (AdminApiDriver.RequestSpec<K> spec : driver.poll()) {
+	            runnable.call(newCall(driver, spec), currentTimeMs);
+	        }
+	    }
+
+	    private <K, V> Call newCall(AdminApiDriver<K, V> driver, AdminApiDriver.RequestSpec<K> spec) {
+	        NodeProvider nodeProvider = spec.scope.destinationBrokerId().isPresent() ?
+	            new ConstantNodeIdProvider(spec.scope.destinationBrokerId().getAsInt()) :
+	            new LeastLoadedNodeProvider();
+	        return new Call(spec.name, spec.nextAllowedTryMs, spec.tries, spec.deadlineMs, nodeProvider) {
+	            @Override
+	            AbstractRequest.Builder<?> createRequest(int timeoutMs) {
+	                return spec.request;
+	            }
+
+	            @Override
+	            void handleResponse(AbstractResponse response) {
+	                long currentTimeMs = time.milliseconds();
+	                driver.onResponse(currentTimeMs, spec, response, this.curNode());
+	                maybeSendRequests(driver, currentTimeMs);
+	            }
+
+	            @Override
+	            void handleFailure(Throwable throwable) {
+	                long currentTimeMs = time.milliseconds();
+	                driver.onFailure(currentTimeMs, spec, throwable);
+	                maybeSendRequests(driver, currentTimeMs);
+	            }
+
+	            @Override
+	            void maybeRetry(long currentTimeMs, Throwable throwable) {
+	                if (throwable instanceof DisconnectException) {
+	                    // Disconnects are a special case. We want to give the driver a chance
+	                    // to retry lookup rather than getting stuck on a node which is down.
+	                    // For example, if a partition leader shuts down after our metadata query,
+	                    // then we might get a disconnect. We want to try to find the new partition
+	                    // leader rather than retrying on the same node.
+	                    driver.onFailure(currentTimeMs, spec, throwable);
+	                    maybeSendRequests(driver, currentTimeMs);
+	                } else {
+	                    super.maybeRetry(currentTimeMs, throwable);
+	                }
+	            }
+	        };
+	    }
+	
+	private static long getOffsetFromSpec(OffsetSpec offsetSpec) {
+		if (offsetSpec instanceof TimestampSpec) {
+			try {
+				Method timestampMethod = offsetSpec.getClass().getDeclaredMethod("timestamp");
+				timestampMethod.setAccessible(true);
+				long timestamp = (long) timestampMethod.invoke(offsetSpec);
+				return timestamp;
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		} else if (offsetSpec instanceof OffsetSpec.EarliestSpec) {
+			return ListOffsetsRequest.EARLIEST_TIMESTAMP;
+		} else if (offsetSpec instanceof OffsetSpec.MaxTimestampSpec) {
+			return ListOffsetsRequest.MAX_TIMESTAMP;
+		}
+		return ListOffsetsRequest.LATEST_TIMESTAMP;
+	}
+	
+	
 
 	@Override
 	public DescribeClusterResult describeCluster(DescribeClusterOptions options) {
@@ -2299,11 +2446,11 @@ public class KafkaAdminClient extends AdminClient {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
-	@Override
-	public ListOffsetsResult listOffsets(Map<TopicPartition, OffsetSpec> topicPartitionOffsets,
-			ListOffsetsOptions options) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-	}
+//	@Override
+//	public ListOffsetsResult listOffsets(Map<TopicPartition, OffsetSpec> topicPartitionOffsets,
+//			ListOffsetsOptions options) {
+//		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+//	}
 
 	@Override
 	public DescribeClientQuotasResult describeClientQuotas(ClientQuotaFilter filter,
