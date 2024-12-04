@@ -32,6 +32,7 @@ package org.oracle.okafka.common.requests;
 import java.sql.SQLException;
 import java.util.Map;
 
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.protocol.ApiMessage;
 import org.apache.kafka.common.protocol.Errors;
 import org.oracle.okafka.common.errors.FeatureNotSupportedException;
@@ -39,17 +40,23 @@ import org.oracle.okafka.common.protocol.ApiKeys;
 
 
 public class DeleteTopicsResponse extends AbstractResponse {
-	private final Map<String, SQLException> errors;
+	private final Map<String, SQLException> topicNameErrorMap;
+	private final Map<Uuid, SQLException> topicIdErrorMap;
 	private Exception requestResult;
 
-	public DeleteTopicsResponse(Map<String, SQLException> errors) {
+	public DeleteTopicsResponse(Map<String, SQLException> topicNameErrorMap, Map<Uuid, SQLException> topicIdErrorMap) {
 		super(ApiKeys.DELETE_TOPICS);
-		this.errors = errors;
+		this.topicNameErrorMap = topicNameErrorMap;
+		this.topicIdErrorMap=topicIdErrorMap;
 		this.requestResult = null;
 	}
 	
-	public Map<String, SQLException> errors() {
-		return errors;
+	public Map<String, SQLException> topicErrormap(){
+		return this.topicNameErrorMap;
+	}
+	
+	public Map<Uuid, SQLException> topicIdErrorMap(){
+		return this.topicIdErrorMap;
 	}
 	
 	public void setResult(Exception ex) {
@@ -61,6 +68,7 @@ public class DeleteTopicsResponse extends AbstractResponse {
     public Exception getResult() {
     	return requestResult;
     }
+    
 
 	@Override
 	public ApiMessage data() {

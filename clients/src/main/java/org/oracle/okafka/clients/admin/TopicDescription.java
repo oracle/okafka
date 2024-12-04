@@ -24,23 +24,22 @@
 
 package org.oracle.okafka.clients.admin;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartitionInfo;
+import org.apache.kafka.common.Uuid;
 import org.oracle.okafka.clients.TopicTeqParameters;
 
 public class TopicDescription extends org.apache.kafka.clients.admin.TopicDescription{
 	
-	private final String name;
 	private final TopicTeqParameters topicParameters;
 	
-	public TopicDescription(String name, boolean internal, List<TopicPartitionInfo> partitions, TopicTeqParameters topicTeqParameters) {
-		super(name, internal, partitions);
-		
-		this.name=name;
+	public TopicDescription(String name, boolean internal, List<TopicPartitionInfo> partitions, TopicTeqParameters topicTeqParameters, Uuid topicId) {
+		super(name, internal, partitions,Collections.emptySet(),topicId);
 		this.topicParameters=topicTeqParameters;
 		
 	}
@@ -57,7 +56,7 @@ public class TopicDescription extends org.apache.kafka.clients.admin.TopicDescri
 	
 	@Override
     public int hashCode() {
-        return Objects.hash(name, this.isInternal(), this.partitions(),topicParameters);
+        return Objects.hash(this.name(), this.isInternal(), this.partitions(), topicParameters);
     }
 	
 	private TopicTeqParameters topicTeqParameters() {

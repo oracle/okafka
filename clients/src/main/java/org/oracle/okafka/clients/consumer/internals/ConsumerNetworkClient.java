@@ -86,6 +86,8 @@ import org.oracle.okafka.common.requests.FetchRequest;
 import org.oracle.okafka.common.requests.FetchResponse;
 import org.oracle.okafka.common.requests.JoinGroupRequest;
 import org.oracle.okafka.common.requests.JoinGroupResponse;
+import org.oracle.okafka.common.requests.MetadataRequest;
+import org.oracle.okafka.common.requests.MetadataResponse;
 import org.oracle.okafka.common.requests.OffsetResetRequest;
 import org.oracle.okafka.common.requests.OffsetResetResponse;
 import org.oracle.okafka.common.requests.SubscribeRequest;
@@ -752,6 +754,16 @@ public class ConsumerNetworkClient {
 			log.debug("Metadata updated:Current Metadata Version " + metadata.version());
 
 		}
+	}
+	
+	public ClientResponse sendMetadataRequest(MetadataRequest.Builder requestBuilder) {
+		log.debug("Sending Metadata Request");
+		long now = time.milliseconds();
+		ClientRequest clientRequest = client.newClientRequest(client.leastLoadedNode(now),
+				requestBuilder, now, true, requestTimeoutMs, null);
+		ClientResponse response = this.client.send(clientRequest, now);  
+		log.debug("Got Metadata Response");
+		return response;
 	}
 
 	private boolean handleSubscribeResponse(ClientResponse response) {

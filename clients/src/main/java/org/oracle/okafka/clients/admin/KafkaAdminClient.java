@@ -1438,6 +1438,10 @@ public class KafkaAdminClient extends AdminClient {
 	private static boolean topicNameIsUnrepresentable(String topicName) {
 		return topicName == null || topicName.isEmpty();
 	}
+	
+	 private static boolean topicIdIsUnrepresentable(Uuid topicId) {
+	        return topicId == null || topicId.equals(Uuid.ZERO_UUID);
+	    }
 
 	private static boolean groupIdIsUnrepresentable(String groupId) {
 		return groupId == null;
@@ -1661,6 +1665,7 @@ public class KafkaAdminClient extends AdminClient {
 				// Handle server responses for particular topics.
 				for (Map.Entry<String, Exception> entry : response.errors().entrySet()) {
 					KafkaFutureImpl<TopicMetadataAndConfig> future = topicFutures.get(entry.getKey());
+					Map<String,Uuid> topicIdMap = response.topicIdMap();
 					if (future == null) {
 						log.warn("Server response mentioned unknown topic {}", entry.getKey());
 					} else {
@@ -1668,7 +1673,11 @@ public class KafkaAdminClient extends AdminClient {
 						if (exception != null) {
 							future.completeExceptionally(exception);
 						} else {
-							future.complete(null);
+							String topic = entry.getKey();
+							TopicMetadataAndConfig topicMetadataAndConfig = new TopicMetadataAndConfig(
+									topicIdMap.get(topic), topicsMap.get(topic).numPartitions,
+									topicsMap.get(topic).replicationFactor, null);
+							future.complete(topicMetadataAndConfig);
 						}
 					}
 				}
@@ -1698,45 +1707,88 @@ public class KafkaAdminClient extends AdminClient {
 				new HashMap<String, KafkaFuture<TopicMetadataAndConfig>>(topicFutures));
 		return createTopicResults;
 	}
-
+	
 	@Override
-	public DeleteTopicsResult deleteTopics(final TopicCollection topics, DeleteTopicsOptions options) {
+	public DeleteTopicsResult deleteTopics(final TopicCollection topics, final DeleteTopicsOptions options) {
+		if (topics instanceof TopicIdCollection)
+			return new org.oracle.okafka.clients.admin.DeleteTopicsResult(
+					handleDeleteTopicsUsingIds(((TopicIdCollection) topics).topicIds(), options), null);
+		else if (topics instanceof TopicNameCollection)
+			return new org.oracle.okafka.clients.admin.DeleteTopicsResult(null,
+					handleDeleteTopicsUsingNames(((TopicNameCollection) topics).topicNames(), options));
+		else
+			throw new IllegalArgumentException("The TopicCollection: " + topics
+					+ " provided did not match any supported classes for deleteTopics.");
+	}
 
-		if (topics instanceof TopicIdCollection) {
-			throw new FeatureNotSupportedException("Topic Ids are not supported for this release of OKafka.");
-		}
-
-		final Collection<String> topicNames = ((TopicCollection.TopicNameCollection) topics).topicNames();
+	private Map<String, KafkaFuture<Void>> handleDeleteTopicsUsingNames(final Collection<String> topicNames,
+			final DeleteTopicsOptions options) {
 		final Map<String, KafkaFutureImpl<Void>> topicFutures = new HashMap<>(topicNames.size());
 		final List<String> validTopicNames = new ArrayList<>(topicNames.size());
-
 		for (String topicName : topicNames) {
 			if (topicNameIsUnrepresentable(topicName)) {
-
 				KafkaFutureImpl<Void> future = new KafkaFutureImpl<>();
 				future.completeExceptionally(new InvalidTopicException(
 						"The given topic name '" + topicName + "' cannot be represented in a request."));
-				topicFutures.put(topicName.toUpperCase(), future);
-
-			} else if (!topicFutures.containsKey(topicName.toUpperCase())) {
-				topicFutures.put(topicName.toUpperCase(), new KafkaFutureImpl<Void>());
-				validTopicNames.add(topicName.toUpperCase());
+				topicFutures.put(topicName, future);
+			} else if (!topicFutures.containsKey(topicName)) {
+				topicFutures.put(topicName, new KafkaFutureImpl<>());
+				validTopicNames.add(topicName);
 			}
 		}
-		final long now = time.milliseconds();
-		Call call = new Call("deleteTopics", calcDeadlineMs(now, options.timeoutMs()), new ControllerNodeProvider()) {
+		if (!validTopicNames.isEmpty()) {
+			final long now = time.milliseconds();
+			final long deadline = calcDeadlineMs(now, options.timeoutMs());
+			final Call call = getDeleteTopicsCall(options, topicFutures, validTopicNames,now,
+					deadline);
+			runnable.call(call, now);
+		}
+		return new HashMap<>(topicFutures);
+	}
+
+	private Map<Uuid, KafkaFuture<Void>> handleDeleteTopicsUsingIds(final Collection<Uuid> topicIds,
+			final DeleteTopicsOptions options) {
+		final Map<Uuid, KafkaFutureImpl<Void>> topicFutures = new HashMap<>(topicIds.size());
+		final List<Uuid> validTopicIds = new ArrayList<>(topicIds.size());
+		for (Uuid topicId : topicIds) {
+			if (topicIdIsUnrepresentable(topicId)) {
+				KafkaFutureImpl<Void> future = new KafkaFutureImpl<>();
+				future.completeExceptionally(new InvalidTopicException(
+						"The given topic ID '" + topicId + "' cannot be represented in a request."));
+				topicFutures.put(topicId, future);
+			} else if (!topicFutures.containsKey(topicId)) {
+				topicFutures.put(topicId, new KafkaFutureImpl<>());
+				validTopicIds.add(topicId);
+			}
+		}
+		if (!validTopicIds.isEmpty()) {
+			final long now = time.milliseconds();
+			final long deadline = calcDeadlineMs(now, options.timeoutMs());
+			final Call call = getDeleteTopicsWithIdsCall(options, topicFutures, validTopicIds,
+					now, deadline);
+			runnable.call(call, now);
+		}
+		return new HashMap<>(topicFutures);
+	}
+
+	private Call getDeleteTopicsCall(final DeleteTopicsOptions options,
+            final Map<String, KafkaFutureImpl<Void>> futures,
+            final List<String> topics,final long now,
+            final long deadline) {
+
+		return new Call("deleteTopics", deadline, new ControllerNodeProvider()) {
 
 			@Override
 			AbstractRequest.Builder createRequest(int timeoutMs) {
-				return new DeleteTopicsRequest.Builder(new HashSet<>(validTopicNames), timeoutMs);
+				return new DeleteTopicsRequest.Builder(new HashSet<>(topics), null, timeoutMs);
 			}
 
 			@Override
 			void handleResponse(org.apache.kafka.common.requests.AbstractResponse abstractResponse) {
 				DeleteTopicsResponse response = (DeleteTopicsResponse) abstractResponse;
 				// Handle server responses for particular topics.
-				for (Map.Entry<String, SQLException> entry : response.errors().entrySet()) {
-					KafkaFutureImpl<Void> future = topicFutures.get(entry.getKey());
+				for (Map.Entry<String, SQLException> entry : response.topicErrormap().entrySet()) {
+					KafkaFutureImpl<Void> future = futures.get(entry.getKey());
 					if (future == null) {
 						log.warn("Server response mentioned unknown topic {}", entry.getKey());
 					} else {
@@ -1750,7 +1802,7 @@ public class KafkaAdminClient extends AdminClient {
 				}
 				// The server should send back a response for every topic. But do a sanity check
 				// anyway.
-				for (Map.Entry<String, KafkaFutureImpl<Void>> entry : topicFutures.entrySet()) {
+				for (Map.Entry<String, KafkaFutureImpl<Void>> entry : futures.entrySet()) {
 					KafkaFutureImpl<Void> future = entry.getValue();
 					if (!future.isDone()) {
 						if (response.getResult() != null) {
@@ -1764,15 +1816,60 @@ public class KafkaAdminClient extends AdminClient {
 
 			@Override
 			void handleFailure(Throwable throwable) {
-				completeAllExceptionally(topicFutures.values(), throwable);
+				completeAllExceptionally(futures.values(), throwable);
 			}
 		};
-		if (!validTopicNames.isEmpty()) {
-			runnable.call(call, now);
-		}
-		return new org.oracle.okafka.clients.admin.DeleteTopicsResult(
-				new HashMap<String, KafkaFuture<Void>>(topicFutures));
+	}
+	
+	private Call getDeleteTopicsWithIdsCall(final DeleteTopicsOptions options,
+            final Map<Uuid, KafkaFutureImpl<Void>> futures,
+            final List<Uuid> topicIds,final long now,
+            final long deadline) {
 
+		return new Call("deleteTopics", deadline, new ControllerNodeProvider()) {
+
+			@Override
+			AbstractRequest.Builder createRequest(int timeoutMs) {
+				return new DeleteTopicsRequest.Builder(null,new HashSet<>(topicIds), timeoutMs);
+			}
+
+			@Override
+			void handleResponse(org.apache.kafka.common.requests.AbstractResponse abstractResponse) {
+				DeleteTopicsResponse response = (DeleteTopicsResponse) abstractResponse;
+				// Handle server responses for particular topics.
+				for (Map.Entry<Uuid, SQLException> entry : response.topicIdErrorMap().entrySet()) {
+					KafkaFutureImpl<Void> future = futures.get(entry.getKey());
+					if (future == null) {
+						log.warn("Server response mentioned unknown topic {}", entry.getKey());
+					} else {
+						SQLException exception = entry.getValue();
+						if (exception != null) {
+							future.completeExceptionally(new KafkaException(exception.getMessage()));
+						} else {
+							future.complete(null);
+						}
+					}
+				}
+				
+				// The server should send back a response for every topic. But do a sanity check
+				// anyway.
+				for (Map.Entry<Uuid, KafkaFutureImpl<Void>> entry : futures.entrySet()) {
+					KafkaFutureImpl<Void> future = entry.getValue();
+					if (!future.isDone()) {
+						if (response.getResult() != null) {
+							future.completeExceptionally(response.getResult());
+						} else
+							future.completeExceptionally(new ApiException(
+									"The server response did not " + "contain a reference to node " + entry.getKey()));
+					}
+				}
+			}
+
+			@Override
+			void handleFailure(Throwable throwable) {
+				completeAllExceptionally(futures.values(), throwable);
+			}
+		};
 	}
 
 	private void handleNotControllerError(org.apache.kafka.common.requests.AbstractResponse response)
@@ -1800,7 +1897,7 @@ public class KafkaAdminClient extends AdminClient {
 			}
 
 			@Override
-			void handleResponse(AbstractResponse abstractResponse) {
+			void handleResponse(AbstractResponse abstractResponse){
 				MetadataResponse response = (MetadataResponse) abstractResponse;
 				if(response.getException()==null) {
 				Map<String, TopicListing> topicListing = new HashMap<>();
@@ -1849,33 +1946,133 @@ public class KafkaAdminClient extends AdminClient {
 	
 	@Override
 	public DescribeTopicsResult describeTopics(final TopicCollection topics, DescribeTopicsOptions options) {
-
+		
 		if (topics instanceof TopicIdCollection) {
-			throw new FeatureNotSupportedException("Topic Ids are not supported for this release of OKafka.");
+			return handleDescribeTopicsByIds(((TopicIdCollection) topics).topicIds(), options);}
+		else if (topics instanceof TopicNameCollection)
+			return handleDescribeTopicsByNames(((TopicNameCollection) topics).topicNames(), options);
+		else
+			throw new IllegalArgumentException("The TopicCollection: " + topics
+					+ " provided did not match any supported classes for describeTopics.");
+	}
+		
+	private DescribeTopicsResult handleDescribeTopicsByIds(final Collection<Uuid> topicIds,
+			final DescribeTopicsOptions options){
+		final Map<Uuid, KafkaFutureImpl<TopicDescription>> topicIdFutures = new HashMap<>(
+				topicIds.size());
+		final List<Uuid> validTopicIds = new ArrayList<>(topicIds.size());
+
+		for (Uuid id : topicIds) {
+			if (topicIdIsUnrepresentable(id)) {
+
+				KafkaFutureImpl<TopicDescription> future = new KafkaFutureImpl<>();
+				future.completeExceptionally(new InvalidTopicException(
+						"The given topic name '" + id + "' cannot be represented in a request."));
+				topicIdFutures.put(id, future);
+
+			} else if (!topicIdFutures.containsKey(id)) {
+				topicIdFutures.put(id,
+						new KafkaFutureImpl<TopicDescription>());
+				validTopicIds.add(id);
+			}
 		}
+		if (validTopicIds.isEmpty()) {
+			DescribeTopicsResult describeTopicsResult = new org.oracle.okafka.clients.admin.DescribeTopicsResult(
+					new HashMap<Uuid, KafkaFuture<TopicDescription>>(topicIdFutures),null);
+			return describeTopicsResult;
+		}
+		final long now = time.milliseconds();
 
-		final Collection<String> topicNames = ((TopicCollection.TopicNameCollection) topics).topicNames();
-		final Map<String, KafkaFutureImpl<org.apache.kafka.clients.admin.TopicDescription>> topicFutures = new HashMap<>(
-				topicNames.size());
-		final List<String> validTopicNames = new ArrayList<>(topicNames.size());
+		runnable.call(
+				new Call("describeTopics", calcDeadlineMs(now, options.timeoutMs()), new LeastLoadedNodeProvider()) {
 
-		for (String topicName : topicNames) {
+					@Override
+					MetadataRequest.Builder createRequest(int timeoutMs) {
+						return new MetadataRequest.Builder(validTopicIds);
+					}
+
+					@Override
+					void handleResponse(AbstractResponse abstractResponse) {
+						MetadataResponse response = (MetadataResponse) abstractResponse;
+						if(response.getException()!=null) {
+							handleFailure(response.getException());
+						}
+						List<PartitionInfo> partitionInfo = response.partitions();
+						Map<Uuid, Exception> errorsPerTopicId = response.topicIdErrors();
+						Map<String, TopicTeqParameters> topicTeqParameters = response.teqParameters();
+						Map<String,Uuid> topicNameIdMap = response.getTopicsIdMap();
+						Map<Uuid,String> topicIdNameMap =new HashMap<>();
+						topicNameIdMap.forEach((key, value) -> topicIdNameMap.put(value, key));
+						Map<String, List<TopicPartitionInfo>> topicPartitions = new HashMap<>();
+
+						for (int i = 0; i < partitionInfo.size(); i++) {
+							String name = partitionInfo.get(i).topic();
+							int partition = partitionInfo.get(i).partition();
+							Node leader = partitionInfo.get(i).leader();
+							Node[] replicas = partitionInfo.get(i).replicas();
+							Node[] inSyncReplicas = partitionInfo.get(i).inSyncReplicas();
+
+							TopicPartitionInfo topicPartitionInfo = new TopicPartitionInfo(partition, leader,
+									replicas != null ? new ArrayList<>(Arrays.asList(replicas)) : new ArrayList<>(),
+									inSyncReplicas != null ? new ArrayList<>(Arrays.asList(inSyncReplicas))
+											: new ArrayList<>());
+							if (topicPartitions.containsKey(name)) {
+								topicPartitions.get(name).add(topicPartitionInfo);
+							} else {
+								topicPartitions.put(name, new ArrayList<>(Arrays.asList(topicPartitionInfo)));
+							}
+						}
+						
+						for (Map.Entry<Uuid, KafkaFutureImpl<TopicDescription>> entry : topicIdFutures
+								.entrySet()) {
+
+							KafkaFutureImpl<TopicDescription> future = entry.getValue();
+
+							if (errorsPerTopicId.get(entry.getKey()) != null) {
+								future.completeExceptionally(errorsPerTopicId.get(entry.getKey()));
+							}
+							TopicDescription topicDescription = new org.oracle.okafka.clients.admin.TopicDescription(
+									topicIdNameMap.get(entry.getKey()), false, topicPartitions.get(topicIdNameMap.get(entry.getKey())),
+									topicTeqParameters.get(topicIdNameMap.get(entry.getKey())),entry.getKey());
+
+							future.complete((TopicDescription) topicDescription);
+						}
+					}
+
+					@Override
+					void handleFailure(Throwable throwable) {
+						completeAllExceptionally(topicIdFutures.values(), throwable);
+					}
+				}, now);
+		DescribeTopicsResult describeTopicsResult = new org.oracle.okafka.clients.admin.DescribeTopicsResult(
+				new HashMap<Uuid, KafkaFuture<TopicDescription>>(topicIdFutures),null);
+		return describeTopicsResult;
+	}
+	
+	private DescribeTopicsResult handleDescribeTopicsByNames(final Collection<String> topics,
+			final DescribeTopicsOptions options){
+	
+		final Map<String, KafkaFutureImpl<TopicDescription>> topicFutures = new HashMap<>(
+				topics.size());
+		final List<String> validTopicNames = new ArrayList<>(topics.size());
+
+		for (String topicName : topics) {
 			if (topicNameIsUnrepresentable(topicName)) {
 
-				KafkaFutureImpl<org.apache.kafka.clients.admin.TopicDescription> future = new KafkaFutureImpl<>();
+				KafkaFutureImpl<TopicDescription> future = new KafkaFutureImpl<>();
 				future.completeExceptionally(new InvalidTopicException(
 						"The given topic name '" + topicName + "' cannot be represented in a request."));
 				topicFutures.put(topicName.toUpperCase(), future);
 
 			} else if (!topicFutures.containsKey(topicName.toUpperCase())) {
 				topicFutures.put(topicName.toUpperCase(),
-						new KafkaFutureImpl<org.apache.kafka.clients.admin.TopicDescription>());
+						new KafkaFutureImpl<TopicDescription>());
 				validTopicNames.add(topicName.toUpperCase());
 			}
 		}
 		if (validTopicNames.isEmpty()) {
-			org.apache.kafka.clients.admin.DescribeTopicsResult describeTopicsResult = new org.oracle.okafka.clients.admin.DescribeTopicsResult(
-					new HashMap<String, KafkaFuture<org.apache.kafka.clients.admin.TopicDescription>>(topicFutures));
+			DescribeTopicsResult describeTopicsResult = new org.oracle.okafka.clients.admin.DescribeTopicsResult(null,
+					new HashMap<String, KafkaFuture<TopicDescription>>(topicFutures));
 			return describeTopicsResult;
 		}
 		final long now = time.milliseconds();
@@ -1887,14 +2084,16 @@ public class KafkaAdminClient extends AdminClient {
 					MetadataRequest.Builder createRequest(int timeoutMs) {
 						return new MetadataRequest.Builder(validTopicNames, false, validTopicNames);
 					}
-
 					@Override
 					void handleResponse(AbstractResponse abstractResponse) {
 						MetadataResponse response = (MetadataResponse) abstractResponse;
+						if(response.getException()!=null) {
+							handleFailure(response.getException());
+						}
 						List<PartitionInfo> partitionInfo = response.partitions();
 						Map<String, Exception> errorsPerTopic = response.topicErrors();
 						Map<String, TopicTeqParameters> topicTeqParameters = response.teqParameters();
-
+						Map<String, Uuid> topicNameIdMap = response.getTopicsIdMap();
 						Map<String, List<TopicPartitionInfo>> topicPartitions = new HashMap<>();
 
 						for (int i = 0; i < partitionInfo.size(); i++) {
@@ -1916,7 +2115,7 @@ public class KafkaAdminClient extends AdminClient {
 							}
 						}
 
-						for (Map.Entry<String, KafkaFutureImpl<org.apache.kafka.clients.admin.TopicDescription>> entry : topicFutures
+						for (Map.Entry<String, KafkaFutureImpl<TopicDescription>> entry : topicFutures
 								.entrySet()) {
 
 							KafkaFutureImpl<TopicDescription> future = entry.getValue();
@@ -1927,9 +2126,9 @@ public class KafkaAdminClient extends AdminClient {
 
 							TopicDescription topicDescription = new org.oracle.okafka.clients.admin.TopicDescription(
 									entry.getKey(), false, topicPartitions.get(entry.getKey()),
-									topicTeqParameters.get(entry.getKey()));
+									topicTeqParameters.get(entry.getKey()),topicNameIdMap.get(entry.getKey()));
 
-							future.complete((org.apache.kafka.clients.admin.TopicDescription) topicDescription);
+							future.complete((TopicDescription) topicDescription);
 						}
 					}
 
@@ -1938,7 +2137,7 @@ public class KafkaAdminClient extends AdminClient {
 						completeAllExceptionally(topicFutures.values(), throwable);
 					}
 				}, now);
-		DescribeTopicsResult describeTopicsResult = new org.oracle.okafka.clients.admin.DescribeTopicsResult(
+		DescribeTopicsResult describeTopicsResult = new org.oracle.okafka.clients.admin.DescribeTopicsResult(null,
 				new HashMap<String, KafkaFuture<TopicDescription>>(topicFutures));
 		return describeTopicsResult;
 	}

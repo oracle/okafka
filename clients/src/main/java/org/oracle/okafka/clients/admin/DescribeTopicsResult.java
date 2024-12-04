@@ -28,11 +28,11 @@ import java.util.Map;
 
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.KafkaFuture;
+import org.apache.kafka.common.Uuid;
 
 public class DescribeTopicsResult extends org.apache.kafka.clients.admin.DescribeTopicsResult {
 
-	protected DescribeTopicsResult(Map<String, KafkaFuture<TopicDescription>> futures) {
-		super(futures);	
+	protected DescribeTopicsResult(Map<Uuid, KafkaFuture<TopicDescription>> topicIdFutures, Map<String, KafkaFuture<TopicDescription>> nameFutures) {
+		super(topicIdFutures, nameFutures);	
 	}
-
 }
