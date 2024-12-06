@@ -58,13 +58,14 @@ public class MetadataRequest extends AbstractRequest {
 
 		}
 
-		public Builder(boolean listTopics) {
+		public Builder(boolean listTopics,boolean needPartitionInfo) {
 			super(ApiKeys.METADATA);
 			this.topics = null;
 			this.topicIds = null;
 			this.allowAutoTopicCreation = false;
 			this.teqParaTopic = null;
 			this.listTopics = listTopics;
+			this.needPartitionInfo=needPartitionInfo;
 		}
 
 		public Builder(List<Uuid> topicIds) {
@@ -79,8 +80,8 @@ public class MetadataRequest extends AbstractRequest {
 			return new Builder(ALL_TOPICS, false, ALL_TOPICS);
 		}
 
-		public static Builder listAllTopics() {
-			return new Builder(true);
+		public static Builder listAllTopics(boolean needPartitionInfo) {
+			return new Builder(true,needPartitionInfo);
 		}
 
 		public List<String> topics() {
