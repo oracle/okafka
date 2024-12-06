@@ -26,7 +26,7 @@ public class TopicMetadataFetcher {
 	}
 
 	public Map<String, List<PartitionInfo>> getAllTopicMetadata(Timer timer) {
-		MetadataRequest.Builder request = MetadataRequest.Builder.listAllTopics();
+		MetadataRequest.Builder request = MetadataRequest.Builder.listAllTopics(true);
 		return getTopicMetadata(request, timer);
 	}
 
