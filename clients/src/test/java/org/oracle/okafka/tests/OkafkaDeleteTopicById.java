@@ -3,21 +3,27 @@ package org.oracle.okafka.tests;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.ExecutionException;
+
 import org.apache.kafka.clients.admin.Admin;
+import org.apache.kafka.clients.admin.CreateTopicsResult;
 import org.apache.kafka.clients.admin.DeleteTopicsResult;
+import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.TopicCollection;
+import org.apache.kafka.common.Uuid;
 import org.junit.Test;
 import org.oracle.okafka.clients.admin.AdminClient;
 
-public class OkafkaDeleteTopic {
-
+public class OkafkaDeleteTopicById {
 	@Test
-	public void DeleteTopicTest() {
-
+	public void DeleteTopicByIdTest() {
 		try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
+
+			CreateTopicsResult result = admin.createTopics(Arrays.asList(new NewTopic("TEQ", 5, (short) 1)));
+			Uuid createdTopicId = result.topicId("TEQ").get();
+
 			DeleteTopicsResult delResult = admin.deleteTopics(
-					TopicCollection.TopicNameCollection.ofTopicNames(new ArrayList<String>(Arrays.asList("TEQ"))));
+					TopicCollection.TopicNameCollection.ofTopicIds(new ArrayList<Uuid>(Arrays.asList(createdTopicId))));
 			try {
 				KafkaFuture<Void> ftr = delResult.all();
 				ftr.get();
@@ -31,6 +37,6 @@ public class OkafkaDeleteTopic {
 			System.out.println("Exception while deleting topic " + e);
 			e.printStackTrace();
 		}
-		System.out.println("Test: OkfakaDeleteTopic completed");
+		System.out.println("Test: OkfakaDeleteTopicById completed");
 	}
 }

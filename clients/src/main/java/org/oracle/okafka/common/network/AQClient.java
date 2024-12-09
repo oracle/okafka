@@ -27,7 +27,9 @@ import org.apache.kafka.clients.ClientResponse;
 import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.clients.TopicTeqParameters;
 import org.oracle.okafka.common.Node;
+import org.oracle.okafka.common.errors.RecordNotFoundSQLException;
 import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.oracle.okafka.common.requests.MetadataRequest;
 import org.oracle.okafka.common.requests.MetadataRequest.Builder;
@@ -128,15 +130,21 @@ public abstract class AQClient {
 
 		MetadataRequest.Builder builder = (MetadataRequest.Builder) request.requestBuilder();
 		MetadataRequest metadataRequest = builder.build();
-
+		
 		List<Node> nodes = new ArrayList<>();
 		List<PartitionInfo> partitionInfo = new ArrayList<>();
 		Map<String, Exception> errorsPerTopic = new HashMap<>();
+		Map<Uuid, Exception> errorsPerTopicId = new HashMap<>();
+		Exception metadataException=null;
 		List<String> metadataTopics=null;
+		List<String> teqParaList=null;
+		List<Uuid> topicIds=metadataRequest.topidIds();
 		boolean disconnected = false;
 		String clusterId = "";
 		boolean getPartitioninfo = false;
 		Map<String, TopicTeqParameters> topicParameterMap = null;
+		Map<String,Uuid> topicNameIdMap=new HashMap<>();
+		Map<Uuid,String> topicIdNameMap=new HashMap<>();
 		try {
 
 			if (con == null) {
@@ -145,25 +153,57 @@ public abstract class AQClient {
 			}
 
 			if (builder.isListTopics()) {
-				return listTopicsResponse(request,con);
-			}  
+				return listTopicsResponse(request, con, currentNode);
+			}
 
-			metadataTopics = new ArrayList<String>(metadataRequest.topics());
-			List<String> teqParaList = metadataRequest.teqParaTopics();
+			if (topicIds != null) {
+				for (Uuid id : topicIds) {
+					try {
+						String topicName = getTopicById(con, id);
+						topicIdNameMap.put(id, topicName);
+					} catch (SQLException sqle) {
+						if (sqle instanceof RecordNotFoundSQLException && !metadataRequest.allowAutoTopicCreation()) {
+							errorsPerTopicId.put(id, sqle);
+							log.error("topic id: " + id.toString() + " doesn't exist");
+						} else {
+							throw sqle;
+						}
+					}
+				}
+				metadataTopics = new ArrayList<>(topicIdNameMap.values());
+				teqParaList = metadataTopics;
+			} else if (metadataRequest.topics() == null && metadataRequest.teqParaTopics() == null) {
+				metadataTopics = metadataRequest.topics() != null ? new ArrayList<String>(metadataRequest.topics())
+						: getAllTopics(con);
+				teqParaList = metadataRequest.teqParaTopics() != null ? metadataRequest.teqParaTopics()
+						: metadataTopics;
+			} else {
+				metadataTopics = metadataRequest.topics();
+				teqParaList = metadataTopics;
+			}
+
 			topicParameterMap = new HashMap<String, TopicTeqParameters>(teqParaList.size());
 			for (String teqTopic : teqParaList) {
+
 				TopicTeqParameters teqPara = fetchQueueParameters(teqTopic, con);
-				topicParameterMap.put(teqTopic, teqPara);	
+				topicParameterMap.put(teqTopic, teqPara);
 			}
 			// Database Name to be set as Cluster ID
 			clusterId = ((oracle.jdbc.internal.OracleConnection) con).getServerSessionInfo()
 					.getProperty("DATABASE_NAME");
-
 			getPartitioninfo = getNodes(nodes, con, currentNode, metadataRequested);
+			if (getPartitioninfo || metadataRequested || builder.needPartitionInfo()) {
+				getPartitionInfo(metadataTopics, new ArrayList<>(metadataTopics), con,
+						nodes.isEmpty() ? all_nodes : nodes, metadataRequest.allowAutoTopicCreation(), partitionInfo,
+						errorsPerTopic, topicNameIdMap);
+			}
 
-			if (getPartitioninfo || metadataRequested) {
-				getPartitionInfo(metadataRequest.topics(), metadataTopics, con, nodes,
-						metadataRequest.allowAutoTopicCreation(), partitionInfo, errorsPerTopic);
+			if (topicIds != null) {
+				for (String topic : metadataTopics) {
+					if (errorsPerTopic.containsKey(topic)) {
+						errorsPerTopicId.put(topicNameIdMap.get(topic), errorsPerTopic.get(topic));
+					}
+				}
 			}
 
 		} catch (Exception exception) {
@@ -175,11 +215,10 @@ public abstract class AQClient {
 							((SQLException) exception).getMessage());
 					log.info("Please grant all the documented privileges to database user.");
 				}
-			if (exception instanceof SQLSyntaxErrorException)
+			if (exception instanceof SQLSyntaxErrorException) {
 				log.trace("Please grant all the documented privileges to database user.");
-			for (String topic : metadataTopics) {
-				errorsPerTopic.put(topic, exception);
 			}
+			metadataException=exception;
 			disconnected = true;
 			try {
 				log.debug("Unexcepted error occured with connection to node {}, closing the connection",
@@ -192,16 +231,22 @@ public abstract class AQClient {
 				log.trace("Failed to close connection with node {}", request.destination());
 			}
 		}
+		MetadataResponse metadataResponse = new MetadataResponse(clusterId, all_nodes, partitionInfoList, errorsPerTopic, errorsPerTopicId, topicParameterMap, topicNameIdMap);
+		metadataResponse.setException(metadataException);
+		
 		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
-				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null,
-				new MetadataResponse(clusterId, all_nodes, partitionInfoList, errorsPerTopic, topicParameterMap));
+				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null, metadataResponse);
 	}
 	
-	private ClientResponse listTopicsResponse (ClientRequest request, Connection con) {
+	private ClientResponse listTopicsResponse (ClientRequest request, Connection con, Node currentNode) {
 		MetadataRequest.Builder builder = (MetadataRequest.Builder) request.requestBuilder();
-		Map<String, TopicTeqParameters> topicParameterMap = null;
+		Map<String, TopicTeqParameters> topicParameterMap = new HashMap<>();
 		Exception listTopicsException=null;
 		boolean disconnected=false;
+		List<PartitionInfo> partitionInfo = new ArrayList<>();
+		Map<String, Exception> errorsPerTopic = new HashMap<>();
+		List<Node> nodes = new ArrayList<>();
+		String clusterId = null;
 		
 		try {
 			List<String> allTopics = getAllTopics(con);
@@ -212,19 +257,27 @@ public abstract class AQClient {
 				topicParameterMap.put(teqTopic, teqPara);
 
 			}
+			if(builder.needPartitionInfo()) {
+				 clusterId = ((oracle.jdbc.internal.OracleConnection) con).getServerSessionInfo()
+						.getProperty("DATABASE_NAME");
+				 
+				getNodes(nodes,con, currentNode, true);
+				getPartitionInfo(allTopics, new ArrayList<>(allTopics), con, nodes.isEmpty()?all_nodes:nodes , false, partitionInfo, errorsPerTopic, new HashMap<>());
+			}
 
 			}catch (Exception exception) {
 				log.error("Exception while listing topics " + exception.getMessage(), exception);
 
 				if (exception instanceof SQLException)
 					if (((SQLException) exception).getErrorCode() == 6550) {
-						
+						listTopicsException=exception;
 						log.error("Not all privileges granted to the database user.", exception);
 					}
-				if (exception instanceof SQLSyntaxErrorException)
+				if (exception instanceof SQLSyntaxErrorException) {
+					listTopicsException=exception;
 					log.trace("Please grant all the documented privileges to database user.");
+				}
 					
-				listTopicsException=exception;
 				disconnected=true;
 				try {
 					log.debug("Unexcepted error occured with connection to node {}, closing the connection",
@@ -238,7 +291,7 @@ public abstract class AQClient {
 				}
 				
 			}
-		MetadataResponse metadataResponse = new MetadataResponse(null, null, null, null, topicParameterMap);
+		MetadataResponse metadataResponse = new MetadataResponse(clusterId, builder.needPartitionInfo() ? all_nodes:null, partitionInfoList, null, null, topicParameterMap, null);
 		metadataResponse.setException(listTopicsException);
 		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
 				request.createdTimeMs(), System.currentTimeMillis(), disconnected , null, null, metadataResponse);
@@ -266,6 +319,60 @@ public abstract class AQClient {
 			// do nothing
 		}
 		return allTopics;
+	}
+	
+	public static Uuid getIdByTopic(Connection con,String topic) throws SQLException {
+		Uuid topicId;
+		String query;
+		query="select qid from user_queues where name = upper(?)";
+	
+		PreparedStatement stmt = null;
+		stmt = con.prepareStatement(query);
+		stmt.setString(1, topic);
+		ResultSet result = stmt.executeQuery();
+		if(result.next()) {
+			topicId = new Uuid(0,result.getInt("qid"));
+		}
+		else {
+			result.close();
+			throw new RecordNotFoundSQLException("topic "+ topic +" doesn't exist");
+		}
+		result.close();
+		try
+		{
+			if (stmt != null)
+				stmt.close();
+		}catch(Exception ex){
+			// do nothing
+		}
+		return topicId;
+	}
+	
+	public static String getTopicById(Connection con, Uuid topicId) throws SQLException {
+		String topicName;
+		String query;
+		query="select name from user_queues where qid = ?";
+	
+		PreparedStatement stmt = null;
+		stmt = con.prepareStatement(query);
+		stmt.setLong(1, topicId.getLeastSignificantBits());
+		ResultSet result = stmt.executeQuery();
+		if(result.next()) {
+			topicName = result.getString("name");
+		}
+		else {
+			result.close();
+			throw new RecordNotFoundSQLException("topic Id "+ topicId.toString() +" doesn't exist");
+		}
+		result.close();
+		try
+		{
+			if (stmt != null)
+				stmt.close();
+		}catch(Exception ex){
+			// do nothing
+		}
+		return topicName;
 	}
 	
 	// Fetches existing cluster nodes 
@@ -296,7 +403,7 @@ public abstract class AQClient {
 			}
 			result.close();
 			result = null;
-
+			
 			if (instance_names.size()==1)
 			{
 				// Connected Node is :
@@ -325,9 +432,8 @@ public abstract class AQClient {
 			if(onlyOneNode) {
 				return furtherMetadata;
 			}
-
+	
 			if (furtherMetadata || metadataRequested) {
-
 				query = "select inst_id, TYPE, value from gv$listener_network order by inst_id";
 				result = stmt.executeQuery(query);
 				Map<Integer, ArrayList<String>> services = new HashMap<>();
@@ -539,13 +645,11 @@ public abstract class AQClient {
 
 	private void getPartitionInfo(List<String> topics, List<String> topicsRem, Connection con,
 			List<Node> nodes, boolean allowAutoTopicCreation, 
-			List<PartitionInfo> partitionInfo, Map<String, Exception> errorsPerTopic) throws Exception {
-		
+			List<PartitionInfo> partitionInfo, Map<String, Exception> errorsPerTopic, Map<String,Uuid> topicNameIdMap) throws Exception {
 		if(nodes.size() <= 0 || topics == null || topics.isEmpty())
 			return;
-
-		String queryQShard[] = {"select SHARD_ID, OWNER_INSTANCE from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) ",
-		"select SHARD_ID, ENQUEUE_INSTANCE from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) "};
+		String queryQShard[] = {"select SHARD_ID, OWNER_INSTANCE, QUEUE_ID from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) ",
+		"select SHARD_ID, ENQUEUE_INSTANCE, QUEUE_ID from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) "};
 		
 		PreparedStatement stmt1 = null;
 		int qryIndex=userQueueShardsQueryIndex;
@@ -573,15 +677,20 @@ public abstract class AQClient {
 					int partCnt = 0;
 					try {
 						//Get number of partitions
-						partCnt = getQueueParameter(SHARDNUM_PARAM, ConnectionUtils.enquote(topic), con);	
+						partCnt = getQueueParameter(SHARDNUM_PARAM, ConnectionUtils.enquote(topic), con);
 					} catch(SQLException sqlE) {
 						int errorNo = sqlE.getErrorCode();
 						if(errorNo == 24010)  {
+							if (!allowAutoTopicCreation) {
+								errorsPerTopic.put(topic, sqlE);
+								log.error("topic: " + topic + " doesn't exist");
+							}
 							//Topic does not exist, it will be created
 							continue;
 						}
 					}catch(Exception excp) {
 						// Topic May or may not exists. We will not attempt to create it again
+						errorsPerTopic.put(topic, excp);
 						topicsRem.remove(topic);
 						continue;
 					}
@@ -592,17 +701,18 @@ public abstract class AQClient {
 
 					// If more than one RAC node then check who is owner Node for which partition
 					if(nodes.size()  > 1) {
-
 						stmt1.clearParameters();
 						stmt1.setString(1, topic);
 						result1 = stmt1.executeQuery(); 
 						// If any row exist 
 						if(result1.isBeforeFirst()) {
-							while(result1.next() ) {
+							while(result1.next()) {
 								int partNum = result1.getInt(1)/2;
 								int nodeNum = result1.getInt(2);
+								Uuid queue_id = new Uuid(0,result1.getInt(3));
 								partitionInfo.add(new PartitionInfo(topic, partNum , nodesArray[nodeNum-1], new Node[0], new Node[0]));	
 								partArr[partNum] = true;
+								topicNameIdMap.put(topic,queue_id);
 							}
 
 							result1.close();
@@ -634,7 +744,7 @@ public abstract class AQClient {
 					for(String topicRem : topicsRem) {
 						topicDetails.put(topicRem, new TopicDetails(1, (short)0 , Collections.<String, String>emptyMap()));
 					}
-					Map<String, Exception> errors= CreateTopics.createTopics(con, topicDetails);
+					Map<String, Exception> errors= CreateTopics.createTopics(con, topicDetails, Collections.<String,Uuid>emptyMap());
 					for(String topicRem : topicsRem) {
 						if(errors.get(topicRem) == null) {
 							partitionInfo.add(new PartitionInfo(topicRem, 0, nodes.get(nodeIndex++%nodesSize), null, null));
@@ -651,7 +761,7 @@ public abstract class AQClient {
 					qryIndex++;
 					userQueueShardsQueryIndex = qryIndex;
 					continue;
-				}
+				}	
 			}
 			finally {
 			

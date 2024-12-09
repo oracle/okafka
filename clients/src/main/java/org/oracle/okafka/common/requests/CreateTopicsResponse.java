@@ -31,6 +31,7 @@ package org.oracle.okafka.common.requests;
 
 import java.util.Map;
 
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.protocol.ApiMessage;
 import org.apache.kafka.common.protocol.Errors;
 import org.oracle.okafka.common.errors.FeatureNotSupportedException;
@@ -38,11 +39,13 @@ import org.oracle.okafka.common.protocol.ApiKeys;
 
 public class CreateTopicsResponse extends AbstractResponse {
     final Map<String, Exception> errors;
+    final Map<String, Uuid> topicIdMap;
     private Exception requestResult;
 
-    public CreateTopicsResponse(Map<String, Exception> errors) {
+    public CreateTopicsResponse(Map<String, Exception> errors, Map<String,Uuid> topicIdMap) {
     	super(ApiKeys.CREATE_TOPICS);
         this.errors = errors;
+        this.topicIdMap=topicIdMap;
         this.requestResult = null;
     }
 
@@ -58,6 +61,10 @@ public class CreateTopicsResponse extends AbstractResponse {
     
     public Exception getResult() {
     	return requestResult;
+    }
+    
+    public Map<String, Uuid> topicIdMap(){
+    	return topicIdMap;
     }
 
 	@Override

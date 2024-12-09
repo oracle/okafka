@@ -32,6 +32,7 @@ package org.oracle.okafka.common.requests;
 import java.util.Set;
 
 import org.oracle.okafka.common.protocol.ApiKeys;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.protocol.ApiMessage;
 import org.apache.kafka.common.requests.AbstractResponse;
 import org.apache.kafka.common.utils.Utils;
@@ -39,33 +40,37 @@ import org.apache.kafka.common.utils.Utils;
 public class DeleteTopicsRequest extends AbstractRequest {
    
     private final Set<String> topics;
+    private final Set<Uuid> topicIds;
     private final Integer timeout;
 
     public static class Builder extends AbstractRequest.Builder<DeleteTopicsRequest> {
         private final Set<String> topics;
+        private final Set<Uuid> topicIds;
         private final Integer timeout;
 
-        public Builder(Set<String> topics, Integer timeout) {
+        public Builder(Set<String> topics, Set<Uuid> topicIds, Integer timeout) {
             super(ApiKeys.DELETE_TOPICS);
             this.topics = topics;
+            this.topicIds=topicIds;
             this.timeout = timeout;
         }
-
+        
         @Override
         public DeleteTopicsRequest build() {
-            return new DeleteTopicsRequest(topics, timeout);
+            return new DeleteTopicsRequest(topics, topicIds, timeout);
         }
         
     	@Override
 		public DeleteTopicsRequest build(short version) {
-			 return new DeleteTopicsRequest(topics, timeout);
+			 return new DeleteTopicsRequest(topics,topicIds , timeout);
 		}
     	
         @Override
         public String toString() {
             StringBuilder bld = new StringBuilder();
             bld.append("(type=DeleteTopicsRequest").
-                append(", topics=(").append(Utils.join(topics, ", ")).append(")").
+                append(topics!=null ? ", topics=(" : ", topic Ids=(").
+                append(topics!=null ? Utils.join(topics, ", ") : Utils.join(topicIds, ", ")).append(")").
                 append(", timeout=").append(timeout).
                 append(")");
             return bld.toString();
@@ -74,9 +79,10 @@ public class DeleteTopicsRequest extends AbstractRequest {
 	
     }
 
-    private DeleteTopicsRequest(Set<String> topics, Integer timeout) {
+    private DeleteTopicsRequest(Set<String> topics, Set<Uuid> topicIds, Integer timeout) {
     	super(ApiKeys.DELETE_TOPICS, (short)1);
         this.topics = topics;
+        this.topicIds=topicIds;
         this.timeout = timeout;
     }
 
@@ -86,6 +92,10 @@ public class DeleteTopicsRequest extends AbstractRequest {
 
     public Integer timeout() {
         return this.timeout;
+    }
+    
+    public Set<Uuid> topicIds(){
+    	return topicIds;
     }
 
 	@Override
