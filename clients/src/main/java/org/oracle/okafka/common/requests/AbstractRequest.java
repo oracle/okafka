@@ -52,6 +52,5 @@ public abstract class AbstractRequest extends org.apache.kafka.common.requests.A
             return apiKey;
         }
 
-        public abstract T build();
     }
 }

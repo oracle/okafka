@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -26,14 +25,12 @@ import org.oracle.okafka.clients.admin.AdminClientConfig;
 import org.oracle.okafka.common.Node;
 import org.oracle.okafka.common.errors.ConnectionException;
 import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
-import org.oracle.okafka.common.errors.RecordNotFoundSQLException;
 import org.oracle.okafka.common.network.AQClient;
 import org.oracle.okafka.common.protocol.ApiKeys;
 import org.oracle.okafka.common.requests.CreateTopicsRequest;
 import org.oracle.okafka.common.requests.CreateTopicsResponse;
 import org.oracle.okafka.common.requests.DeleteTopicsRequest;
 import org.oracle.okafka.common.requests.DeleteTopicsResponse;
-import org.oracle.okafka.common.requests.MetadataRequest;
 import org.oracle.okafka.common.requests.CreateTopicsRequest.TopicDetails;
 import org.oracle.okafka.common.utils.ConnectionUtils;
 import org.oracle.okafka.common.utils.CreateTopics;
@@ -82,6 +79,8 @@ public class AQKafkaAdmin extends AQClient{
 			return createTopics(request);
 		if(key == ApiKeys.DELETE_TOPICS)
 			return deleteTopics(request);
+		if(key == ApiKeys.LIST_OFFSETS)
+			return listOffsets(request);
 		if(key == ApiKeys.METADATA) 
 			return getMetadata(request);
 		return null;
@@ -159,7 +158,7 @@ public class AQKafkaAdmin extends AQClient{
 		 CallableStatement cStmt = null;
 		 Map<String, SQLException> result = new HashMap<>();
 		 Set<String> topicSet = new HashSet<>(topics);
-		 try {			 
+		 try {	
 			 cStmt = jdbcConn.prepareCall(query);
 			 for(String topic: topics) {
 				 try {
@@ -293,6 +292,30 @@ public class AQKafkaAdmin extends AQClient{
 		}
 		
 		return response;
+	}
+	
+	private ClientResponse listOffsets(ClientRequest request) {
+		Node node =(org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
+		if (node == null)
+		{
+			List<org.apache.kafka.common.Node> nodeList = metadataManager.updater().fetchNodes();
+			for(org.apache.kafka.common.Node nodeNow : nodeList)
+			{
+				if(nodeNow.id() == Integer.parseInt(request.destination()))
+				{
+					node = (org.oracle.okafka.common.Node)nodeNow;
+				}
+			}	
+		}
+		
+		ClientResponse response = getOffsetsResponse(request,connections.get(node));
+		if(response.wasDisconnected()) { 
+			connections.remove(node);
+			forceMetadata = true;
+		}
+		
+		return response;
+		
 	}
 	
 	/**

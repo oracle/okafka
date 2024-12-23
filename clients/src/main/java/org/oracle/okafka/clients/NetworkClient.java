@@ -31,6 +31,7 @@ package org.oracle.okafka.clients;
 
 //import org.apache.kafka.clients.unused.ClusterConnectionStates;
 import org.apache.kafka.clients.admin.internals.AdminMetadataManager;
+import org.apache.kafka.clients.admin.internals.AdminMetadataManager.AdminMetadataUpdater;
 import org.oracle.okafka.common.Node;
 import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
@@ -552,8 +553,11 @@ public class NetworkClient implements KafkaClient {
 			/* attempt failed, we'll try again after the backoff */
 			connectionStates.disconnected(node, now);
 			/* maybe the problem is our metadata, update it */
-			((DefaultMetadataUpdater)metadataUpdater).requestUpdate();                     
-
+			if(!(metadataUpdater instanceof AdminMetadataUpdater))
+				((DefaultMetadataUpdater)metadataUpdater).requestUpdate();
+			else
+				metadataManager.requestUpdate();
+			
 			log.warn("Error connecting to node {}", node, e);
 			if(e instanceof JMSSecurityException || ((JMSException)e).getErrorCode().equals("12505"))
 				throw new InvalidLoginCredentialsException("Invalid login details provided:" + e.getMessage());
@@ -565,6 +569,7 @@ public class NetworkClient implements KafkaClient {
 	private void handleDisconnection(Node node, boolean disconnected, long now) {
 		if(disconnected) {
 			disconnected(node, now);
+			if(!(metadataUpdater instanceof AdminMetadataUpdater))
 			((DefaultMetadataUpdater)metadataUpdater).requestUpdate();
 		}	
 	}
