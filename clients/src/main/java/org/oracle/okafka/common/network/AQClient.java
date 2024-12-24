@@ -839,19 +839,41 @@ public abstract class AQClient {
 			for (Map.Entry<String, List<ListOffsetsPartition>> entry : topicoffsetPartitionMap.entrySet()) {
 				List<ListOffsetsPartition> offSetPartitionList = entry.getValue();
 				List<ListOffsetsPartitionResponse> offSetPartitionRespList = new ArrayList<>();
+
+				int totalPartition = 0;
+				try {
+					totalPartition = getQueueParameter(SHARDNUM_PARAM, ConnectionUtils.enquote(entry.getKey()),
+							jdbcConn);
+				} catch (SQLException sqlE) {
+					int errorNo = sqlE.getErrorCode();
+					if (errorNo == 24010) {
+						for (ListOffsetsPartition listOffsetPartition : offSetPartitionList) {
+							offSetPartitionRespList.add(new ListOffsetsPartitionResponse().setError(sqlE));
+						}
+					}
+					continue;
+				}
 				for (ListOffsetsPartition listOffsetPartition : offSetPartitionList) {
 					long timestamp = listOffsetPartition.timestamp();
 					int partition = listOffsetPartition.partitionIndex();
+
+					if (partition >= totalPartition) {
+						offSetPartitionRespList.add(new ListOffsetsPartitionResponse()
+								.setError(new IllegalArgumentException("Invalid Partition number")));
+						continue;
+					}
+
 					ListOffsetsPartitionResponse listOffsetPartitionResp;
 					if (timestamp == ListOffsetsRequest.EARLIEST_TIMESTAMP)
 						listOffsetPartitionResp = FetchOffsets.fetchEarliestOffset(entry.getKey(), partition, jdbcConn);
 					else if (timestamp == ListOffsetsRequest.LATEST_TIMESTAMP)
 						listOffsetPartitionResp = FetchOffsets.fetchLatestOffset(entry.getKey(), partition, jdbcConn);
 					else if (timestamp == ListOffsetsRequest.MAX_TIMESTAMP)
-						listOffsetPartitionResp = FetchOffsets.fetchMaxTimestampOffset(entry.getKey(), partition, jdbcConn);
-					else
-						listOffsetPartitionResp = FetchOffsets.fetchOffsetByTimestamp(entry.getKey(), partition, timestamp,
+						listOffsetPartitionResp = FetchOffsets.fetchMaxTimestampOffset(entry.getKey(), partition,
 								jdbcConn);
+					else
+						listOffsetPartitionResp = FetchOffsets.fetchOffsetByTimestamp(entry.getKey(), partition,
+								timestamp, jdbcConn);
 					offSetPartitionRespList.add(listOffsetPartitionResp);
 				}
 				offsetPartitionResponseMap.put(entry.getKey(), offSetPartitionRespList);

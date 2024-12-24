@@ -20,14 +20,6 @@ public class FetchOffsets {
 				    queue_name VARCHAR2(128) := ?;
 				    partition_name VARCHAR2(50);
 				    msg_id RAW(16);
-				    total_shards NUMBER;
-				BEGIN
-					EXECUTE IMMEDIATE 'SELECT COUNT(DISTINCT(SHARD)) FROM ' || DBMS_ASSERT.SQL_OBJECT_NAME(queue_name)
-				    INTO total_shards;
-
-				   	IF shard_num>=total_shards THEN
-				   	   	RAISE_APPLICATION_ERROR(20001, 'Invalid partition number');
-				   	END IF;
 				BEGIN
 				    SELECT LOWER(PARTNAME) INTO partition_name
 				    FROM USER_QUEUE_PARTITION_MAP
@@ -44,15 +36,8 @@ public class FetchOffsets {
 				        ? := msg_id;
 
 				    EXCEPTION
-				    WHEN NO_DATA_FOUND THEN
-				    	RAISE_APPLICATION_ERROR(20003, 'No messages in the given partition');
-				END;
-				   	EXCEPTION
-				   	WHEN NO_DATA_FOUND THEN
-				   		RAISE_APPLICATION_ERROR(20002, 'Invalid queue name');
-				   	WHEN OTHERS THEN
+				    WHEN OTHERS THEN
 				   		RAISE;
-
 				END;
 				""";
 		try {
@@ -75,11 +60,7 @@ public class FetchOffsets {
 			response.setOffset(offset);
 
 		} catch (SQLException sqle) {
-			if (sqle.getErrorCode() == 20001) {
-				response.setError(new IllegalArgumentException("Partition Number Is Invalid"));
-			} else if (sqle.getErrorCode() == 20002) {
-				response.setError(new IllegalArgumentException("Queue with the provided name doesn't exist"));
-			} else if (sqle.getErrorCode() == 20003) {
+			if (sqle.getErrorCode() == 1403) {
 				response.setOffset(0);
 			} else
 				throw sqle;
@@ -105,14 +86,6 @@ public class FetchOffsets {
 				    queue_name VARCHAR2(128) := ?;
 				    partition_name VARCHAR2(50);
 				    msg_id RAW(16);
-				    total_shards NUMBER;
-				BEGIN
-					EXECUTE IMMEDIATE 'SELECT COUNT(DISTINCT(SHARD)) FROM ' || DBMS_ASSERT.SQL_OBJECT_NAME(queue_name)
-				    INTO total_shards;
-
-				   	IF shard_num>=total_shards THEN
-				   	   	RAISE_APPLICATION_ERROR(20001, 'Invalid partition number');
-				   	END IF;
 				BEGIN
 				    SELECT LOWER(PARTNAME) INTO partition_name
 				    FROM USER_QUEUE_PARTITION_MAP
@@ -129,15 +102,8 @@ public class FetchOffsets {
 				        ? := msg_id;
 
 				    EXCEPTION
-				    WHEN NO_DATA_FOUND THEN
-				    	RAISE_APPLICATION_ERROR(20003, 'No messages in the given partition');
-				END;
-				   	EXCEPTION
-				   	WHEN NO_DATA_FOUND THEN
-				   		RAISE_APPLICATION_ERROR(20002, 'Invalid queue name');
-				   	WHEN OTHERS THEN
+				    WHEN OTHERS THEN
 				   		RAISE;
-
 				END;
 				""";
 		try {
@@ -155,16 +121,12 @@ public class FetchOffsets {
 			for (byte b : msgIdBytes) {
 				msgIdHex.append(String.format("%02X", b));
 			}
-
+			
 			long offset = MessageIdConverter.getOKafkaOffset("ID:" + msgIdHex, true, true).getOffset();
 			response.setOffset(offset+1);
 
 		} catch (SQLException sqle) {
-			if (sqle.getErrorCode() == 20001) {
-				response.setError(new IllegalArgumentException("Partition Number Is Invalid"));
-			} else if (sqle.getErrorCode() == 20002) {
-				response.setError(new IllegalArgumentException("Queue with the provided name doesn't exist"));
-			} else if (sqle.getErrorCode() == 20003) {
+			if (sqle.getErrorCode() == 1403) {
 				response.setOffset(0);
 			} else
 				throw sqle;
@@ -194,14 +156,6 @@ public class FetchOffsets {
 				    next_timestamp TIMESTAMP(6) WITH TIME ZONE;
 				    msg_id RAW(16);
 				    found BOOLEAN := FALSE;
-				    total_shards NUMBER;
-				BEGIN
-				EXECUTE IMMEDIATE 'SELECT COUNT(DISTINCT(SHARD)) FROM ' || DBMS_ASSERT.SQL_OBJECT_NAME(queue_name)
-				    INTO total_shards;
-
-				   	IF shard_num>=total_shards THEN
-				   	   	RAISE_APPLICATION_ERROR(20001, 'Invalid partition number');
-				   	END IF;
 				BEGIN
 				    SELECT LOWER(PARTNAME)
 				    BULK COLLECT INTO partition_list
@@ -232,11 +186,9 @@ public class FetchOffsets {
 
 				    ? := msg_id;
 				    ? := next_timestamp;
-				END;
-				EXCEPTION
-				   	WHEN NO_DATA_FOUND THEN
-				   		RAISE_APPLICATION_ERROR(20002, 'Invalid queue name');
-				   	WHEN OTHERS THEN
+
+				    EXCEPTION
+				    WHEN OTHERS THEN
 				   		RAISE;
 				END;
 				""";
@@ -265,11 +217,7 @@ public class FetchOffsets {
 			response.setOffset(offset).setTimestamp(okafkaTimestamp);
 
 		} catch (SQLException sqle) {
-			if (sqle.getErrorCode() == 20001) {
-				response.setError(new IllegalArgumentException("Partition Number Is Invalid"));
-			} else if (sqle.getErrorCode() == 20002) {
-				response.setError(new IllegalArgumentException("Queue with the provided name doesn't exist"));
-			} else if (sqle.getErrorCode() == 20003) {
+			if (sqle.getErrorCode() == 1403) {
 				// do nothing;
 			} else
 				throw sqle;
@@ -296,14 +244,7 @@ public class FetchOffsets {
 				    partition_name VARCHAR2(50);
 				    msg_id RAW(16);
 				    enqueue_time TIMESTAMP(6) WITH TIME ZONE;
-				    total_shards NUMBER;
-				BEGIN
-					EXECUTE IMMEDIATE 'SELECT COUNT(DISTINCT(SHARD)) FROM ' || DBMS_ASSERT.SQL_OBJECT_NAME(queue_name)
-				    INTO total_shards;
 
-				   	IF shard_num>=total_shards THEN
-				   	   	RAISE_APPLICATION_ERROR(20001, 'Invalid partition number');
-				   	END IF;
 				BEGIN
 				    SELECT LOWER(PARTNAME) INTO partition_name
 				    FROM USER_QUEUE_PARTITION_MAP
@@ -323,16 +264,10 @@ public class FetchOffsets {
 				        ? := enqueue_time;
 
 				    EXCEPTION
-				    WHEN NO_DATA_FOUND THEN
-				    	RAISE_APPLICATION_ERROR(20003, 'No messages in the given partition');
-				END;
-				   	EXCEPTION
-				   	WHEN NO_DATA_FOUND THEN
-				   		RAISE_APPLICATION_ERROR(20002, 'Invalid queue name');
-				   	WHEN OTHERS THEN
+				  	WHEN OTHERS THEN
 				   		RAISE;
-
 				END;
+
 				""";
 		try {
 			cStmt = jdbcConn.prepareCall(plsql);
@@ -358,11 +293,7 @@ public class FetchOffsets {
 			response.setOffset(offset).setTimestamp(okafkaTimestamp);
 
 		} catch (SQLException sqle) {
-			if (sqle.getErrorCode() == 20001) {
-				response.setError(new IllegalArgumentException("Partition Number Is Invalid"));
-			} else if (sqle.getErrorCode() == 20002) {
-				response.setError(new IllegalArgumentException("Queue with the provided name doesn't exist"));
-			} else if (sqle.getErrorCode() == 20003) {
+			if (sqle.getErrorCode() == 1403) {
 				// do nothing
 			} else
 				throw sqle;
