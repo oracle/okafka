@@ -157,7 +157,7 @@ public class FetchOffsets {
 			}
 
 			long offset = MessageIdConverter.getOKafkaOffset("ID:" + msgIdHex, true, true).getOffset();
-			response.setOffset(offset);
+			response.setOffset(offset+1);
 
 		} catch (SQLException sqle) {
 			if (sqle.getErrorCode() == 20001) {
