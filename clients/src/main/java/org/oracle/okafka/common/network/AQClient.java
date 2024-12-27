@@ -723,7 +723,7 @@ public abstract class AQClient {
 							}
 							topicDone = true;
 						} // Entry Existed in USER_QUEUE_SHARD
-					}// Node > 1
+					}// Nodes > 1
 					
 					// No Record in USER_QUEUE_SHARD or Node =1 check if topic exist		   	
 					if(!topicDone && partCnt!=0){
@@ -839,17 +839,17 @@ public abstract class AQClient {
 			for (Map.Entry<String, List<ListOffsetsPartition>> entry : topicoffsetPartitionMap.entrySet()) {
 				List<ListOffsetsPartition> offSetPartitionList = entry.getValue();
 				List<ListOffsetsPartitionResponse> offSetPartitionRespList = new ArrayList<>();
-
 				int totalPartition = 0;
 				try {
-					totalPartition = getQueueParameter(SHARDNUM_PARAM, ConnectionUtils.enquote(entry.getKey()),
-							jdbcConn);
+					totalPartition = getQueueParameter(SHARDNUM_PARAM, entry.getKey(), jdbcConn);
 				} catch (SQLException sqlE) {
 					int errorNo = sqlE.getErrorCode();
 					if (errorNo == 24010) {
 						for (ListOffsetsPartition listOffsetPartition : offSetPartitionList) {
-							offSetPartitionRespList.add(new ListOffsetsPartitionResponse().setError(sqlE));
+							offSetPartitionRespList.add(new ListOffsetsPartitionResponse()
+									.setPartitionIndex(listOffsetPartition.partitionIndex()).setError(sqlE));
 						}
+						offsetPartitionResponseMap.put(entry.getKey(), offSetPartitionRespList);
 					}
 					continue;
 				}
@@ -858,7 +858,7 @@ public abstract class AQClient {
 					int partition = listOffsetPartition.partitionIndex();
 
 					if (partition >= totalPartition) {
-						offSetPartitionRespList.add(new ListOffsetsPartitionResponse()
+						offSetPartitionRespList.add(new ListOffsetsPartitionResponse().setPartitionIndex(partition)
 								.setError(new IllegalArgumentException("Invalid Partition number")));
 						continue;
 					}

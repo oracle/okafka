@@ -121,7 +121,6 @@ import org.apache.kafka.clients.admin.ListTransactionsResult;
 import org.apache.kafka.clients.admin.NewPartitionReassignment;
 import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.clients.admin.NewTopic;
-//import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.admin.RemoveMembersFromConsumerGroupOptions;
@@ -136,20 +135,9 @@ import org.apache.kafka.clients.admin.UpdateFeaturesOptions;
 import org.apache.kafka.clients.admin.UpdateFeaturesResult;
 import org.apache.kafka.clients.admin.UserScramCredentialAlteration;
 import org.apache.kafka.clients.admin.CreateTopicsResult.TopicMetadataAndConfig;
-//import org.apache.kafka.clients.admin.KafkaAdminClient.ConstantNodeIdProvider;
-//import org.apache.kafka.clients.admin.KafkaAdminClient.LeastLoadedNodeProvider;
-//import org.apache.kafka.clients.admin.KafkaAdminClient.NodeProvider;
 import org.apache.kafka.clients.admin.ListOffsetsResult.ListOffsetsResultInfo;
 import org.apache.kafka.clients.admin.OffsetSpec.TimestampSpec;
-//import org.apache.kafka.clients.admin.KafkaAdminClient.LeastLoadedNodeProvider;
-//import org.apache.kafka.clients.admin.KafkaAdminClient.LeastLoadedNodeProvider;
-/*
-import org.apache.kafka.clients.admin.KafkaAdminClient.Call;
-import org.apache.kafka.clients.admin.KafkaAdminClient.ControllerNodeProvider;
-import org.apache.kafka.clients.admin.KafkaAdminClient.MetadataUpdateNodeIdProvider;
-import org.apache.kafka.clients.admin.KafkaAdminClient.NodeProvider;
-import org.apache.kafka.clients.admin.KafkaAdminClient.TimeoutProcessor;
- */
+
 import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.clients.KafkaClient;
 import org.oracle.okafka.clients.NetworkClient;
@@ -2243,7 +2231,6 @@ public class KafkaAdminClient extends AdminClient {
 						completeAllExceptionally(topicFutures.values(), throwable);
 					}
 				}, now);
-		
 		return new ListOffsetsResult(new HashMap<TopicPartition, KafkaFuture<ListOffsetsResultInfo>>(topicFutures));
 	}
 	
@@ -2421,12 +2408,6 @@ public class KafkaAdminClient extends AdminClient {
 			Map<TopicPartition, OffsetAndMetadata> offsets, AlterConsumerGroupOffsetsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
-
-//	@Override
-//	public ListOffsetsResult listOffsets(Map<TopicPartition, OffsetSpec> topicPartitionOffsets,
-//			ListOffsetsOptions options) {
-//		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-//	}
 
 	@Override
 	public DescribeClientQuotasResult describeClientQuotas(ClientQuotaFilter filter,
