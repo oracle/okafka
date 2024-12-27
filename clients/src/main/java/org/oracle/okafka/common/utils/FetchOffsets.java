@@ -243,7 +243,8 @@ public class FetchOffsets {
 					.ofPattern("dd-MMM-yy hh.mm.ss.SSSSSS a", java.util.Locale.ENGLISH).withZone(ZoneOffset.UTC);
 
 			String okafkaTimestampUTC = formatter.format(instant) + " " + "+00:00";
-			cStmt.setString(3, okafkaTimestampUTC);
+			System.out.println(okafkaTimestampUTC.toUpperCase());
+			cStmt.setString(3, okafkaTimestampUTC.toUpperCase());
 
 			cStmt.registerOutParameter(4, Types.BINARY);
 			cStmt.registerOutParameter(5, Types.TIMESTAMP_WITH_TIMEZONE);

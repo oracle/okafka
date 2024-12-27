@@ -30,7 +30,7 @@ public class OkafkaListOffsets {
 			for (TopicPartition tp : topicOffsetSpecMap.keySet()) {
 				try {
 					ListOffsetsResultInfo resInfo = result.partitionResult(tp).get();
-					System.out.print(resInfo);
+					System.out.println(resInfo);
 				} catch (Exception e) {
 					System.out.println(e);
 				}
