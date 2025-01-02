@@ -421,13 +421,13 @@ public class ConsumerNetworkClient {
 	}
 
 	private boolean rejoinNeeded(Exception exception ) {
-		if (exception != null && exception instanceof JMSException) {
-			if( ((JMSException)exception).getLinkedException().getMessage().startsWith("ORA-24003") ) {
+		if(exception!=null && aqConsumer.getSQLException(exception)!=null) {
+			int errorCode = aqConsumer.getSQLException(exception).getErrorCode();
+			if(errorCode == 24003) {
 				log.debug("Join Group is needed");
-				return true;				
+				return true;
 			}
 		}
-
 		return rejoin;
 	}
 

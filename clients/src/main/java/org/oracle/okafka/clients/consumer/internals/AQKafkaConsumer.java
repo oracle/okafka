@@ -160,6 +160,17 @@ public final class AQKafkaConsumer extends AQClient{
 		return null;
 	}
 
+	public SQLException getSQLException(Throwable cause) {
+		while (cause != null) {
+			if (cause instanceof SQLException) {
+				return (SQLException) cause;
+			}
+			cause = cause instanceof JMSException ?
+					((JMSException) cause).getLinkedException() : cause.getCause();
+		}
+		return null; 
+	}
+	
 	/**
 	 * Consumes messages in bulk from a given topic . Consumes or wait till either timeout occurs or max.poll.records condition is met
 	 * @param node consume by establishing connection to this instance. 
@@ -220,22 +231,17 @@ public final class AQKafkaConsumer extends AQClient{
 
 			return createFetchResponse(request, topic, msgs, false, null);
 		} catch(JMSException exception) { 
-			log.debug("Exception in bulkReceive " + exception.getMessage(),exception );
-			Exception linkedException = exception.getLinkedException();
+			log.debug("Exception in bulkReceive " + exception.getMessage(),exception);
 			int errorCode = 0;
-			if(linkedException != null && linkedException instanceof SQLException )
-			{
-				errorCode = ((SQLException)linkedException).getErrorCode();
+			Throwable cause = exception;
+			SQLException mainCause = getSQLException(cause);
+			if(mainCause!=null){
+				errorCode = mainCause.getErrorCode();
+			}
+			else{
+				errorCode = Integer.parseInt(exception.getErrorCode());
 			}
 
-			if(errorCode != 24003)
-			{
-				try {
-					errorCode = Integer.parseInt(exception.getErrorCode());
-				}catch(Exception parseEx) {
-					//Do Nothing. Keep original ErrorCode
-				}
-			}
 			log.debug("Dequeue Error Code = " + errorCode);
 			//If not Rebalancing Error and not Transient error then 
 			if(!(errorCode == 24003 ||	errorCode == 120)) {
@@ -245,7 +251,7 @@ public final class AQKafkaConsumer extends AQClient{
 				log.error("failed to receive messages from topic: {}", topic);
 			}
 			return createFetchResponse(request, topic, Collections.emptyList(), disconnected, exception);
-		} catch(Exception ex) {
+		}catch(Exception ex) {
 			log.error("Exception from bulkReceive " + ex, ex );
 			close(node);
 			disconnected = true;
