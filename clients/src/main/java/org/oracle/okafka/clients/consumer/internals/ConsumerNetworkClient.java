@@ -99,6 +99,7 @@ import org.oracle.okafka.common.requests.UnsubscribeResponse;
 import org.apache.kafka.common.utils.Time;
 import org.slf4j.Logger;
 import oracle.jms.AQjmsBytesMessage;
+import org.oracle.okafka.common.utils.ConnectionUtils;
 
 public class ConsumerNetworkClient {
 	private static final int MAX_POLL_TIMEOUT_MS = 5000;
@@ -421,8 +422,8 @@ public class ConsumerNetworkClient {
 	}
 
 	private boolean rejoinNeeded(Exception exception ) {
-		if(exception!=null && aqConsumer.getSQLException(exception)!=null) {
-			int errorCode = aqConsumer.getSQLException(exception).getErrorCode();
+		if(exception!=null && ConnectionUtils.getSQLException(exception)!=null) {
+			int errorCode = ConnectionUtils.getSQLException(exception).getErrorCode();
 			if(errorCode == 24003) {
 				log.debug("Join Group is needed");
 				return true;

@@ -160,16 +160,7 @@ public final class AQKafkaConsumer extends AQClient{
 		return null;
 	}
 
-	public SQLException getSQLException(Throwable cause) {
-		while (cause != null) {
-			if (cause instanceof SQLException) {
-				return (SQLException) cause;
-			}
-			cause = cause instanceof JMSException ?
-					((JMSException) cause).getLinkedException() : cause.getCause();
-		}
-		return null; 
-	}
+	
 	
 	/**
 	 * Consumes messages in bulk from a given topic . Consumes or wait till either timeout occurs or max.poll.records condition is met
@@ -234,7 +225,7 @@ public final class AQKafkaConsumer extends AQClient{
 			log.debug("Exception in bulkReceive " + exception.getMessage(),exception);
 			int errorCode = 0;
 			Throwable cause = exception;
-			SQLException mainCause = getSQLException(cause);
+			SQLException mainCause = ConnectionUtils.getSQLException(cause);
 			if(mainCause!=null){
 				errorCode = mainCause.getErrorCode();
 			}
