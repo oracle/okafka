@@ -30,6 +30,7 @@
 package org.oracle.okafka.clients.consumer.internals;
 
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -405,7 +406,7 @@ public class ConsumerNetworkClient {
 					needsJoinPrepare = false;
 				}
 				if (lastRebalanceStartMs == -1L)
-	                lastRebalanceStartMs = time.milliseconds();
+					lastRebalanceStartMs = time.milliseconds();
 				log.debug("Sending Join Group Request to database via node " + response.destination());
 				sendJoinGroupRequest(metadata.getNodeById(Integer.parseInt(response.destination())));
 				log.debug("Join Group Response received");
@@ -422,8 +423,9 @@ public class ConsumerNetworkClient {
 	}
 
 	private boolean rejoinNeeded(Exception exception ) {
-		if(exception!=null && ConnectionUtils.getSQLException(exception)!=null) {
-			int errorCode = ConnectionUtils.getSQLException(exception).getErrorCode();
+		SQLException sqlCause = ConnectionUtils.getSQLException(exception);
+		if(exception!=null && sqlCause!=null) {
+			int errorCode = sqlCause.getErrorCode();
 			if(errorCode == 24003) {
 				log.debug("Join Group is needed");
 				return true;
