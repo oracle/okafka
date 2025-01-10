@@ -245,9 +245,10 @@ public abstract class AQClient {
 		Map<String, TopicTeqParameters> topicParameterMap = new HashMap<>();
 		Exception listTopicsException=null;
 		boolean disconnected=false;
-		List<PartitionInfo> partitionInfo = null;
+		List<PartitionInfo> partitionInfo = new ArrayList<>();
 		Map<String, Exception> errorsPerTopic = new HashMap<>();
 		List<Node> nodes = new ArrayList<>();
+		String clusterId = null;
 		
 		try {
 			List<String> allTopics = getAllTopics(con);
@@ -259,6 +260,9 @@ public abstract class AQClient {
 
 			}
 			if(builder.needPartitionInfo()) {
+				 clusterId = ((oracle.jdbc.internal.OracleConnection) con).getServerSessionInfo()
+						.getProperty("DATABASE_NAME");
+				 
 				getNodes(nodes,con, currentNode, true);
 				getPartitionInfo(allTopics, new ArrayList<>(allTopics), con, nodes.isEmpty()?all_nodes:nodes , false, partitionInfo, errorsPerTopic, new HashMap<>());
 			}
@@ -289,7 +293,7 @@ public abstract class AQClient {
 				}
 				
 			}
-		MetadataResponse metadataResponse = new MetadataResponse(null, null, partitionInfoList, null, null, topicParameterMap, null);
+		MetadataResponse metadataResponse = new MetadataResponse(clusterId, builder.needPartitionInfo() ? all_nodes:null, partitionInfoList, null, null, topicParameterMap, null);
 		metadataResponse.setException(listTopicsException);
 		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
 				request.createdTimeMs(), System.currentTimeMillis(), disconnected , null, null, metadataResponse);
