@@ -56,6 +56,7 @@ public class ConnectionUtils {
 		String url = urlBuilder.toString();
 		return url;
 	}
+	
 	public static Connection createJDBCConnection(Node node, AbstractConfig configs) throws SQLException{
 		OracleDataSource s=new OracleDataSource();
 		String dbUrl = createUrl(node, configs);
@@ -317,5 +318,18 @@ public class ConnectionUtils {
 		}
 		return hostnPort;
 	}
+	
+	public static SQLException getSQLException(Throwable cause) {
+		while (cause != null) {
+			if (cause instanceof SQLException) {
+				return (SQLException) cause;
+			}
+			cause = cause instanceof JMSException ?
+					((JMSException) cause).getLinkedException() : cause.getCause();
+		}
+		return null; 
+	}
+	
+	
 	
 }
