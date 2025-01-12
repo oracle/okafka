@@ -221,7 +221,7 @@ public class AQKafkaAdmin extends AQClient{
 			 for(Uuid id: topicIds) {
 				 String topic;
 				 try {
-					 topic = getTopicById(jdbcConn,id);
+					 topic = ConnectionUtils.getTopicById(jdbcConn,id);
 					 cStmt.setInt(1, (int)id.getLeastSignificantBits());
 					 cStmt.setInt(2, 1);
 					 cStmt.execute();  

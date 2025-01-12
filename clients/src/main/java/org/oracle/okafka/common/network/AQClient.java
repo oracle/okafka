@@ -161,7 +161,7 @@ public abstract class AQClient {
 			if (topicIds != null) {
 				for (Uuid id : topicIds) {
 					try {
-						String topicName = getTopicById(con, id);
+						String topicName = ConnectionUtils.getTopicById(con, id);
 						topicIdNameMap.put(id, topicName);
 					} catch (SQLException sqle) {
 						if (sqle instanceof RecordNotFoundSQLException && !metadataRequest.allowAutoTopicCreation()) {
@@ -322,61 +322,7 @@ public abstract class AQClient {
 		}
 		return allTopics;
 	}
-	
-	public static Uuid getIdByTopic(Connection con,String topic) throws SQLException {
-		Uuid topicId;
-		String query;
-		query="select qid from user_queues where name = upper(?)";
-	
-		PreparedStatement stmt = null;
-		stmt = con.prepareStatement(query);
-		stmt.setString(1, topic);
-		ResultSet result = stmt.executeQuery();
-		if(result.next()) {
-			topicId = new Uuid(0,result.getInt("qid"));
-		}
-		else {
-			result.close();
-			throw new RecordNotFoundSQLException("topic "+ topic +" doesn't exist");
-		}
-		result.close();
-		try
-		{
-			if (stmt != null)
-				stmt.close();
-		}catch(Exception ex){
-			// do nothing
-		}
-		return topicId;
-	}
-	
-	public static String getTopicById(Connection con, Uuid topicId) throws SQLException {
-		String topicName;
-		String query;
-		query="select name from user_queues where qid = ?";
-	
-		PreparedStatement stmt = null;
-		stmt = con.prepareStatement(query);
-		stmt.setLong(1, topicId.getLeastSignificantBits());
-		ResultSet result = stmt.executeQuery();
-		if(result.next()) {
-			topicName = result.getString("name");
-		}
-		else {
-			result.close();
-			throw new RecordNotFoundSQLException("topic Id "+ topicId.toString() +" doesn't exist");
-		}
-		result.close();
-		try
-		{
-			if (stmt != null)
-				stmt.close();
-		}catch(Exception ex){
-			// do nothing
-		}
-		return topicName;
-	}
-	
+		
 	// Fetches existing cluster nodes 
 	// Returns TRUE if new node is added, existing node went down, or if the startup time changed for the nodes
 	// otherwise return false
@@ -738,9 +684,9 @@ public abstract class AQClient {
 						}
 						topicDone =true;
 						try {
-							topicNameIdMap.put(topic,getIdByTopic(con,topic));
+							topicNameIdMap.put(topic,ConnectionUtils.getIdByTopic(con,topic));
 						}catch(SQLException sqle) {
-							//do nothing
+							topicNameIdMap.put(topic, Uuid.ZERO_UUID);
 						}
 					}
 					if(topicDone)

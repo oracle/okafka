@@ -28,9 +28,11 @@ import javax.jms.TopicConnectionFactory;
 
 import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.common.Node;
+import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.oracle.okafka.common.config.SslConfigs;
 import org.oracle.okafka.common.errors.ConnectionException;
+import org.oracle.okafka.common.errors.RecordNotFoundSQLException;
 import org.slf4j.Logger;
 
 import oracle.jdbc.driver.OracleConnection;
@@ -328,6 +330,60 @@ public class ConnectionUtils {
 					((JMSException) cause).getLinkedException() : cause.getCause();
 		}
 		return null; 
+	}
+	
+	public static Uuid getIdByTopic(Connection con,String topic) throws SQLException {
+		Uuid topicId;
+		String query;
+		query="select qid from user_queues where name = upper(?)";
+	
+		PreparedStatement stmt = null;
+		stmt = con.prepareStatement(query);
+		stmt.setString(1, topic);
+		ResultSet result = stmt.executeQuery();
+		if(result.next()) {
+			topicId = new Uuid(0,result.getInt("qid"));
+		}
+		else {
+			result.close();
+			throw new RecordNotFoundSQLException("topic "+ topic +" doesn't exist");
+		}
+		result.close();
+		try
+		{
+			if (stmt != null)
+				stmt.close();
+		}catch(Exception ex){
+			// do nothing
+		}
+		return topicId;
+	}
+	
+	public static String getTopicById(Connection con, Uuid topicId) throws SQLException {
+		String topicName;
+		String query;
+		query="select name from user_queues where qid = ?";
+	
+		PreparedStatement stmt = null;
+		stmt = con.prepareStatement(query);
+		stmt.setLong(1, topicId.getLeastSignificantBits());
+		ResultSet result = stmt.executeQuery();
+		if(result.next()) {
+			topicName = result.getString("name");
+		}
+		else {
+			result.close();
+			throw new RecordNotFoundSQLException("topic Id "+ topicId.toString() +" doesn't exist");
+		}
+		result.close();
+		try
+		{
+			if (stmt != null)
+				stmt.close();
+		}catch(Exception ex){
+			// do nothing
+		}
+		return topicName;
 	}
 	
 	

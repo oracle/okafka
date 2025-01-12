@@ -1975,20 +1975,19 @@ public class KafkaAdminClient extends AdminClient {
 	
 	@Override
 	public DescribeTopicsResult describeTopics(final TopicCollection topics, DescribeTopicsOptions options) {
-		
+
 		if (topics instanceof TopicIdCollection) {
-			return handleDescribeTopicsByIds(((TopicIdCollection) topics).topicIds(), options);}
-		else if (topics instanceof TopicNameCollection)
+			return handleDescribeTopicsByIds(((TopicIdCollection) topics).topicIds(), options);
+		} else if (topics instanceof TopicNameCollection)
 			return handleDescribeTopicsByNames(((TopicNameCollection) topics).topicNames(), options);
 		else
 			throw new IllegalArgumentException("The TopicCollection: " + topics
 					+ " provided did not match any supported classes for describeTopics.");
 	}
-		
+
 	private DescribeTopicsResult handleDescribeTopicsByIds(final Collection<Uuid> topicIds,
-			final DescribeTopicsOptions options){
-		final Map<Uuid, KafkaFutureImpl<TopicDescription>> topicIdFutures = new HashMap<>(
-				topicIds.size());
+			final DescribeTopicsOptions options) {
+		final Map<Uuid, KafkaFutureImpl<TopicDescription>> topicIdFutures = new HashMap<>(topicIds.size());
 		final List<Uuid> validTopicIds = new ArrayList<>(topicIds.size());
 
 		for (Uuid id : topicIds) {
@@ -2000,14 +1999,13 @@ public class KafkaAdminClient extends AdminClient {
 				topicIdFutures.put(id, future);
 
 			} else if (!topicIdFutures.containsKey(id)) {
-				topicIdFutures.put(id,
-						new KafkaFutureImpl<TopicDescription>());
+				topicIdFutures.put(id, new KafkaFutureImpl<TopicDescription>());
 				validTopicIds.add(id);
 			}
 		}
 		if (validTopicIds.isEmpty()) {
 			DescribeTopicsResult describeTopicsResult = new org.oracle.okafka.clients.admin.DescribeTopicsResult(
-					new HashMap<Uuid, KafkaFuture<TopicDescription>>(topicIdFutures),null);
+					new HashMap<Uuid, KafkaFuture<TopicDescription>>(topicIdFutures), null);
 			return describeTopicsResult;
 		}
 		final long now = time.milliseconds();
@@ -2023,14 +2021,14 @@ public class KafkaAdminClient extends AdminClient {
 					@Override
 					void handleResponse(AbstractResponse abstractResponse) {
 						MetadataResponse response = (MetadataResponse) abstractResponse;
-						if(response.getException()!=null) {
+						if (response.getException() != null) {
 							handleFailure(response.getException());
 						}
 						List<PartitionInfo> partitionInfo = response.partitions();
 						Map<Uuid, Exception> errorsPerTopicId = response.topicIdErrors();
 						Map<String, TopicTeqParameters> topicTeqParameters = response.teqParameters();
-						Map<String,Uuid> topicNameIdMap = response.getTopicsIdMap();
-						Map<Uuid,String> topicIdNameMap =new HashMap<>();
+						Map<String, Uuid> topicNameIdMap = response.getTopicsIdMap();
+						Map<Uuid, String> topicIdNameMap = new HashMap<>();
 						topicNameIdMap.forEach((key, value) -> topicIdNameMap.put(value, key));
 						Map<String, List<TopicPartitionInfo>> topicPartitions = new HashMap<>();
 
@@ -2051,20 +2049,21 @@ public class KafkaAdminClient extends AdminClient {
 								topicPartitions.put(name, new ArrayList<>(Arrays.asList(topicPartitionInfo)));
 							}
 						}
-						
-						for (Map.Entry<Uuid, KafkaFutureImpl<TopicDescription>> entry : topicIdFutures
-								.entrySet()) {
+
+						for (Map.Entry<Uuid, KafkaFutureImpl<TopicDescription>> entry : topicIdFutures.entrySet()) {
 
 							KafkaFutureImpl<TopicDescription> future = entry.getValue();
 
 							if (errorsPerTopicId.get(entry.getKey()) != null) {
 								future.completeExceptionally(errorsPerTopicId.get(entry.getKey()));
-							}
-							TopicDescription topicDescription = new org.oracle.okafka.clients.admin.TopicDescription(
-									topicIdNameMap.get(entry.getKey()), false, topicPartitions.get(topicIdNameMap.get(entry.getKey())),
-									topicTeqParameters.get(topicIdNameMap.get(entry.getKey())),entry.getKey());
+							} else {
+								TopicDescription topicDescription = new org.oracle.okafka.clients.admin.TopicDescription(
+										topicIdNameMap.get(entry.getKey()), false,
+										topicPartitions.get(topicIdNameMap.get(entry.getKey())),
+										topicTeqParameters.get(topicIdNameMap.get(entry.getKey())), entry.getKey());
 
-							future.complete((TopicDescription) topicDescription);
+								future.complete((TopicDescription) topicDescription);
+							}
 						}
 					}
 
@@ -2074,15 +2073,14 @@ public class KafkaAdminClient extends AdminClient {
 					}
 				}, now);
 		DescribeTopicsResult describeTopicsResult = new org.oracle.okafka.clients.admin.DescribeTopicsResult(
-				new HashMap<Uuid, KafkaFuture<TopicDescription>>(topicIdFutures),null);
+				new HashMap<Uuid, KafkaFuture<TopicDescription>>(topicIdFutures), null);
 		return describeTopicsResult;
 	}
-	
+
 	private DescribeTopicsResult handleDescribeTopicsByNames(final Collection<String> topics,
-			final DescribeTopicsOptions options){
-	
-		final Map<String, KafkaFutureImpl<TopicDescription>> topicFutures = new HashMap<>(
-				topics.size());
+			final DescribeTopicsOptions options) {
+
+		final Map<String, KafkaFutureImpl<TopicDescription>> topicFutures = new HashMap<>(topics.size());
 		final List<String> validTopicNames = new ArrayList<>(topics.size());
 
 		for (String topicName : topics) {
@@ -2094,8 +2092,7 @@ public class KafkaAdminClient extends AdminClient {
 				topicFutures.put(topicName.toUpperCase(), future);
 
 			} else if (!topicFutures.containsKey(topicName.toUpperCase())) {
-				topicFutures.put(topicName.toUpperCase(),
-						new KafkaFutureImpl<TopicDescription>());
+				topicFutures.put(topicName.toUpperCase(), new KafkaFutureImpl<TopicDescription>());
 				validTopicNames.add(topicName.toUpperCase());
 			}
 		}
@@ -2113,10 +2110,11 @@ public class KafkaAdminClient extends AdminClient {
 					MetadataRequest.Builder createRequest(int timeoutMs) {
 						return new MetadataRequest.Builder(validTopicNames, false, validTopicNames);
 					}
+
 					@Override
 					void handleResponse(AbstractResponse abstractResponse) {
 						MetadataResponse response = (MetadataResponse) abstractResponse;
-						if(response.getException()!=null) {
+						if (response.getException() != null) {
 							handleFailure(response.getException());
 						}
 						List<PartitionInfo> partitionInfo = response.partitions();
@@ -2143,20 +2141,19 @@ public class KafkaAdminClient extends AdminClient {
 							}
 						}
 
-						for (Map.Entry<String, KafkaFutureImpl<TopicDescription>> entry : topicFutures
-								.entrySet()) {
+						for (Map.Entry<String, KafkaFutureImpl<TopicDescription>> entry : topicFutures.entrySet()) {
 
 							KafkaFutureImpl<TopicDescription> future = entry.getValue();
 
 							if (errorsPerTopic.get(entry.getKey()) != null) {
 								future.completeExceptionally(errorsPerTopic.get(entry.getKey()));
+							} else {
+								TopicDescription topicDescription = new org.oracle.okafka.clients.admin.TopicDescription(
+										entry.getKey(), false, topicPartitions.get(entry.getKey()),
+										topicTeqParameters.get(entry.getKey()), topicNameIdMap.get(entry.getKey()));
+
+								future.complete((TopicDescription) topicDescription);
 							}
-
-							TopicDescription topicDescription = new org.oracle.okafka.clients.admin.TopicDescription(
-									entry.getKey(), false, topicPartitions.get(entry.getKey()),
-									topicTeqParameters.get(entry.getKey()),topicNameIdMap.get(entry.getKey()));
-
-							future.complete((TopicDescription) topicDescription);
 						}
 					}
 
@@ -2234,7 +2231,7 @@ public class KafkaAdminClient extends AdminClient {
 		return new ListOffsetsResult(new HashMap<TopicPartition, KafkaFuture<ListOffsetsResultInfo>>(topicFutures));
 	}
 	
-	private static long getOffsetFromSpec(OffsetSpec offsetSpec) {
+	private long getOffsetFromSpec(OffsetSpec offsetSpec) {
 		if (offsetSpec instanceof TimestampSpec) {
 			try {
 				Method timestampMethod = offsetSpec.getClass().getDeclaredMethod("timestamp");
@@ -2242,7 +2239,7 @@ public class KafkaAdminClient extends AdminClient {
 				long timestamp = (long) timestampMethod.invoke(offsetSpec);
 				return timestamp;
 			} catch (Exception e) {
-				e.printStackTrace();
+				log.error("Exception caught: ",e);
 			}
 		} else if (offsetSpec instanceof OffsetSpec.EarliestSpec) {
 			return ListOffsetsRequest.EARLIEST_TIMESTAMP;
