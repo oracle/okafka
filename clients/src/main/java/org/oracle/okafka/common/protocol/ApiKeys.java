@@ -32,6 +32,8 @@
 package 
 org.oracle.okafka.common.protocol;
 
+import org.apache.kafka.common.message.ApiMessageType;
+
 /**
  * Identifiers for all the Kafka APIs
  */
@@ -47,7 +49,8 @@ public enum ApiKeys {
 	UNSUBSCRIBE(8, "Unsubscribe"),
 	JOIN_GROUP(9, "JoinGroup"),
 	SYNC_GROUP(10, "SyncGroup"),
-	CONNECT_ME(11,"ConnectMe");
+	CONNECT_ME(11,"ConnectMe"),
+	LIST_OFFSETS(12,"ListOffsets");
     private static final ApiKeys[] ID_TO_TYPE;
     private static final int MIN_API_KEY = 0;
     public static final int MAX_API_KEY;
@@ -143,6 +146,8 @@ public enum ApiKeys {
     	case CONNECT_ME:
     		//Operation to find Oracle RAC Node to connect to. Not exactly a FIND_CORRDINATOR call.
     		return org.apache.kafka.common.protocol.ApiKeys.FIND_COORDINATOR;
+    	case LIST_OFFSETS:
+    		return org.apache.kafka.common.protocol.ApiKeys.LIST_OFFSETS;
     	default: 
     		// Default to HEARTBEAT. No SUpport for HEARTBEAT for oKafka.
     		return org.apache.kafka.common.protocol.ApiKeys.HEARTBEAT;
@@ -180,6 +185,8 @@ public enum ApiKeys {
     	case FIND_COORDINATOR:
     		//Operation to find Oracle RAC Node to connect to. Not exactly a FIND_CORRDINATOR call.
     		return CONNECT_ME;
+    	case LIST_OFFSETS:
+    		return LIST_OFFSETS;
     	default: 
     		// Default to FETCH.
     		return FETCH;

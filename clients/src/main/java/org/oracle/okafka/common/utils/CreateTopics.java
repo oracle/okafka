@@ -99,10 +99,9 @@ public class CreateTopics {
 					cStmt.setLong(3, retentionSec);
 					cStmt.execute();
 					try {
-						topicIdMap.put(topic, AQClient.getIdByTopic(jdbcConn, topic));
+						topicIdMap.put(topic, ConnectionUtils.getIdByTopic(jdbcConn, topic));
 					} catch (SQLException sqle) {
 						topicIdMap.put(topic, Uuid.ZERO_UUID);
-						throw sqle;
 					}
 
 				} catch (SQLException sqlEx) {
