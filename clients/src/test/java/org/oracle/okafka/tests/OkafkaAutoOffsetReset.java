@@ -32,7 +32,9 @@ public class OkafkaAutoOffsetReset {
 		try {
 			 while(true) {
 		     try {
+		    	System.out.println(consumer.listTopics());
 		    	ConsumerRecords <String, String> records = consumer.poll(Duration.ofMillis(10000));
+		    	System.out.println(consumer.listTopics());
 		   
 		    	for (ConsumerRecord<String, String> record : records)				
 		    		System.out.printf("partition = %d, offset = %d, key = %s, value =%s\n  ", record.partition(), record.offset(), record.key(), record.value());

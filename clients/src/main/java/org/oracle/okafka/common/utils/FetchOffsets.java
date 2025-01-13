@@ -131,6 +131,39 @@ public class FetchOffsets {
 			        "        RAISE; " +
 			        "END;";
 	
+	private static final String COMMITTED_OFFSET_PLSQL = """
+			DECLARE
+				queue_name VARCHAR2(128) := ?;
+				shard_num NUMBER := ?;
+				subscriber_name VARCHAR(128) := ?;
+				partition_names SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST();
+				current_max_seq_num NUMBER;
+				max_seq_num_global NUMBER := -1;
+			BEGIN
+				SELECT LOWER(PARTNAME) BULK COLLECT INTO partition_names
+				FROM user_queue_partition_map WHERE QUEUE_TABLE = queue_name AND SHARD = shard_num;
+
+				FOR i IN 1 .. partition_names.COUNT LOOP
+			BEGIN
+				EXECUTE IMMEDIATE
+					'SELECT MAX(SEQ_NUM) FROM ' || DBMS_ASSERT.SQL_OBJECT_NAME('AQ$_' || queue_name || '_L') || ' PARTITION (' || partition_names(i) || ')
+					WHERE SUBSCRIBER# = (SELECT SUBSCRIBER_ID FROM USER_QUEUE_SUBSCRIBERS WHERE CONSUMER_NAME = ''' || subscriber_name || ''')
+					AND FLAGS = 1'
+					INTO current_max_seq_num;
+
+				IF current_max_seq_num > max_seq_num_global THEN
+				max_seq_num_global := current_max_seq_num;
+				END IF;
+			EXCEPTION
+				WHEN OTHERS THEN
+				RAISE;
+			END;
+			END LOOP;
+
+				? := max_seq_num_global;
+			END;
+			""";
+	
 	public static ListOffsetsPartitionResponse fetchEarliestOffset(String topic, int partition, Connection jdbcConn)
 			throws SQLException {
 		ListOffsetsPartitionResponse response = new ListOffsetsPartitionResponse().setPartitionIndex(partition);
