@@ -33,8 +33,6 @@ import org.apache.kafka.clients.ClientDnsLookup;
 import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
 import org.apache.kafka.clients.ClientUtils;
-import org.oracle.okafka.clients.admin.AdminClientConfig;
-import org.oracle.okafka.clients.admin.KafkaAdminClient.Call;
 import org.apache.kafka.clients.admin.AbortTransactionOptions;
 import org.apache.kafka.clients.admin.AbortTransactionResult;
 import org.apache.kafka.clients.admin.AbortTransactionSpec;
@@ -123,7 +121,6 @@ import org.apache.kafka.clients.admin.ListTransactionsResult;
 import org.apache.kafka.clients.admin.NewPartitionReassignment;
 import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.clients.admin.NewTopic;
-//import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.admin.RemoveMembersFromConsumerGroupOptions;
@@ -138,15 +135,9 @@ import org.apache.kafka.clients.admin.UpdateFeaturesOptions;
 import org.apache.kafka.clients.admin.UpdateFeaturesResult;
 import org.apache.kafka.clients.admin.UserScramCredentialAlteration;
 import org.apache.kafka.clients.admin.CreateTopicsResult.TopicMetadataAndConfig;
-//import org.apache.kafka.clients.admin.KafkaAdminClient.LeastLoadedNodeProvider;
-//import org.apache.kafka.clients.admin.KafkaAdminClient.LeastLoadedNodeProvider;
-/*
-import org.apache.kafka.clients.admin.KafkaAdminClient.Call;
-import org.apache.kafka.clients.admin.KafkaAdminClient.ControllerNodeProvider;
-import org.apache.kafka.clients.admin.KafkaAdminClient.MetadataUpdateNodeIdProvider;
-import org.apache.kafka.clients.admin.KafkaAdminClient.NodeProvider;
-import org.apache.kafka.clients.admin.KafkaAdminClient.TimeoutProcessor;
- */
+import org.apache.kafka.clients.admin.ListOffsetsResult.ListOffsetsResultInfo;
+import org.apache.kafka.clients.admin.OffsetSpec.TimestampSpec;
+
 import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.clients.KafkaClient;
 import org.oracle.okafka.clients.NetworkClient;
@@ -182,10 +173,8 @@ import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
 import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.RetriableException;
 import org.apache.kafka.common.errors.TimeoutException;
-import org.apache.kafka.common.errors.UnknownTopicIdException;
 import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.internals.KafkaFutureImpl;
-import org.apache.kafka.common.message.MetadataRequestData;
 import org.apache.kafka.common.metrics.JmxReporter;
 import org.apache.kafka.common.metrics.MetricConfig;
 import org.apache.kafka.common.metrics.Metrics;
@@ -201,23 +190,27 @@ import org.oracle.okafka.common.requests.CreateTopicsResponse;
 import org.oracle.okafka.common.requests.DeleteTopicsRequest;
 import org.oracle.okafka.common.requests.DeleteTopicsResponse;
 import org.oracle.okafka.common.requests.MetadataRequest;
+import org.oracle.okafka.common.requests.ListOffsetsRequest;
+import org.oracle.okafka.common.requests.ListOffsetsRequest.ListOffsetsPartition;
+import org.oracle.okafka.common.requests.ListOffsetsResponse.ListOffsetsPartitionResponse;
+import org.oracle.okafka.common.requests.ListOffsetsResponse;
 import org.oracle.okafka.common.requests.MetadataResponse;
 import org.oracle.okafka.common.requests.CreateTopicsRequest.TopicDetails;
 import org.apache.kafka.common.utils.AppInfoParser;
+import org.apache.kafka.common.utils.ExponentialBackoff;
 import org.apache.kafka.common.utils.KafkaThread;
 import org.apache.kafka.common.utils.LogContext;
 import org.oracle.okafka.common.utils.TNSParser;
 import org.apache.kafka.common.utils.Time;
-import org.apache.kafka.common.KafkaFuture;
 import org.oracle.okafka.clients.admin.internals.AQKafkaAdmin;
 import org.oracle.okafka.clients.consumer.ConsumerConfig;
 import org.slf4j.Logger;
 
-import static org.apache.kafka.common.requests.MetadataRequest.convertTopicIdsToMetadataRequestTopic;
 import static org.apache.kafka.common.utils.Utils.closeQuietly;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -237,6 +230,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * The default implementation of {@link AdminClient}. An instance of this class
@@ -272,7 +266,8 @@ public class KafkaAdminClient extends AdminClient {
 	static final String NETWORK_THREAD_PREFIX = "kafka-admin-client-thread";
 
 	private final Logger log;
-
+	private final LogContext logContext;
+	
 	/**
 	 * The default timeout to use for an operation.
 	 */
@@ -333,6 +328,8 @@ public class KafkaAdminClient extends AdminClient {
 	private final int maxRetries;
 
 	private final long retryBackoffMs;
+    private final long retryBackoffMaxMs;
+    private final ExponentialBackoff retryBackoff;
 
 	/**
 	 * Get or create a list value from a map.
@@ -492,6 +489,7 @@ public class KafkaAdminClient extends AdminClient {
 		this.defaultTimeoutMs = config.getInt(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG);
 		this.clientId = clientId;
 		this.log = logContext.logger(KafkaAdminClient.class);
+        this.logContext = logContext;
 		this.time = time;
 		this.metadataManager = metadataManager;
 		this.requestTimeoutMs = config.getInt(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG);
@@ -562,6 +560,12 @@ public class KafkaAdminClient extends AdminClient {
 				: timeoutProcessorFactory;
 		this.maxRetries = config.getInt(AdminClientConfig.RETRIES_CONFIG);
 		this.retryBackoffMs = config.getLong(AdminClientConfig.RETRY_BACKOFF_MS_CONFIG);
+        this.retryBackoffMaxMs = config.getLong(AdminClientConfig.RETRY_BACKOFF_MAX_MS_CONFIG);
+        this.retryBackoff = new ExponentialBackoff(
+            retryBackoffMs,
+            CommonClientConfigs.RETRY_BACKOFF_EXP_BASE,
+            retryBackoffMaxMs,
+            CommonClientConfigs.RETRY_BACKOFF_JITTER);
 		config.logUnused();
 		AppInfoParser.registerAppInfo(JMX_PREFIX, clientId, metrics, time.milliseconds());
 		log.debug("Kafka admin client initialized");
@@ -682,21 +686,37 @@ public class KafkaAdminClient extends AdminClient {
 		private final String callName;
 		private final long deadlineMs;
 		private final NodeProvider nodeProvider;
-		private int tries = 0;
+		private int tries;
 		private boolean aborted = false;
 		private Node curNode = null;
-		private long nextAllowedTryMs = 0;
+		private long nextAllowedTryMs;
 
+		Call(boolean internal,
+	             String callName,
+	             long nextAllowedTryMs,
+	             int tries,
+	             long deadlineMs,
+	             NodeProvider nodeProvider
+	        ) {
+	            this.internal = internal;
+	            this.callName = callName;
+	            this.nextAllowedTryMs = nextAllowedTryMs;
+	            this.tries = tries;
+	            this.deadlineMs = deadlineMs;
+	            this.nodeProvider = nodeProvider;
+	        }
+		
 		Call(boolean internal, String callName, long deadlineMs, NodeProvider nodeProvider) {
-			this.internal = internal;
-			this.callName = callName;
-			this.deadlineMs = deadlineMs;
-			this.nodeProvider = nodeProvider;
-		}
+            this(internal, callName, 0, 0, deadlineMs, nodeProvider);
+        }
 
-		Call(String callName, long deadlineMs, NodeProvider nodeProvider) {
-			this(false, callName, deadlineMs, nodeProvider);
-		}
+        Call(String callName, long deadlineMs, NodeProvider nodeProvider) {
+            this(false, callName, 0, 0, deadlineMs, nodeProvider);
+        }
+
+        Call(String callName, long nextAllowedTryMs, int tries, long deadlineMs, NodeProvider nodeProvider) {
+            this(false, callName, nextAllowedTryMs, tries, deadlineMs, nodeProvider);
+        }
 
 		protected Node curNode() {
 			return curNode;
@@ -759,16 +779,25 @@ public class KafkaAdminClient extends AdminClient {
 			if (log.isDebugEnabled()) {
 				log.debug("{} failed: {}. Beginning retry #{}", this, prettyPrintException(throwable), tries);
 			}
-			runnable.enqueue(this, now);
+			maybeRetry(now, throwable);
 		}
+		
+		void maybeRetry(long now, Throwable throwable) {
+            runnable.pendingCalls.add(this);
+        }
 
 		private void failWithTimeout(long now, Throwable cause) {
 			if (log.isDebugEnabled()) {
 				log.debug("{} timed out at {} after {} attempt(s)", this, now, tries,
 						new Exception(prettyPrintException(cause)));
 			}
-			handleFailure(
-					new TimeoutException(this + " timed out at " + now + " after " + tries + " attempt(s)", cause));
+			
+			if (cause instanceof TimeoutException) {
+				handleFailure(cause);
+			} else {
+				handleFailure(
+						new TimeoutException(this + " timed out at " + now + " after " + tries + " attempt(s)", cause));
+			}
 		}
 
 		/**
@@ -1946,20 +1975,19 @@ public class KafkaAdminClient extends AdminClient {
 	
 	@Override
 	public DescribeTopicsResult describeTopics(final TopicCollection topics, DescribeTopicsOptions options) {
-		
+
 		if (topics instanceof TopicIdCollection) {
-			return handleDescribeTopicsByIds(((TopicIdCollection) topics).topicIds(), options);}
-		else if (topics instanceof TopicNameCollection)
+			return handleDescribeTopicsByIds(((TopicIdCollection) topics).topicIds(), options);
+		} else if (topics instanceof TopicNameCollection)
 			return handleDescribeTopicsByNames(((TopicNameCollection) topics).topicNames(), options);
 		else
 			throw new IllegalArgumentException("The TopicCollection: " + topics
 					+ " provided did not match any supported classes for describeTopics.");
 	}
-		
+
 	private DescribeTopicsResult handleDescribeTopicsByIds(final Collection<Uuid> topicIds,
-			final DescribeTopicsOptions options){
-		final Map<Uuid, KafkaFutureImpl<TopicDescription>> topicIdFutures = new HashMap<>(
-				topicIds.size());
+			final DescribeTopicsOptions options) {
+		final Map<Uuid, KafkaFutureImpl<TopicDescription>> topicIdFutures = new HashMap<>(topicIds.size());
 		final List<Uuid> validTopicIds = new ArrayList<>(topicIds.size());
 
 		for (Uuid id : topicIds) {
@@ -1971,14 +1999,13 @@ public class KafkaAdminClient extends AdminClient {
 				topicIdFutures.put(id, future);
 
 			} else if (!topicIdFutures.containsKey(id)) {
-				topicIdFutures.put(id,
-						new KafkaFutureImpl<TopicDescription>());
+				topicIdFutures.put(id, new KafkaFutureImpl<TopicDescription>());
 				validTopicIds.add(id);
 			}
 		}
 		if (validTopicIds.isEmpty()) {
 			DescribeTopicsResult describeTopicsResult = new org.oracle.okafka.clients.admin.DescribeTopicsResult(
-					new HashMap<Uuid, KafkaFuture<TopicDescription>>(topicIdFutures),null);
+					new HashMap<Uuid, KafkaFuture<TopicDescription>>(topicIdFutures), null);
 			return describeTopicsResult;
 		}
 		final long now = time.milliseconds();
@@ -1994,14 +2021,14 @@ public class KafkaAdminClient extends AdminClient {
 					@Override
 					void handleResponse(AbstractResponse abstractResponse) {
 						MetadataResponse response = (MetadataResponse) abstractResponse;
-						if(response.getException()!=null) {
+						if (response.getException() != null) {
 							handleFailure(response.getException());
 						}
 						List<PartitionInfo> partitionInfo = response.partitions();
 						Map<Uuid, Exception> errorsPerTopicId = response.topicIdErrors();
 						Map<String, TopicTeqParameters> topicTeqParameters = response.teqParameters();
-						Map<String,Uuid> topicNameIdMap = response.getTopicsIdMap();
-						Map<Uuid,String> topicIdNameMap =new HashMap<>();
+						Map<String, Uuid> topicNameIdMap = response.getTopicsIdMap();
+						Map<Uuid, String> topicIdNameMap = new HashMap<>();
 						topicNameIdMap.forEach((key, value) -> topicIdNameMap.put(value, key));
 						Map<String, List<TopicPartitionInfo>> topicPartitions = new HashMap<>();
 
@@ -2022,20 +2049,21 @@ public class KafkaAdminClient extends AdminClient {
 								topicPartitions.put(name, new ArrayList<>(Arrays.asList(topicPartitionInfo)));
 							}
 						}
-						
-						for (Map.Entry<Uuid, KafkaFutureImpl<TopicDescription>> entry : topicIdFutures
-								.entrySet()) {
+
+						for (Map.Entry<Uuid, KafkaFutureImpl<TopicDescription>> entry : topicIdFutures.entrySet()) {
 
 							KafkaFutureImpl<TopicDescription> future = entry.getValue();
 
 							if (errorsPerTopicId.get(entry.getKey()) != null) {
 								future.completeExceptionally(errorsPerTopicId.get(entry.getKey()));
-							}
-							TopicDescription topicDescription = new org.oracle.okafka.clients.admin.TopicDescription(
-									topicIdNameMap.get(entry.getKey()), false, topicPartitions.get(topicIdNameMap.get(entry.getKey())),
-									topicTeqParameters.get(topicIdNameMap.get(entry.getKey())),entry.getKey());
+							} else {
+								TopicDescription topicDescription = new org.oracle.okafka.clients.admin.TopicDescription(
+										topicIdNameMap.get(entry.getKey()), false,
+										topicPartitions.get(topicIdNameMap.get(entry.getKey())),
+										topicTeqParameters.get(topicIdNameMap.get(entry.getKey())), entry.getKey());
 
-							future.complete((TopicDescription) topicDescription);
+								future.complete((TopicDescription) topicDescription);
+							}
 						}
 					}
 
@@ -2045,15 +2073,14 @@ public class KafkaAdminClient extends AdminClient {
 					}
 				}, now);
 		DescribeTopicsResult describeTopicsResult = new org.oracle.okafka.clients.admin.DescribeTopicsResult(
-				new HashMap<Uuid, KafkaFuture<TopicDescription>>(topicIdFutures),null);
+				new HashMap<Uuid, KafkaFuture<TopicDescription>>(topicIdFutures), null);
 		return describeTopicsResult;
 	}
-	
+
 	private DescribeTopicsResult handleDescribeTopicsByNames(final Collection<String> topics,
-			final DescribeTopicsOptions options){
-	
-		final Map<String, KafkaFutureImpl<TopicDescription>> topicFutures = new HashMap<>(
-				topics.size());
+			final DescribeTopicsOptions options) {
+
+		final Map<String, KafkaFutureImpl<TopicDescription>> topicFutures = new HashMap<>(topics.size());
 		final List<String> validTopicNames = new ArrayList<>(topics.size());
 
 		for (String topicName : topics) {
@@ -2065,8 +2092,7 @@ public class KafkaAdminClient extends AdminClient {
 				topicFutures.put(topicName.toUpperCase(), future);
 
 			} else if (!topicFutures.containsKey(topicName.toUpperCase())) {
-				topicFutures.put(topicName.toUpperCase(),
-						new KafkaFutureImpl<TopicDescription>());
+				topicFutures.put(topicName.toUpperCase(), new KafkaFutureImpl<TopicDescription>());
 				validTopicNames.add(topicName.toUpperCase());
 			}
 		}
@@ -2084,10 +2110,11 @@ public class KafkaAdminClient extends AdminClient {
 					MetadataRequest.Builder createRequest(int timeoutMs) {
 						return new MetadataRequest.Builder(validTopicNames, false, validTopicNames);
 					}
+
 					@Override
 					void handleResponse(AbstractResponse abstractResponse) {
 						MetadataResponse response = (MetadataResponse) abstractResponse;
-						if(response.getException()!=null) {
+						if (response.getException() != null) {
 							handleFailure(response.getException());
 						}
 						List<PartitionInfo> partitionInfo = response.partitions();
@@ -2095,7 +2122,6 @@ public class KafkaAdminClient extends AdminClient {
 						Map<String, TopicTeqParameters> topicTeqParameters = response.teqParameters();
 						Map<String, Uuid> topicNameIdMap = response.getTopicsIdMap();
 						Map<String, List<TopicPartitionInfo>> topicPartitions = new HashMap<>();
-
 						for (int i = 0; i < partitionInfo.size(); i++) {
 
 							String name = partitionInfo.get(i).topic();
@@ -2115,20 +2141,19 @@ public class KafkaAdminClient extends AdminClient {
 							}
 						}
 
-						for (Map.Entry<String, KafkaFutureImpl<TopicDescription>> entry : topicFutures
-								.entrySet()) {
+						for (Map.Entry<String, KafkaFutureImpl<TopicDescription>> entry : topicFutures.entrySet()) {
 
 							KafkaFutureImpl<TopicDescription> future = entry.getValue();
 
 							if (errorsPerTopic.get(entry.getKey()) != null) {
 								future.completeExceptionally(errorsPerTopic.get(entry.getKey()));
+							} else {
+								TopicDescription topicDescription = new org.oracle.okafka.clients.admin.TopicDescription(
+										entry.getKey(), false, topicPartitions.get(entry.getKey()),
+										topicTeqParameters.get(entry.getKey()), topicNameIdMap.get(entry.getKey()));
+
+								future.complete((TopicDescription) topicDescription);
 							}
-
-							TopicDescription topicDescription = new org.oracle.okafka.clients.admin.TopicDescription(
-									entry.getKey(), false, topicPartitions.get(entry.getKey()),
-									topicTeqParameters.get(entry.getKey()),topicNameIdMap.get(entry.getKey()));
-
-							future.complete((TopicDescription) topicDescription);
 						}
 					}
 
@@ -2141,7 +2166,89 @@ public class KafkaAdminClient extends AdminClient {
 				new HashMap<String, KafkaFuture<TopicDescription>>(topicFutures));
 		return describeTopicsResult;
 	}
+	
+	@Override
+	public ListOffsetsResult listOffsets(Map<TopicPartition, OffsetSpec> topicPartitionOffsets,
+			ListOffsetsOptions options) {
+		final Map<TopicPartition, KafkaFutureImpl<ListOffsetsResultInfo>> topicFutures = new HashMap<>();
+		for(TopicPartition tp : topicPartitionOffsets.keySet()) {
+			topicFutures.put(tp, new KafkaFutureImpl<ListOffsetsResultInfo>());
+		}
+		Map<TopicPartition, Long> offsetTimestampsByPartition = topicPartitionOffsets.entrySet().stream()
+				.collect(Collectors.toMap(Map.Entry::getKey, e -> getOffsetFromSpec(e.getValue())));
 
+		Map<String, List<ListOffsetsPartition>> topicoffsetPartitionMap = new HashMap<>();
+		
+		for(Map.Entry<TopicPartition,Long> entry : offsetTimestampsByPartition.entrySet()) {
+			TopicPartition tp = entry.getKey();
+			if(topicoffsetPartitionMap.containsKey(tp.topic())) {
+				topicoffsetPartitionMap.get(tp.topic()).add(new ListOffsetsPartition().setPartitionIndex(tp.partition()).setTimestamp(entry.getValue()));
+			}
+			else {
+				List<ListOffsetsPartition> newOffsetPartitionList = new ArrayList<>();
+				newOffsetPartitionList.add(new ListOffsetsPartition().setPartitionIndex(tp.partition()).setTimestamp(entry.getValue()));
+				topicoffsetPartitionMap.put(tp.topic(), newOffsetPartitionList);
+			}
+		}
+						
+		final long now = time.milliseconds();
+		
+		runnable.call(
+				new Call("listOffsets", calcDeadlineMs(now, options.timeoutMs()), new LeastLoadedNodeProvider()) {
+
+					@Override
+					AbstractRequest.Builder createRequest(int timeoutMs) {
+						return new ListOffsetsRequest.Builder(topicoffsetPartitionMap);
+					}
+					
+					@Override
+					void handleResponse(AbstractResponse abstractResponse) {
+						ListOffsetsResponse response = (ListOffsetsResponse) abstractResponse;
+						if(response.getException()!=null) {
+							handleFailure(response.getException());
+						}
+						
+						Map<String, List<ListOffsetsPartitionResponse>> offsetResponseMap = response.getOffsetPartitionResponseMap();
+						for(Map.Entry<String, List<ListOffsetsPartitionResponse>> entry : offsetResponseMap.entrySet()) {
+							for(ListOffsetsPartitionResponse op : entry.getValue()) {
+								TopicPartition tp = new TopicPartition(entry.getKey(),op.partitionIndex());
+								if(op.getError()==null) {
+									ListOffsetsResultInfo offsetResult = new ListOffsetsResultInfo(op.offset(),op.timestamp(),null);
+									topicFutures.get(tp).complete(offsetResult);
+								}
+								else {
+									topicFutures.get(tp).completeExceptionally(op.getError());
+								}
+							}
+						}
+					}
+
+					@Override
+					void handleFailure(Throwable throwable) {
+						completeAllExceptionally(topicFutures.values(), throwable);
+					}
+				}, now);
+		return new ListOffsetsResult(new HashMap<TopicPartition, KafkaFuture<ListOffsetsResultInfo>>(topicFutures));
+	}
+	
+	private long getOffsetFromSpec(OffsetSpec offsetSpec) {
+		if (offsetSpec instanceof TimestampSpec) {
+			try {
+				Method timestampMethod = offsetSpec.getClass().getDeclaredMethod("timestamp");
+				timestampMethod.setAccessible(true);
+				long timestamp = (long) timestampMethod.invoke(offsetSpec);
+				return timestamp;
+			} catch (Exception e) {
+				log.error("Exception caught: ",e);
+			}
+		} else if (offsetSpec instanceof OffsetSpec.EarliestSpec) {
+			return ListOffsetsRequest.EARLIEST_TIMESTAMP;
+		} else if (offsetSpec instanceof OffsetSpec.MaxTimestampSpec) {
+			return ListOffsetsRequest.MAX_TIMESTAMP;
+		}
+		return ListOffsetsRequest.LATEST_TIMESTAMP;
+	}
+	
 	@Override
 	public DescribeClusterResult describeCluster(DescribeClusterOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
@@ -2296,12 +2403,6 @@ public class KafkaAdminClient extends AdminClient {
 	@Override
 	public AlterConsumerGroupOffsetsResult alterConsumerGroupOffsets(String groupId,
 			Map<TopicPartition, OffsetAndMetadata> offsets, AlterConsumerGroupOffsetsOptions options) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-	}
-
-	@Override
-	public ListOffsetsResult listOffsets(Map<TopicPartition, OffsetSpec> topicPartitionOffsets,
-			ListOffsetsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 

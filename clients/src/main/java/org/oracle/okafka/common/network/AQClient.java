@@ -32,19 +32,21 @@ import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.oracle.okafka.common.requests.MetadataRequest;
-import org.oracle.okafka.common.requests.MetadataRequest.Builder;
 import org.oracle.okafka.common.requests.MetadataResponse;
 import org.oracle.okafka.common.requests.CreateTopicsRequest.TopicDetails;
+import org.oracle.okafka.common.requests.ListOffsetsRequest;
+import org.oracle.okafka.common.requests.ListOffsetsRequest.ListOffsetsPartition;
+import org.oracle.okafka.common.requests.ListOffsetsResponse;
+import org.oracle.okafka.common.requests.ListOffsetsResponse.ListOffsetsPartitionResponse;
 import org.oracle.okafka.common.utils.ConnectionUtils;
 import org.oracle.okafka.common.utils.CreateTopics;
+import org.oracle.okafka.common.utils.FetchOffsets;
 import org.slf4j.Logger;
 import java.sql.Timestamp;
 import java.sql.Date;
 
 import javax.jms.JMSException;
 import oracle.jdbc.OracleTypes;
-import oracle.jdbc.driver.OracleConnection;
-import oracle.jms.AQjmsSession;
 
 /*
  *  Abstract class to communicate with Oracle Database. 
@@ -159,7 +161,7 @@ public abstract class AQClient {
 			if (topicIds != null) {
 				for (Uuid id : topicIds) {
 					try {
-						String topicName = getTopicById(con, id);
+						String topicName = ConnectionUtils.getTopicById(con, id);
 						topicIdNameMap.put(id, topicName);
 					} catch (SQLException sqle) {
 						if (sqle instanceof RecordNotFoundSQLException && !metadataRequest.allowAutoTopicCreation()) {
@@ -320,61 +322,7 @@ public abstract class AQClient {
 		}
 		return allTopics;
 	}
-	
-	public static Uuid getIdByTopic(Connection con,String topic) throws SQLException {
-		Uuid topicId;
-		String query;
-		query="select qid from user_queues where name = upper(?)";
-	
-		PreparedStatement stmt = null;
-		stmt = con.prepareStatement(query);
-		stmt.setString(1, topic);
-		ResultSet result = stmt.executeQuery();
-		if(result.next()) {
-			topicId = new Uuid(0,result.getInt("qid"));
-		}
-		else {
-			result.close();
-			throw new RecordNotFoundSQLException("topic "+ topic +" doesn't exist");
-		}
-		result.close();
-		try
-		{
-			if (stmt != null)
-				stmt.close();
-		}catch(Exception ex){
-			// do nothing
-		}
-		return topicId;
-	}
-	
-	public static String getTopicById(Connection con, Uuid topicId) throws SQLException {
-		String topicName;
-		String query;
-		query="select name from user_queues where qid = ?";
-	
-		PreparedStatement stmt = null;
-		stmt = con.prepareStatement(query);
-		stmt.setLong(1, topicId.getLeastSignificantBits());
-		ResultSet result = stmt.executeQuery();
-		if(result.next()) {
-			topicName = result.getString("name");
-		}
-		else {
-			result.close();
-			throw new RecordNotFoundSQLException("topic Id "+ topicId.toString() +" doesn't exist");
-		}
-		result.close();
-		try
-		{
-			if (stmt != null)
-				stmt.close();
-		}catch(Exception ex){
-			// do nothing
-		}
-		return topicName;
-	}
-	
+		
 	// Fetches existing cluster nodes 
 	// Returns TRUE if new node is added, existing node went down, or if the startup time changed for the nodes
 	// otherwise return false
@@ -648,6 +596,7 @@ public abstract class AQClient {
 			List<PartitionInfo> partitionInfo, Map<String, Exception> errorsPerTopic, Map<String,Uuid> topicNameIdMap) throws Exception {
 		if(nodes.size() <= 0 || topics == null || topics.isEmpty())
 			return;
+		
 		String queryQShard[] = {"select SHARD_ID, OWNER_INSTANCE, QUEUE_ID from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) ",
 		"select SHARD_ID, ENQUEUE_INSTANCE, QUEUE_ID from user_queue_shards where  QUEUE_ID = (select qid from user_queues where name = upper(?)) "};
 		
@@ -725,15 +674,20 @@ public abstract class AQClient {
 							topicDone = true;
 						} // Entry Existed in USER_QUEUE_SHARD
 					}// Nodes > 1
-
+					
 					// No Record in USER_QUEUE_SHARD or Node =1 check if topic exist		   	
-					if(!topicDone){
+					if(!topicDone && partCnt!=0){
 						for(int i = 0; i < partCnt ; i++) {
 							//When nodeSize > 1 but the partition is not yet created, then we distribute this partition across 
 							// available nodes by assigning the partition to node in round robin manner.
 							partitionInfo.add(new PartitionInfo(topic, i , nodes.get(nodeIndex++%nodesSize), null, null));
 						}
 						topicDone =true;
+						try {
+							topicNameIdMap.put(topic,ConnectionUtils.getIdByTopic(con,topic));
+						}catch(SQLException sqle) {
+							topicNameIdMap.put(topic, Uuid.ZERO_UUID);
+						}
 					}
 					if(topicDone)
 						topicsRem.remove(topic);
@@ -744,10 +698,12 @@ public abstract class AQClient {
 					for(String topicRem : topicsRem) {
 						topicDetails.put(topicRem, new TopicDetails(1, (short)0 , Collections.<String, String>emptyMap()));
 					}
-					Map<String, Exception> errors= CreateTopics.createTopics(con, topicDetails, Collections.<String,Uuid>emptyMap());
+					Map<String,Uuid> remTopicIdMap = new HashMap<>();
+					Map<String, Exception> errors= CreateTopics.createTopics(con, topicDetails, remTopicIdMap);
 					for(String topicRem : topicsRem) {
 						if(errors.get(topicRem) == null) {
 							partitionInfo.add(new PartitionInfo(topicRem, 0, nodes.get(nodeIndex++%nodesSize), null, null));
+							topicNameIdMap.put(topicRem, remTopicIdMap.get(topicRem));
 						} else {
 							errorsPerTopic.put(topicRem, errors.get(topicRem));
 						}
@@ -818,6 +774,80 @@ public abstract class AQClient {
 		
 		return topicTeqParam;
 	} 
+	
+	public ClientResponse getOffsetsResponse(ClientRequest request, Connection jdbcConn) {
+		log.debug("AQClient: Getting Offsets now");
+
+		ListOffsetsRequest.Builder builder = (ListOffsetsRequest.Builder) request.requestBuilder();
+		ListOffsetsRequest listOffsetRequest = builder.build();
+		Map<String, List<ListOffsetsPartition>> topicoffsetPartitionMap = listOffsetRequest.getOffsetPartitionMap();
+		Map<String, List<ListOffsetsPartitionResponse>> offsetPartitionResponseMap = new HashMap<>();
+		boolean disconnected = false;
+		Exception exception = null;
+
+		try {
+			for (Map.Entry<String, List<ListOffsetsPartition>> entry : topicoffsetPartitionMap.entrySet()) {
+				List<ListOffsetsPartition> offSetPartitionList = entry.getValue();
+				List<ListOffsetsPartitionResponse> offSetPartitionRespList = new ArrayList<>();
+				int totalPartition = 0;
+				try {
+					totalPartition = getQueueParameter(SHARDNUM_PARAM, entry.getKey(), jdbcConn);
+				} catch (SQLException sqlE) {
+					int errorNo = sqlE.getErrorCode();
+					if (errorNo == 24010) {
+						for (ListOffsetsPartition listOffsetPartition : offSetPartitionList) {
+							offSetPartitionRespList.add(new ListOffsetsPartitionResponse()
+									.setPartitionIndex(listOffsetPartition.partitionIndex()).setError(sqlE));
+						}
+						offsetPartitionResponseMap.put(entry.getKey(), offSetPartitionRespList);
+					}
+					continue;
+				}
+				for (ListOffsetsPartition listOffsetPartition : offSetPartitionList) {
+					long timestamp = listOffsetPartition.timestamp();
+					int partition = listOffsetPartition.partitionIndex();
+
+					if (partition >= totalPartition) {
+						offSetPartitionRespList.add(new ListOffsetsPartitionResponse().setPartitionIndex(partition)
+								.setError(new IllegalArgumentException("Invalid Partition number")));
+						continue;
+					}
+
+					ListOffsetsPartitionResponse listOffsetPartitionResp;
+					if (timestamp == ListOffsetsRequest.EARLIEST_TIMESTAMP)
+						listOffsetPartitionResp = FetchOffsets.fetchEarliestOffset(entry.getKey(), partition, jdbcConn);
+					else if (timestamp == ListOffsetsRequest.LATEST_TIMESTAMP)
+						listOffsetPartitionResp = FetchOffsets.fetchLatestOffset(entry.getKey(), partition, jdbcConn);
+					else if (timestamp == ListOffsetsRequest.MAX_TIMESTAMP)
+						listOffsetPartitionResp = FetchOffsets.fetchMaxTimestampOffset(entry.getKey(), partition,
+								jdbcConn);
+					else
+						listOffsetPartitionResp = FetchOffsets.fetchOffsetByTimestamp(entry.getKey(), partition,
+								timestamp, jdbcConn);
+					offSetPartitionRespList.add(listOffsetPartitionResp);
+				}
+				offsetPartitionResponseMap.put(entry.getKey(), offSetPartitionRespList);
+			}
+		} catch (Exception e) {
+			try {
+				disconnected = true;
+				exception = e;
+				log.debug("Unexcepted error occured with connection to node {}, closing the connection",
+						request.destination());
+				if (jdbcConn != null)
+					jdbcConn.close();
+
+				log.trace("Connection with node {} is closed", request.destination());
+			} catch (SQLException sqlEx) {
+				log.trace("Failed to close connection with node {}", request.destination());
+			}
+		}
+		ListOffsetsResponse listOffsetResponse = new ListOffsetsResponse(offsetPartitionResponseMap);
+		listOffsetResponse.setException(exception);
+
+		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
+				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null, listOffsetResponse);
+	}
 
 	public static String getProperty(String str, String property) {
 		String tmp = str.toUpperCase();
