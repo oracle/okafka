@@ -76,6 +76,12 @@ public class AdminClientConfig extends AbstractConfig {
     private static final String RETRY_BACKOFF_MS_DOC = "The amount of time to wait before attempting to " +
                 "retry a failed request. This avoids repeatedly sending requests in a tight loop under " +
                 "some failure scenarios.";
+    
+    /**
+     * <code>retry.backoff.max.ms</code>
+     */
+    public static final String RETRY_BACKOFF_MAX_MS_CONFIG = CommonClientConfigs.RETRY_BACKOFF_MAX_MS_CONFIG;
+    private static final String RETRY_BACKOFF_MAX_MS_DOC = CommonClientConfigs.RETRY_BACKOFF_MAX_MS_DOC;
 
     /** <code>connections.max.idle.ms</code> */
     public static final String CONNECTIONS_MAX_IDLE_MS_CONFIG = CommonClientConfigs.CONNECTIONS_MAX_IDLE_MS_CONFIG;
@@ -142,6 +148,12 @@ public class AdminClientConfig extends AbstractConfig {
                                         atLeast(0L),
                                         Importance.LOW,
                                         RETRY_BACKOFF_MS_DOC)
+                                .define(RETRY_BACKOFF_MAX_MS_CONFIG,
+                                        Type.LONG,
+                                        1000L,
+                                        atLeast(0L),
+                                        Importance.LOW,
+                                        RETRY_BACKOFF_MAX_MS_DOC)
                                 .define(REQUEST_TIMEOUT_MS_CONFIG,
                                         Type.INT,
                                         120000,
