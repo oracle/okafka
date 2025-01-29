@@ -10,7 +10,7 @@ package org.oracle.okafka.common.errors;
 import org.apache.kafka.common.KafkaException;
 
 /** 
- * If we are unable to create the desired Connection then this error is thrown.  
+ * Thrown when OKafka application fails to connect with the Oracle Database. 
  */
 public class ConnectionException extends KafkaException {
 	private static final long serialVersionUID = 1L;
