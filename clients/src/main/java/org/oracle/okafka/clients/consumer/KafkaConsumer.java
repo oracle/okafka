@@ -79,7 +79,6 @@ import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.clients.Metadata;
 import org.oracle.okafka.clients.NetworkClient;
 import org.apache.kafka.clients.consumer.internals.ConsumerInterceptors;
-import org.apache.kafka.clients.consumer.internals.FetchMetricsManager;
 import org.oracle.okafka.clients.consumer.internals.ConsumerNetworkClient;
 import org.oracle.okafka.clients.consumer.internals.FetchMetricsRegistry;
 import org.oracle.okafka.clients.consumer.internals.OkafkaConsumerMetrics;
