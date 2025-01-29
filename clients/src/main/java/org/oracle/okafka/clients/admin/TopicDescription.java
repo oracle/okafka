@@ -34,6 +34,9 @@ import org.apache.kafka.common.TopicPartitionInfo;
 import org.apache.kafka.common.Uuid;
 import org.oracle.okafka.clients.TopicTeqParameters;
 
+/**
+ * A detailed description of a single topic in the cluster.
+ */
 public class TopicDescription extends org.apache.kafka.clients.admin.TopicDescription{
 	
 	private final TopicTeqParameters topicParameters;

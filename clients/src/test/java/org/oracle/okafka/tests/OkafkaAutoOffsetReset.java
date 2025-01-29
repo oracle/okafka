@@ -27,7 +27,7 @@ public class OkafkaAutoOffsetReset {
 		
 		consumer.subscribe(Arrays.asList("TEQ"));
 		
-		int expectedMsgCnt = 1000;
+		int expectedMsgCnt = 3000;
 		int msgCnt = 0;		
 		try {
 			 while(true) {

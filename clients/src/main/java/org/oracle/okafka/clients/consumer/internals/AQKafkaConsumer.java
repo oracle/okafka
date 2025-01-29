@@ -375,12 +375,15 @@ public final class AQKafkaConsumer extends AQClient{
     }*/
 
 	public ClientResponse seek(ClientRequest request) {
+		log.debug("Sending Seek Request");
 		Map<TopicPartition, Exception> responses = new HashMap<>();
 		CallableStatement seekStmt = null;
 		try {
 			OffsetResetRequest.Builder builder = (OffsetResetRequest.Builder)request.requestBuilder();
 			OffsetResetRequest offsetResetRequest = builder.build();
 			Node node = metadata.getNodeById(Integer.parseInt(request.destination()));
+			log.debug("Destination Node: " + node);
+			
 			Map<TopicPartition, Long> offsetResetTimestamps = offsetResetRequest.offsetResetTimestamps();
 			Map<String, Map<TopicPartition, Long>> offsetResetTimeStampByTopic = new HashMap<String, Map<TopicPartition, Long>>() ;
 			for(Map.Entry<TopicPartition, Long> offsetResetTimestamp : offsetResetTimestamps.entrySet()) {
@@ -392,8 +395,7 @@ public final class AQKafkaConsumer extends AQClient{
 			}
 			TopicConsumers consumers = topicConsumersMap.get(node);
 			Connection con = ((AQjmsSession)consumers.getSession()).getDBConnection();
-
-
+			
 			SeekInput[] seekInputs = null;
 			String[] inArgs = new String[5];
 			int indx =0;
@@ -482,8 +484,9 @@ public final class AQKafkaConsumer extends AQClient{
 						}
 					}
 					seekStmt.setInt(stmtIndx++, SeekInput.DISCARD_SKIPPED);
+					log.debug("Invoking 'dbms_aq.seek_input_t' for the topic: "+ topic);
 					seekStmt.execute();
-
+					log.debug("'dbms_aq.seek_input_t' completed for the topic: "+ topic);
 					for(Map.Entry<TopicPartition, Long> offsets : offsetResetTimestampOfTopic.getValue().entrySet()) {
 						responses.put(offsets.getKey(), null);
 					}
@@ -1083,7 +1086,7 @@ public final class AQKafkaConsumer extends AQClient{
 			syncStmt.setInt(2, syncRequest.getVersion());
 			syncStmt.registerOutParameter(1, OracleTypes.ARRAY, typeList);
 			syncStmt.registerOutParameter(2, Types.INTEGER);
-			//System.out.println("SyncGroup 8: Executing SYNC Procedure now");
+//			System.out.println("SyncGroup 8: Executing SYNC Procedure now");
 			syncStmt.execute();
 			//System.out.println("SyncGroup 9: Retrieved  Response. creating qpatInfo array now");
 			QPATInfo[] qpatInfo = ((QPATInfoList)qpatl.create(syncStmt.getObject(1), 2002)).getArray();
