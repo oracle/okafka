@@ -27,14 +27,12 @@ package org.oracle.okafka.clients.admin;
 import java.util.Collection;
 import java.util.Map;
 
-import org.apache.kafka.clients.admin.Admin;
-import org.apache.kafka.clients.admin.KafkaAdminClient;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.Uuid;
 
 /**
- * The result of the {@link KafkaAdminClient#describeTopics(Collection)} call.
+ * The result of the {@link Admin#describeTopics(Collection)} call.
  *
  * The API of this class is evolving, see {@link Admin} for details.
  */

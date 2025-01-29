@@ -1086,7 +1086,7 @@ public final class AQKafkaConsumer extends AQClient{
 			syncStmt.setInt(2, syncRequest.getVersion());
 			syncStmt.registerOutParameter(1, OracleTypes.ARRAY, typeList);
 			syncStmt.registerOutParameter(2, Types.INTEGER);
-//			System.out.println("SyncGroup 8: Executing SYNC Procedure now");
+			//System.out.println("SyncGroup 8: Executing SYNC Procedure now");
 			syncStmt.execute();
 			//System.out.println("SyncGroup 9: Retrieved  Response. creating qpatInfo array now");
 			QPATInfo[] qpatInfo = ((QPATInfoList)qpatl.create(syncStmt.getObject(1), 2002)).getArray();
