@@ -1827,6 +1827,11 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 	
+	/**
+     * Since we parse the message data for each partition from each fetch response lazily, fetch-level
+     * metrics need to be aggregated as the messages from each partition are parsed. This class is used
+     * to facilitate this incremental aggregation.
+     */
 	private static class FetchResponseMetricAggregator {
 		private final FetchManagerMetrics sensors;
 		private final Set<TopicPartition> unrecordedPartitions;
@@ -1881,7 +1886,13 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 			}
 		}
 	}
-
+	
+	/**
+	 * @hidden
+	 * The {@link FetchManagerMetrics} class provides wrapper methods to record lag, lead, latency, and fetch metrics.
+	 * It keeps an internal ID of the assigned set of partitions which is updated to ensure the set of metrics it
+	 * records matches up with the topic-partitions in use.
+	 */
 	public static class FetchManagerMetrics {
 		private final Metrics metrics;
 		private FetchMetricsRegistry metricsRegistry;

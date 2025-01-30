@@ -50,6 +50,9 @@ import org.apache.kafka.common.config.ConfigDef.Type;
 import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.serialization.Serializer;
 
+/**
+ * Configuration for the OKafka Producer.
+ */
 public class ProducerConfig extends AbstractConfig {
 
 

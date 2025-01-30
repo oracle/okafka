@@ -30,6 +30,11 @@ import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.Uuid;
 
+/**
+ * The result of the {@link Admin#describeTopics(Collection)} call.
+ *
+ * The API of this class is evolving, see {@link Admin} for details.
+ */
 public class DescribeTopicsResult extends org.apache.kafka.clients.admin.DescribeTopicsResult {
 
 	protected DescribeTopicsResult(Map<Uuid, KafkaFuture<TopicDescription>> topicIdFutures, Map<String, KafkaFuture<TopicDescription>> nameFutures) {
