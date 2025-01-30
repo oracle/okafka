@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.kafka.clients.ClientResponse;
+import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.utils.LogContext;
@@ -32,38 +33,33 @@ public class TopicMetadataFetcher {
 
 	private Map<String, List<PartitionInfo>> getTopicMetadata(MetadataRequest.Builder builder, Timer timer) {
 		boolean retry = false;
-		
-		
+
 		do {
-			
-			retry=false;
-			ClientResponse response= client.sendMetadataRequest(builder);
-			MetadataResponse metadataResponse= (MetadataResponse)response.responseBody();
-				
-			if(metadataResponse.getException()==null && !response.wasDisconnected()) {
-				Map<String,List<PartitionInfo>> listTopicsMap=new HashMap<>();
-				
+
+			retry = false;
+			ClientResponse response = client.sendMetadataRequest(builder);
+			MetadataResponse metadataResponse = (MetadataResponse) response.responseBody();
+
+			if (metadataResponse.getException() == null && !response.wasDisconnected()) {
+				Map<String, List<PartitionInfo>> listTopicsMap = new HashMap<>();
+
 				List<PartitionInfo> partitionInfoList = metadataResponse.partitions();
-				for(int i=0;i<partitionInfoList.size();i++) {
-					String topic=partitionInfoList.get(i).topic();
+				for (int i = 0; i < partitionInfoList.size(); i++) {
+					String topic = partitionInfoList.get(i).topic();
 					if (listTopicsMap.containsKey(topic)) {
 						listTopicsMap.get(topic).add(partitionInfoList.get(i));
 					} else {
 						listTopicsMap.put(topic, new ArrayList<>(Arrays.asList(partitionInfoList.get(i))));
 					}
 				}
-				
+
 				return listTopicsMap;
+			} else if (metadataResponse.getException() != null) {
+				throw new KafkaException("Unexpected error while listing topics " + metadataResponse.getException());
+			} else {
+				retry = true;
 			}
-			else if(metadataResponse.getException()!=null) {
-				
-				log.error("Exception Caught: ",metadataResponse.getException());
-				return null;
-			}
-			else {
-				retry=true;
-			}	
-			
+
 		} while (retry && timer.notExpired());
 
 		throw new TimeoutException("Timeout expired while fetching topic metadata");
