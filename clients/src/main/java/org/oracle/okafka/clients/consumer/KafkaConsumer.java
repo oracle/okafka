@@ -1479,11 +1479,33 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 		}
 	}
 	
+	/**
+     * Get metadata about partitions for all topics that the user is authorized to view. This method will issue a
+     * remote call to the server.
+
+     * @return The map of topics and its partitions
+     *
+     * @throws org.apache.kafka.common.KafkaException for any other unrecoverable errors
+     * @throws org.apache.kafka.common.errors.TimeoutException if the offset metadata could not be fetched before
+     *         the amount of time allocated by {@code default.api.timeout.ms} expires.
+     */
 	@Override
 	public Map<String, List<PartitionInfo>> listTopics() {
 		return listTopics(Duration.ofMillis(defaultApiTimeoutMs));
 	}
-
+	
+	/**
+     * Get metadata about partitions for all topics that the user is authorized to view. This method will issue a
+     * remote call to the server.
+     *
+     * @param timeout The maximum time this operation will block to fetch topic metadata
+     *
+     * @return The map of topics and its partitions
+     * 
+     * @throws org.apache.kafka.common.errors.TimeoutException if the topic metadata could not be fetched before
+     *             expiration of the passed timeout
+     * @throws org.apache.kafka.common.KafkaException for any other unrecoverable errors
+     */
 	@Override
 	public Map<String, List<PartitionInfo>> listTopics(Duration timeout) {
 		acquireAndEnsureOpen();
@@ -1527,13 +1549,11 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 	}
 
 	/**
-	 * This method is not yet supported.
-	 */
+     * Get the metrics kept by the consumer
+     */
 	@Override
 	public Map<MetricName, ? extends Metric> metrics() {
 		return Collections.unmodifiableMap(this.metrics.metrics());
-//		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-
 	}
 
 	/**
@@ -1781,47 +1801,67 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 			currentThread.set(NO_CURRENT_THREAD);
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public void seek(TopicPartition partition, OffsetAndMetadata offsetAndMetadata) {
-		// TODO Auto-generated method stub
-
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public Map<TopicPartition, OffsetAndMetadata> committed(Set<TopicPartition> partitions) {
-		// TODO Auto-generated method stub
-		return null;
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public Map<TopicPartition, OffsetAndMetadata> committed(Set<TopicPartition> partitions, Duration timeout) {
-		// TODO Auto-generated method stub
-		return null;
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+     * Return the current group metadata associated with this consumer.
+     *
+     * @return consumer group metadata
+     */
 	@Override
 	public ConsumerGroupMetadata groupMetadata() {
-		// TODO Auto-generated method stub
 		return cgMetadata;
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public void enforceRebalance() {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public void enforceRebalance(String reason) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public Uuid clientInstanceId(Duration timeout) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public OptionalLong currentLag(TopicPartition topicPartition) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");

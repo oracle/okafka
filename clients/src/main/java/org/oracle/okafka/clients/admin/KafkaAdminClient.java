@@ -615,6 +615,12 @@ public class KafkaAdminClient extends AdminClient {
 			Thread.currentThread().interrupt();
 		}
 	}
+	
+	@Override
+	public void close(Duration timeout) {
+		close(timeout.toMillis(),TimeUnit.MILLISECONDS);
+
+	}
 
 	/**
 	 * An interface for providing a node for a call.
@@ -2249,60 +2255,93 @@ public class KafkaAdminClient extends AdminClient {
 		return ListOffsetsRequest.LATEST_TIMESTAMP;
 	}
 	
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DescribeClusterResult describeCluster(DescribeClusterOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DescribeAclsResult describeAcls(final AclBindingFilter filter, DescribeAclsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public CreateAclsResult createAcls(Collection<AclBinding> acls, CreateAclsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DeleteAclsResult deleteAcls(Collection<AclBindingFilter> filters, DeleteAclsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DescribeConfigsResult describeConfigs(Collection<ConfigResource> configResources,
 			final DescribeConfigsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public AlterConfigsResult alterConfigs(Map<ConfigResource, Config> configs, final AlterConfigsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public AlterReplicaLogDirsResult alterReplicaLogDirs(Map<TopicPartitionReplica, String> replicaAssignment,
 			final AlterReplicaLogDirsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DescribeLogDirsResult describeLogDirs(Collection<Integer> brokers, DescribeLogDirsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DescribeReplicaLogDirsResult describeReplicaLogDirs(Collection<TopicPartitionReplica> replicas,
 			DescribeReplicaLogDirsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public CreatePartitionsResult createPartitions(Map<String, NewPartitions> newPartitions,
 			final CreatePartitionsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DeleteRecordsResult deleteRecords(final Map<TopicPartition, RecordsToDelete> recordsToDelete,
 			final DeleteRecordsOptions options) {
@@ -2310,28 +2349,43 @@ public class KafkaAdminClient extends AdminClient {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public CreateDelegationTokenResult createDelegationToken(final CreateDelegationTokenOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public RenewDelegationTokenResult renewDelegationToken(final byte[] hmac,
 			final RenewDelegationTokenOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public ExpireDelegationTokenResult expireDelegationToken(final byte[] hmac,
 			final ExpireDelegationTokenOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DescribeDelegationTokenResult describeDelegationToken(final DescribeDelegationTokenOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DescribeConsumerGroupsResult describeConsumerGroups(final Collection<String> groupIds,
 			final DescribeConsumerGroupsOptions options) {
@@ -2339,17 +2393,26 @@ public class KafkaAdminClient extends AdminClient {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public ListConsumerGroupsResult listConsumerGroups(ListConsumerGroupsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public ListConsumerGroupOffsetsResult listConsumerGroupOffsets(final String groupId,
 			final ListConsumerGroupOffsetsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DeleteConsumerGroupsResult deleteConsumerGroups(Collection<String> groupIds,
 			DeleteConsumerGroupsOptions options) {
@@ -2357,30 +2420,36 @@ public class KafkaAdminClient extends AdminClient {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
-	@Override
-	public void close(Duration timeout) {
-		// TODO Auto-generated method stub
-
-	}
-
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public AlterConfigsResult incrementalAlterConfigs(Map<ConfigResource, Collection<AlterConfigOp>> configs,
 			AlterConfigsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DeleteConsumerGroupOffsetsResult deleteConsumerGroupOffsets(String groupId, Set<TopicPartition> partitions,
 			DeleteConsumerGroupOffsetsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public ElectLeadersResult electLeaders(ElectionType electionType, Set<TopicPartition> partitions,
 			ElectLeadersOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public AlterPartitionReassignmentsResult alterPartitionReassignments(
 			Map<TopicPartition, Optional<NewPartitionReassignment>> reassignments,
@@ -2388,112 +2457,172 @@ public class KafkaAdminClient extends AdminClient {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public ListPartitionReassignmentsResult listPartitionReassignments(Optional<Set<TopicPartition>> partitions,
 			ListPartitionReassignmentsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public RemoveMembersFromConsumerGroupResult removeMembersFromConsumerGroup(String groupId,
 			RemoveMembersFromConsumerGroupOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public AlterConsumerGroupOffsetsResult alterConsumerGroupOffsets(String groupId,
 			Map<TopicPartition, OffsetAndMetadata> offsets, AlterConsumerGroupOffsetsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DescribeClientQuotasResult describeClientQuotas(ClientQuotaFilter filter,
 			DescribeClientQuotasOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public AlterClientQuotasResult alterClientQuotas(Collection<ClientQuotaAlteration> entries,
 			AlterClientQuotasOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DescribeUserScramCredentialsResult describeUserScramCredentials(List<String> users,
 			DescribeUserScramCredentialsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public AlterUserScramCredentialsResult alterUserScramCredentials(List<UserScramCredentialAlteration> alterations,
 			AlterUserScramCredentialsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DescribeFeaturesResult describeFeatures(DescribeFeaturesOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public UpdateFeaturesResult updateFeatures(Map<String, FeatureUpdate> featureUpdates,
 			UpdateFeaturesOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public UnregisterBrokerResult unregisterBroker(int brokerId, UnregisterBrokerOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public Map<MetricName, ? extends Metric> metrics() {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public ListConsumerGroupOffsetsResult listConsumerGroupOffsets(Map<String, ListConsumerGroupOffsetsSpec> groupSpecs,
 			ListConsumerGroupOffsetsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DescribeMetadataQuorumResult describeMetadataQuorum(DescribeMetadataQuorumOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DescribeProducersResult describeProducers(Collection<TopicPartition> partitions,
 			DescribeProducersOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public DescribeTransactionsResult describeTransactions(Collection<String> transactionalIds,
 			DescribeTransactionsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public AbortTransactionResult abortTransaction(AbortTransactionSpec spec, AbortTransactionOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public ListTransactionsResult listTransactions(ListTransactionsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public FenceProducersResult fenceProducers(Collection<String> transactionalIds, FenceProducersOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public Uuid clientInstanceId(Duration timeout) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
+	/**
+	 * This method is not yet supported.
+	 */
 	@Override
 	public ListClientMetricsResourcesResult listClientMetricsResources(ListClientMetricsResourcesOptions arg0) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
