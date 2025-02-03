@@ -249,12 +249,7 @@ public class ConsumerNetworkClient {
 			for(Map.Entry<Node, String> poll : pollMap.entrySet()) {	
 				Node node = poll.getKey();
 				log.debug("Fetch Records for topic " + poll.getValue() + " from host " + node );
-				String topic =  poll.getValue();
-				if(metadata.topicParaMap.get(topic).getStickyDeq() != 2) {
-					String errMsg = "Topic " + topic + " is not an Oracle kafka topic, Please drop and re-create topic"
-							+" using Admin.createTopics() or dbms_aqadm.create_database_kafka_topic procedure";
-					throw new InvalidTopicException(errMsg);				
-				}
+
 				if(!this.client.ready(node, now)) {
 					log.debug("Failed to consume messages from node: {}", node);
 					//ToDo: Retry poll to get new connection to same or different node.
@@ -397,7 +392,6 @@ public class ConsumerNetworkClient {
 			long elapsed = response.requestLatencyMs();
 			long prevTime = time.milliseconds();
 			long current;
-
 			while(elapsed < timeoutMs && rejoinNeeded(exception)) {
 				log.debug("JoinGroup Is Needed");
 				if (needsJoinPrepare) {
@@ -415,6 +409,7 @@ public class ConsumerNetworkClient {
 				elapsed = elapsed + (current - prevTime);
 				prevTime = current;
 			}
+			
 		} catch(Exception e)
 		{
 			log.error(e.getMessage(), e);
@@ -691,7 +686,6 @@ public class ConsumerNetworkClient {
 		
 		if(!subscriptions.subscription().equals(subscriptionSnapshot)) {
 			boolean noSubExist = false;
-			rejoin = true;
 			String topic = getSubscribableTopics();
 			long now = time.milliseconds();
 			Node node = client.leastLoadedNode(now);

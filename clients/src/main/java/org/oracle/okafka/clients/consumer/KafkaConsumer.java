@@ -1215,13 +1215,12 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 					subscriptions.position(tp, new FetchPosition(record.offset(), Optional.empty(),
 							new LeaderAndEpoch(Optional.empty(), Optional.empty())));
 				} catch (IllegalStateException isE) {
-					if (metadata.getDBMajorVersion() < 23) {
+					if (metadata.getDBMajorVersion() < 23 || metadata.topicParaMap.get(topic).getStickyDeq() == 1
+							|| metadata.topicParaMap.get(topic).getStickyDeq() == 0) {
 						// Partition assigned by TEQ Server not through JoinGroup/Sync
 						subscriptions.assignFromSubscribed(Collections.singleton(tp));
 						subscriptions.seek(tp, 0);
 						subscriptions.completeValidation(tp);
-						subscriptions.position(tp, new FetchPosition(record.offset(), Optional.empty(),
-								new LeaderAndEpoch(Optional.empty(), Optional.empty())));
 					}
 					subscriptions.position(tp, new FetchPosition(record.offset(), Optional.empty(),
 							new LeaderAndEpoch(Optional.empty(), Optional.empty())));
