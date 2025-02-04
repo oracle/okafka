@@ -1217,7 +1217,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 							new LeaderAndEpoch(Optional.empty(), Optional.empty())));
 				} catch (IllegalStateException isE) {
 					TopicTeqParameters teqParam = metadata.topicParaMap.get(topic);
-					int stickyDeqParam = teqParam != null ? teqParam.getStickyDeq(): null;
+					int stickyDeqParam = teqParam != null ? teqParam.getStickyDeq(): 2;
 					if (metadata.getDBMajorVersion() < 23 || stickyDeqParam == 1) {
 						// Partition assigned by TEQ Server not through JoinGroup/Sync
 						subscriptions.assignFromSubscribed(Collections.singleton(tp));

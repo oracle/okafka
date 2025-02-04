@@ -252,9 +252,8 @@ public class ConsumerNetworkClient {
 				log.debug("Fetch Records for topic " + poll.getValue() + " from host " + node );
 				String topic =  poll.getValue();
 				TopicTeqParameters teqParam = metadata.topicParaMap.get(topic);
-				int stickyDeqParam = teqParam != null ? teqParam.getStickyDeq(): null;
+				int stickyDeqParam = teqParam != null ? teqParam.getStickyDeq(): 2;
 				if(stickyDeqParam == 0) {
-					System.out.println(metadata.topicParaMap.get(topic).getStickyDeq());
 					String errMsg = "Topic " + topic + " is not an Oracle kafka topic, Please drop and re-create topic"
 							+" using Admin.createTopics() or dbms_aqadm.create_database_kafka_topic procedure";
 					throw new InvalidTopicException(errMsg);				
@@ -282,7 +281,7 @@ public class ConsumerNetworkClient {
 		
 		return this.messages;
 	}
-	
+
 	/**
 	 * 
 	 * @return map of <node , topic> . Every node is leader for its corresponding topic.
