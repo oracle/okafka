@@ -63,6 +63,7 @@ import org.apache.kafka.clients.ClientResponse;
 import org.oracle.okafka.clients.KafkaClient;
 import org.oracle.okafka.clients.Metadata;
 import org.oracle.okafka.clients.NetworkClient;
+import org.oracle.okafka.clients.TopicTeqParameters;
 import org.oracle.okafka.clients.consumer.KafkaConsumer.FetchManagerMetrics;
 import org.oracle.okafka.clients.consumer.internals.SubscriptionState.FetchPosition;
 import org.apache.kafka.clients.RequestCompletionHandler;
@@ -250,7 +251,9 @@ public class ConsumerNetworkClient {
 				Node node = poll.getKey();
 				log.debug("Fetch Records for topic " + poll.getValue() + " from host " + node );
 				String topic =  poll.getValue();
-				if(metadata.topicParaMap.get(topic).getStickyDeq() != 2) {
+				TopicTeqParameters teqParam = metadata.topicParaMap.get(topic);
+				int stickyDeqParam = teqParam != null ? teqParam.getStickyDeq(): 2;
+				if(stickyDeqParam == 0) {
 					String errMsg = "Topic " + topic + " is not an Oracle kafka topic, Please drop and re-create topic"
 							+" using Admin.createTopics() or dbms_aqadm.create_database_kafka_topic procedure";
 					throw new InvalidTopicException(errMsg);				
@@ -278,7 +281,7 @@ public class ConsumerNetworkClient {
 		
 		return this.messages;
 	}
-	
+
 	/**
 	 * 
 	 * @return map of <node , topic> . Every node is leader for its corresponding topic.
@@ -397,7 +400,6 @@ public class ConsumerNetworkClient {
 			long elapsed = response.requestLatencyMs();
 			long prevTime = time.milliseconds();
 			long current;
-
 			while(elapsed < timeoutMs && rejoinNeeded(exception)) {
 				log.debug("JoinGroup Is Needed");
 				if (needsJoinPrepare) {
@@ -415,6 +417,7 @@ public class ConsumerNetworkClient {
 				elapsed = elapsed + (current - prevTime);
 				prevTime = current;
 			}
+			
 		} catch(Exception e)
 		{
 			log.error(e.getMessage(), e);
@@ -691,7 +694,6 @@ public class ConsumerNetworkClient {
 		
 		if(!subscriptions.subscription().equals(subscriptionSnapshot)) {
 			boolean noSubExist = false;
-			rejoin = true;
 			String topic = getSubscribableTopics();
 			long now = time.milliseconds();
 			Node node = client.leastLoadedNode(now);
