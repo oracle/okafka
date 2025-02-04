@@ -78,6 +78,7 @@ import org.apache.kafka.clients.consumer.OffsetResetStrategy;
 import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.clients.Metadata;
 import org.oracle.okafka.clients.NetworkClient;
+import org.oracle.okafka.clients.TopicTeqParameters;
 import org.apache.kafka.clients.consumer.internals.ConsumerInterceptors;
 import org.oracle.okafka.clients.consumer.internals.ConsumerNetworkClient;
 import org.oracle.okafka.clients.consumer.internals.FetchMetricsRegistry;
@@ -1215,8 +1216,9 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 					subscriptions.position(tp, new FetchPosition(record.offset(), Optional.empty(),
 							new LeaderAndEpoch(Optional.empty(), Optional.empty())));
 				} catch (IllegalStateException isE) {
-					if (metadata.getDBMajorVersion() < 23 || metadata.topicParaMap.get(topic).getStickyDeq() == 1
-							|| metadata.topicParaMap.get(topic).getStickyDeq() == 0) {
+					TopicTeqParameters teqParam = metadata.topicParaMap.get(topic);
+					int stickyDeqParam = teqParam != null ? teqParam.getStickyDeq(): null;
+					if (metadata.getDBMajorVersion() < 23 || stickyDeqParam == 1) {
 						// Partition assigned by TEQ Server not through JoinGroup/Sync
 						subscriptions.assignFromSubscribed(Collections.singleton(tp));
 						subscriptions.seek(tp, 0);

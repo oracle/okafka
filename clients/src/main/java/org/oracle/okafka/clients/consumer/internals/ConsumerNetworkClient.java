@@ -63,6 +63,7 @@ import org.apache.kafka.clients.ClientResponse;
 import org.oracle.okafka.clients.KafkaClient;
 import org.oracle.okafka.clients.Metadata;
 import org.oracle.okafka.clients.NetworkClient;
+import org.oracle.okafka.clients.TopicTeqParameters;
 import org.oracle.okafka.clients.consumer.KafkaConsumer.FetchManagerMetrics;
 import org.oracle.okafka.clients.consumer.internals.SubscriptionState.FetchPosition;
 import org.apache.kafka.clients.RequestCompletionHandler;
@@ -249,7 +250,15 @@ public class ConsumerNetworkClient {
 			for(Map.Entry<Node, String> poll : pollMap.entrySet()) {	
 				Node node = poll.getKey();
 				log.debug("Fetch Records for topic " + poll.getValue() + " from host " + node );
-
+				String topic =  poll.getValue();
+				TopicTeqParameters teqParam = metadata.topicParaMap.get(topic);
+				int stickyDeqParam = teqParam != null ? teqParam.getStickyDeq(): null;
+				if(stickyDeqParam == 0) {
+					System.out.println(metadata.topicParaMap.get(topic).getStickyDeq());
+					String errMsg = "Topic " + topic + " is not an Oracle kafka topic, Please drop and re-create topic"
+							+" using Admin.createTopics() or dbms_aqadm.create_database_kafka_topic procedure";
+					throw new InvalidTopicException(errMsg);				
+				}
 				if(!this.client.ready(node, now)) {
 					log.debug("Failed to consume messages from node: {}", node);
 					//ToDo: Retry poll to get new connection to same or different node.
