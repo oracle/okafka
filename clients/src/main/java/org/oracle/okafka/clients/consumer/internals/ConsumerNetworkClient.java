@@ -48,6 +48,7 @@ import org.apache.kafka.clients.consumer.ConsumerPartitionAssignor;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.common.errors.InterruptException;
 import org.apache.kafka.common.errors.InvalidTopicException;
+import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.metrics.Measurable;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.metrics.Sensor;
@@ -89,7 +90,8 @@ import org.oracle.okafka.common.requests.FetchResponse;
 import org.oracle.okafka.common.requests.JoinGroupRequest;
 import org.oracle.okafka.common.requests.JoinGroupResponse;
 import org.oracle.okafka.common.requests.MetadataRequest;
-import org.oracle.okafka.common.requests.MetadataResponse;
+import org.oracle.okafka.common.requests.OffsetFetchRequest;
+import org.oracle.okafka.common.requests.OffsetFetchResponse;
 import org.oracle.okafka.common.requests.OffsetResetRequest;
 import org.oracle.okafka.common.requests.OffsetResetResponse;
 import org.oracle.okafka.common.requests.SubscribeRequest;
@@ -99,6 +101,7 @@ import org.oracle.okafka.common.requests.SyncGroupResponse;
 import org.oracle.okafka.common.requests.UnsubscribeRequest;
 import org.oracle.okafka.common.requests.UnsubscribeResponse;
 import org.apache.kafka.common.utils.Time;
+import org.apache.kafka.common.utils.Timer;
 import org.slf4j.Logger;
 import oracle.jms.AQjmsBytesMessage;
 import org.oracle.okafka.common.utils.ConnectionUtils;
@@ -977,6 +980,46 @@ public class ConsumerNetworkClient {
 			nextAutoCommitDeadline = time.milliseconds() + autoCommitIntervalMs;
 		}
 	} 
+	
+	public Map<TopicPartition,OffsetAndMetadata> fetchCommittedOffsets(Set<TopicPartition> partitions, Timer timer){
+		
+		long now = time.milliseconds();
+		OffsetFetchRequest.Builder requestBuilder = new OffsetFetchRequest.Builder(consumerGroupId, new ArrayList<>(partitions));
+		ClientRequest clientRequest = client.newClientRequest(client.leastLoadedNode(now),
+				requestBuilder, now, true, requestTimeoutMs, null);
+		boolean retry = false;
+		do {
+			retry=false;
+			ClientResponse response = this.client.send(clientRequest, now);  
+			OffsetFetchResponse offsetResponse = (OffsetFetchResponse)response.responseBody();
+			
+			if(offsetResponse.getException()==null && !response.wasDisconnected()) {
+				Map<TopicPartition, OffsetAndMetadata> offsetResponseMap = new HashMap<>();
+				Map<TopicPartition, Long> offsetFetchResponseMap = offsetResponse.getOffsetFetchResponseMap();
+				
+				for(Map.Entry<TopicPartition, Long> entry : offsetFetchResponseMap.entrySet()) {
+					if(entry.getValue()!= null) {
+						offsetResponseMap.put(entry.getKey(), new OffsetAndMetadata(entry.getValue()));
+					}
+					else {
+						offsetResponseMap.put(entry.getKey(), null);
+					}
+				}
+				
+				return offsetResponseMap;
+			}
+			else if(response.wasDisconnected())
+				retry = true;
+			else {
+				log.error("Exception Caught: ",offsetResponse.getException());
+				throw new KafkaException("Unexpected error fetching Committed Offsets",offsetResponse.getException());
+			}
+			
+		} while (retry && timer.notExpired());
+
+		throw new TimeoutException("Timeout expired while fetching topic metadata");
+	
+	}
 
 	public void unsubscribe() {
 		

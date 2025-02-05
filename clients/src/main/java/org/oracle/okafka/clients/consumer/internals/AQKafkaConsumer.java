@@ -51,6 +51,7 @@ import org.oracle.okafka.common.Node;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.metrics.Metrics;
 
 import org.oracle.okafka.common.internals.PartitionData;
@@ -70,7 +71,10 @@ import org.oracle.okafka.common.requests.FetchRequest;
 import org.oracle.okafka.common.requests.FetchResponse;
 import org.oracle.okafka.common.requests.JoinGroupRequest;
 import org.oracle.okafka.common.requests.JoinGroupResponse;
+import org.oracle.okafka.common.requests.ListOffsetsRequest;
 import org.oracle.okafka.common.requests.MetadataResponse;
+import org.oracle.okafka.common.requests.OffsetFetchRequest;
+import org.oracle.okafka.common.requests.OffsetFetchResponse;
 import org.oracle.okafka.common.requests.OffsetResetRequest;
 import org.oracle.okafka.common.requests.OffsetResetResponse;
 import org.oracle.okafka.common.requests.SubscribeRequest;
@@ -79,6 +83,7 @@ import org.oracle.okafka.common.requests.SyncGroupRequest;
 import org.oracle.okafka.common.requests.SyncGroupResponse;
 import org.oracle.okafka.common.requests.UnsubscribeResponse;
 import org.oracle.okafka.common.utils.ConnectionUtils;
+import org.oracle.okafka.common.utils.FetchOffsets;
 import org.apache.kafka.common.utils.LogContext;
 import org.oracle.okafka.common.utils.MessageIdConverter;
 import org.oracle.okafka.common.utils.MessageIdConverter.OKafkaOffset;
@@ -156,6 +161,8 @@ public final class AQKafkaConsumer extends AQClient{
 			return getMetadata(request);
 		case CONNECT_ME:
 			return connectMe(request);
+		case OFFSET_FETCH:
+			return fetchOffsets(request);
 		}
 		return null;
 	}
@@ -1157,6 +1164,92 @@ public final class AQKafkaConsumer extends AQClient{
 		return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
 				request.createdTimeMs(), time.milliseconds(), disconnected, null,null, new SyncGroupResponse(data, version, exception));
 	}
+	
+	private ClientResponse fetchOffsets(ClientRequest request) {
+		log.debug("Sending  Fetch Offset Request");
+		
+		OffsetFetchRequest.Builder builder = (OffsetFetchRequest.Builder) request.requestBuilder();
+		OffsetFetchRequest offsetFetchRequest = builder.build();
+		List<TopicPartition> topicPartitions = offsetFetchRequest.partitions();
+		String groupId = offsetFetchRequest.groupId();
+		Map<TopicPartition,Long> offsetFetchResponseMap = new HashMap<>();
+		boolean disconnected = false;
+		Exception exception = null;
+		Connection jdbcConn = null;
+		Node node = null;
+		if(metadata.isBootstrap())
+		{
+			Cluster cluster = metadata.fetch();
+			List<Node> clusterNodes = NetworkClient.convertToOracleNodes(cluster.nodes());
+			// Check if we have a node where connection already exists
+			Set<Node> nodesWithConn = topicConsumersMap.keySet();
+			for(Node nodeNow: clusterNodes)
+			{
+				for(Node connectedNode : nodesWithConn)
+				{
+					if(connectedNode.equals(nodeNow))
+					{
+						//Found a node with a connection to database.
+						node = nodeNow;
+						break;
+					}
+				}
+			}
+			if(node == null)
+			{
+				//No node with connection yet. Pick the first bootstrap node.
+				node = clusterNodes.get(0);
+				log.debug("No Connected Node Found. Picked first of bootstrap nodes.: " + node);
+			}
+		}
+		else
+		{
+			node = (org.oracle.okafka.common.Node)metadata.getNodeById(Integer.parseInt(request.destination()));
+		}
+		System.out.println("++++"+ request.destination());
+		System.out.println("+++++++++++++++" + node);
+		try {
+			connect(node);
+			jdbcConn = getDBConnection(node);
+			for(TopicPartition tp : topicPartitions) {
+				try {
+					int totalPartition = getQueueParameter(SHARDNUM_PARAM, tp.topic(), jdbcConn);
+					if(tp.partition()>=totalPartition) {
+						log.error("Invalid Partition number ",new IllegalArgumentException("Invalid Partition number: "+ tp.topic() + "-" + tp.partition()));
+						offsetFetchResponseMap.put(tp, null);
+						continue;
+					}
+					long offset = FetchOffsets.fetchCommittedOffset(tp.topic(), tp.partition(), groupId, jdbcConn);
+					offsetFetchResponseMap.put(tp, offset);
+				} catch (SQLException sqlE) {
+					if(sqlE.getErrorCode() == 24010)
+						log.error("Invalid Topic Name ",new InvalidTopicException(sqlE));
+					offsetFetchResponseMap.put(tp, null);
+				}
+			}
+			
+		} catch (Exception e) {
+			try {
+				System.out.println(e);
+				disconnected = true;
+				exception = e;
+				log.debug("Unexcepted error occured with connection to node {}, closing the connection",
+						request.destination());
+				if (jdbcConn != null)
+					jdbcConn.close();
+
+				log.trace("Connection with node {} is closed", request.destination());
+			} catch (SQLException sqlEx) {
+				log.trace("Failed to close connection with node {}", request.destination());
+			}
+		}
+		
+		OffsetFetchResponse offsetResponse = new OffsetFetchResponse(offsetFetchResponseMap);
+		offsetResponse.setException(exception);
+		
+		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
+				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null, offsetResponse);
+	}
 
 	public ClientResponse connectMe(ClientRequest request)
 	{
@@ -1265,6 +1358,7 @@ public final class AQKafkaConsumer extends AQClient{
 			} catch(JMSException e) {
 				log.error("Exception while creating Topic consumer " + e, e );
 				close(node, nodeConsumers);
+				System.out.println("errror in connect"+e);
 				throw e;
 			}
 		}
@@ -1448,7 +1542,7 @@ public final class AQKafkaConsumer extends AQClient{
 					topicConsumersMap.put((org.oracle.okafka.common.Node)bNode, bootStrapConsumer);
 					break;
 				}
-				// A connection was created before poll is invoked. This connection is passed on to the application and may be used for transactionala activity.
+				// A connection was created before poll is invoked. This connection is passed on to the application and may be used for transactional activity.
 				// OKafkaConsumer must use this connection going forward. Hence it should not look for optimal database instance to consume records. Hence avoid connectMe call.
 				skipConnectMe = true;
 			}
