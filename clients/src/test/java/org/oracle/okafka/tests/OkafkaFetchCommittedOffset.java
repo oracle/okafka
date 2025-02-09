@@ -23,7 +23,6 @@ public class OkafkaFetchCommittedOffset {
 		prop.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
 		
 		Consumer<String, String> consumer = new KafkaConsumer<String, String>(prop);
-		consumer.subscribe(Arrays.asList("TEQ"));
 		try {
 			Set<TopicPartition> topicPartitons = new HashSet<>();
 			topicPartitons.add(new TopicPartition("TEQ",0));

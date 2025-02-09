@@ -1166,46 +1166,45 @@ public final class AQKafkaConsumer extends AQClient{
 	}
 	
 	private ClientResponse fetchOffsets(ClientRequest request) {
-		log.debug("Sending  Fetch Offset Request");
-		
+
 		OffsetFetchRequest.Builder builder = (OffsetFetchRequest.Builder) request.requestBuilder();
 		OffsetFetchRequest offsetFetchRequest = builder.build();
 		List<TopicPartition> topicPartitions = offsetFetchRequest.partitions();
 		String groupId = offsetFetchRequest.groupId();
-		Map<TopicPartition,Long> offsetFetchResponseMap = new HashMap<>();
+		Map<TopicPartition, Long> offsetFetchResponseMap = new HashMap<>();
 		boolean disconnected = false;
 		Exception exception = null;
 		Connection jdbcConn = null;
-		TopicConsumers topicConsumer=null;
-		
-		for(Node nodeNow : topicConsumersMap.keySet()) {
-			if(request.destination().equals(""+nodeNow.id())) {
-				topicConsumer=topicConsumersMap.get(nodeNow);
+		TopicConsumers topicConsumer = null;
+
+		for (Node nodeNow : topicConsumersMap.keySet()) {
+			if (request.destination().equals("" + nodeNow.id())) {
+				topicConsumer = topicConsumersMap.get(nodeNow);
 			}
 		}
 		try {
 			jdbcConn = topicConsumer.getDBConnection();
-			for(TopicPartition tp : topicPartitions) {
+			for (TopicPartition tp : topicPartitions) {
 				try {
 					int totalPartition = getQueueParameter(SHARDNUM_PARAM, tp.topic(), jdbcConn);
-					if(tp.partition()>=totalPartition) {
+					if (tp.partition() >= totalPartition) {
 						offsetFetchResponseMap.put(tp, null);
 						continue;
 					}
 					long offset = FetchOffsets.fetchCommittedOffset(tp.topic(), tp.partition(), groupId, jdbcConn);
-					if(offset != -1)
+					if (offset != -1)
 						offsetFetchResponseMap.put(tp, offset);
 					else
 						offsetFetchResponseMap.put(tp, null);
 				} catch (SQLException sqlE) {
-					if(sqlE.getErrorCode() == 24010)
+					if (sqlE.getErrorCode() == 24010)
 						offsetFetchResponseMap.put(tp, null);
-					else 
+					else
 						throw sqlE;
-					
+
 				}
 			}
-			
+
 		} catch (Exception e) {
 			try {
 				disconnected = true;
@@ -1220,10 +1219,10 @@ public final class AQKafkaConsumer extends AQClient{
 				log.trace("Failed to close connection with node {}", request.destination());
 			}
 		}
-		
+
 		OffsetFetchResponse offsetResponse = new OffsetFetchResponse(offsetFetchResponseMap);
 		offsetResponse.setException(exception);
-		
+
 		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
 				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null, offsetResponse);
 	}

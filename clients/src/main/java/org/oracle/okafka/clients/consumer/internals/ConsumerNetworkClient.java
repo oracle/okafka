@@ -995,8 +995,11 @@ public class ConsumerNetworkClient {
 
 		do {
 			retry = false;
+
+			log.debug("Sending  Fetch Offset Request");
 			ClientResponse response = this.client.send(clientRequest, now);
 			OffsetFetchResponse offsetResponse = (OffsetFetchResponse) response.responseBody();
+			log.debug("Recieved Offset Fetch Response ");
 
 			if (offsetResponse.getException() == null && !response.wasDisconnected()) {
 				Map<TopicPartition, OffsetAndMetadata> offsetResponseMap = new HashMap<>();

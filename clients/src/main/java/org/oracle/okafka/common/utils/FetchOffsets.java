@@ -361,8 +361,9 @@ public class FetchOffsets {
 
 	}
 	
-	public static long fetchCommittedOffset(String topic, int partition, String subscriberName, Connection jdbcConn) throws SQLException {
-		
+	public static long fetchCommittedOffset(String topic, int partition, String subscriberName, Connection jdbcConn)
+			throws SQLException {
+
 		CallableStatement cStmt = null;
 		try {
 			cStmt = jdbcConn.prepareCall(COMMITTED_OFFSET_PLSQL);
@@ -374,22 +375,22 @@ public class FetchOffsets {
 			cStmt.registerOutParameter(5, Types.INTEGER);
 
 			cStmt.executeQuery();
-			
+
 			int subshard = cStmt.getInt(4);
 			long sequence = cStmt.getInt(5);
-			if(sequence == -1)
+			if (sequence == -1)
 				return -1;
-			long offset = subshard*MessageIdConverter.DEFAULT_SUBPARTITION_SIZE + sequence;
+			long offset = subshard * MessageIdConverter.DEFAULT_SUBPARTITION_SIZE + sequence;
 			return offset;
-			
-		} catch(SQLException sqle) {
+
+		} catch (SQLException sqle) {
 			if (sqle.getErrorCode() == 1403) {
 				return -1;
 			} else
 				throw sqle;
 		} finally {
 			try {
-				if(cStmt!=null)
+				if (cStmt != null)
 					cStmt.close();
 			} catch (Exception ex) {
 				// do nothing

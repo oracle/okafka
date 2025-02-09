@@ -17,12 +17,11 @@ public class OkafkaAutoOffsetReset {
 	public void autoOffsetSeekTest() throws IOException {
 		Properties prop = new Properties();
 		prop = OkafkaSetup.setup();
-        prop.put("group.id" , "S67");
+        prop.put("group.id" , "S1");
 		prop.put("max.poll.records", 1000);
 		prop.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
 		prop.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
 		prop.put("auto.offset.reset", "earliest");
-		System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "DEBUG");
 
 		Consumer<String, String> consumer = new KafkaConsumer<String, String>(prop);
 		
@@ -33,9 +32,7 @@ public class OkafkaAutoOffsetReset {
 		try {
 			 while(true) {
 		     try {
-//		    	System.out.println(consumer.listTopics());
 		    	ConsumerRecords <String, String> records = consumer.poll(Duration.ofMillis(10000));
-//		    	System.out.println(consumer.listTopics());
 		   
 		    	for (ConsumerRecord<String, String> record : records)				
 		    		System.out.printf("partition = %d, offset = %d, key = %s, value =%s\n  ", record.partition(), record.offset(), record.key(), record.value());
