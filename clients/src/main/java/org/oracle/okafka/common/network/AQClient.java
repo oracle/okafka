@@ -41,10 +41,8 @@ import org.oracle.okafka.common.requests.ListOffsetsResponse.ListOffsetsPartitio
 import org.oracle.okafka.common.utils.ConnectionUtils;
 import org.oracle.okafka.common.utils.CreateTopics;
 import org.oracle.okafka.common.utils.FetchOffsets;
-import org.oracle.okafka.common.utils.MessageIdConverter;
 import org.slf4j.Logger;
 import java.sql.Timestamp;
-import java.sql.Types;
 import java.sql.Date;
 
 import javax.jms.JMSException;

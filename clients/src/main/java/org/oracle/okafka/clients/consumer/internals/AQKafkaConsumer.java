@@ -51,7 +51,6 @@ import org.oracle.okafka.common.Node;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
-import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.metrics.Metrics;
 
 import org.oracle.okafka.common.internals.PartitionData;
@@ -71,7 +70,6 @@ import org.oracle.okafka.common.requests.FetchRequest;
 import org.oracle.okafka.common.requests.FetchResponse;
 import org.oracle.okafka.common.requests.JoinGroupRequest;
 import org.oracle.okafka.common.requests.JoinGroupResponse;
-import org.oracle.okafka.common.requests.ListOffsetsRequest;
 import org.oracle.okafka.common.requests.MetadataResponse;
 import org.oracle.okafka.common.requests.OffsetFetchRequest;
 import org.oracle.okafka.common.requests.OffsetFetchResponse;
