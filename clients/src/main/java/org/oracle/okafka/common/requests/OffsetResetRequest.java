@@ -50,7 +50,7 @@ public class OffsetResetRequest extends AbstractRequest {
 	private final Map<TopicPartition, Long> offsetResetTimestamps;
 	private final long pollTimeoutMs;
 	private OffsetResetRequest(Map<TopicPartition, Long> offsetResetTimestamps, long pollTimeoutMs) {
-		super(ApiKeys.OFFSETRESET, (short)1);
+		super(ApiKeys.OFFSETRESET, (short)0);
 		this.offsetResetTimestamps = offsetResetTimestamps;
 		this.pollTimeoutMs = pollTimeoutMs;
 	}

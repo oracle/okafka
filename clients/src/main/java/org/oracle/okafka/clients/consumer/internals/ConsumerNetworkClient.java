@@ -981,44 +981,47 @@ public class ConsumerNetworkClient {
 		}
 	} 
 	
-	public Map<TopicPartition,OffsetAndMetadata> fetchCommittedOffsets(Set<TopicPartition> partitions, Timer timer){
-		
+	public Map<TopicPartition, OffsetAndMetadata> fetchCommittedOffsets(Set<TopicPartition> partitions, Timer timer) {
+
 		long now = time.milliseconds();
-		OffsetFetchRequest.Builder requestBuilder = new OffsetFetchRequest.Builder(consumerGroupId, new ArrayList<>(partitions));
-		ClientRequest clientRequest = client.newClientRequest(client.leastLoadedNode(now),
-				requestBuilder, now, true, requestTimeoutMs, null);
+		OffsetFetchRequest.Builder requestBuilder = new OffsetFetchRequest.Builder(consumerGroupId,
+				new ArrayList<>(partitions));
+		Node node = client.leastLoadedNode(now);
+		if (node == null || !client.ready(node, now))
+			throw new KafkaException("Couldn't connect to any node for Fetching Committed Offsets");
+		ClientRequest clientRequest = client.newClientRequest(client.leastLoadedNode(now), requestBuilder, now, true,
+				requestTimeoutMs, null);
 		boolean retry = false;
+
 		do {
-			retry=false;
-			ClientResponse response = this.client.send(clientRequest, now);  
-			OffsetFetchResponse offsetResponse = (OffsetFetchResponse)response.responseBody();
-			
-			if(offsetResponse.getException()==null && !response.wasDisconnected()) {
+			retry = false;
+			ClientResponse response = this.client.send(clientRequest, now);
+			OffsetFetchResponse offsetResponse = (OffsetFetchResponse) response.responseBody();
+
+			if (offsetResponse.getException() == null && !response.wasDisconnected()) {
 				Map<TopicPartition, OffsetAndMetadata> offsetResponseMap = new HashMap<>();
 				Map<TopicPartition, Long> offsetFetchResponseMap = offsetResponse.getOffsetFetchResponseMap();
-				
-				for(Map.Entry<TopicPartition, Long> entry : offsetFetchResponseMap.entrySet()) {
-					if(entry.getValue()!= null) {
+
+				for (Map.Entry<TopicPartition, Long> entry : offsetFetchResponseMap.entrySet()) {
+					if (entry.getValue() != null) {
 						offsetResponseMap.put(entry.getKey(), new OffsetAndMetadata(entry.getValue()));
-					}
-					else {
+					} else {
 						offsetResponseMap.put(entry.getKey(), null);
 					}
 				}
-				
+
 				return offsetResponseMap;
-			}
-			else if(response.wasDisconnected())
+			} else if (response.wasDisconnected())
 				retry = true;
 			else {
-				log.error("Exception Caught: ",offsetResponse.getException());
-				throw new KafkaException("Unexpected error fetching Committed Offsets",offsetResponse.getException());
+				log.error("Exception Caught: ", offsetResponse.getException());
+				throw new KafkaException("Unexpected error fetching Committed Offsets", offsetResponse.getException());
 			}
-			
+
 		} while (retry && timer.notExpired());
 
 		throw new TimeoutException("Timeout expired while fetching topic metadata");
-	
+
 	}
 
 	public void unsubscribe() {

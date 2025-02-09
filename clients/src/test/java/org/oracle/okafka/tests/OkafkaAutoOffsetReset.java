@@ -26,7 +26,7 @@ public class OkafkaAutoOffsetReset {
 
 		Consumer<String, String> consumer = new KafkaConsumer<String, String>(prop);
 		
-		consumer.subscribe(Arrays.asList("TEQ2"));
+		consumer.subscribe(Arrays.asList("TEQ"));
 		
 		int expectedMsgCnt = 1000;
 		int msgCnt = 0;		

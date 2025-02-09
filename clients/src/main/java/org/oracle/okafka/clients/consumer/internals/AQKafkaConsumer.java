@@ -1176,61 +1176,38 @@ public final class AQKafkaConsumer extends AQClient{
 		boolean disconnected = false;
 		Exception exception = null;
 		Connection jdbcConn = null;
-		Node node = null;
-		if(metadata.isBootstrap())
-		{
-			Cluster cluster = metadata.fetch();
-			List<Node> clusterNodes = NetworkClient.convertToOracleNodes(cluster.nodes());
-			// Check if we have a node where connection already exists
-			Set<Node> nodesWithConn = topicConsumersMap.keySet();
-			for(Node nodeNow: clusterNodes)
-			{
-				for(Node connectedNode : nodesWithConn)
-				{
-					if(connectedNode.equals(nodeNow))
-					{
-						//Found a node with a connection to database.
-						node = nodeNow;
-						break;
-					}
-				}
-			}
-			if(node == null)
-			{
-				//No node with connection yet. Pick the first bootstrap node.
-				node = clusterNodes.get(0);
-				log.debug("No Connected Node Found. Picked first of bootstrap nodes.: " + node);
+		TopicConsumers topicConsumer=null;
+		
+		for(Node nodeNow : topicConsumersMap.keySet()) {
+			if(request.destination().equals(""+nodeNow.id())) {
+				topicConsumer=topicConsumersMap.get(nodeNow);
 			}
 		}
-		else
-		{
-			node = (org.oracle.okafka.common.Node)metadata.getNodeById(Integer.parseInt(request.destination()));
-		}
-		System.out.println("++++"+ request.destination());
-		System.out.println("+++++++++++++++" + node);
 		try {
-			connect(node);
-			jdbcConn = getDBConnection(node);
+			jdbcConn = topicConsumer.getDBConnection();
 			for(TopicPartition tp : topicPartitions) {
 				try {
 					int totalPartition = getQueueParameter(SHARDNUM_PARAM, tp.topic(), jdbcConn);
 					if(tp.partition()>=totalPartition) {
-						log.error("Invalid Partition number ",new IllegalArgumentException("Invalid Partition number: "+ tp.topic() + "-" + tp.partition()));
 						offsetFetchResponseMap.put(tp, null);
 						continue;
 					}
 					long offset = FetchOffsets.fetchCommittedOffset(tp.topic(), tp.partition(), groupId, jdbcConn);
-					offsetFetchResponseMap.put(tp, offset);
+					if(offset != -1)
+						offsetFetchResponseMap.put(tp, offset);
+					else
+						offsetFetchResponseMap.put(tp, null);
 				} catch (SQLException sqlE) {
 					if(sqlE.getErrorCode() == 24010)
-						log.error("Invalid Topic Name ",new InvalidTopicException(sqlE));
-					offsetFetchResponseMap.put(tp, null);
+						offsetFetchResponseMap.put(tp, null);
+					else 
+						throw sqlE;
+					
 				}
 			}
 			
 		} catch (Exception e) {
 			try {
-				System.out.println(e);
 				disconnected = true;
 				exception = e;
 				log.debug("Unexcepted error occured with connection to node {}, closing the connection",
@@ -1358,7 +1335,6 @@ public final class AQKafkaConsumer extends AQClient{
 			} catch(JMSException e) {
 				log.error("Exception while creating Topic consumer " + e, e );
 				close(node, nodeConsumers);
-				System.out.println("errror in connect"+e);
 				throw e;
 			}
 		}

@@ -130,47 +130,7 @@ public class FetchOffsets {
 			        "    WHEN OTHERS THEN " +
 			        "        RAISE; " +
 			        "END;";
-	
-//	private static final String COMMITTED_OFFSET_PLSQL = 
-//			"DECLARE " + 
-//				    "    queue_name VARCHAR2(128) := ?; " + 
-//				    "    shard_num NUMBER := ?; " + 
-//				    "    subscriber_name VARCHAR(128) := ?; " + 
-//				    "    partition_names SYS.ODCIVARCHAR2LIST := SYS.ODCIVARCHAR2LIST(); " + 
-//				    "    current_max_seq_num NUMBER; " + 
-//				    "    max_seq_num_global NUMBER := -1; " + 
-//				    "BEGIN " + 
-//				    "    SELECT LOWER(PARTNAME) BULK COLLECT INTO partition_names " + 
-//				    "    FROM user_dequeue_log_partition_map " + 
-//				    "    WHERE QUEUE_PART# IN ( " + 
-//				    "        SELECT PARTITION# " + 
-//				    "        FROM user_queue_partition_map " + 
-//				    "        WHERE QUEUE_TABLE = queue_name " + 
-//				    "        AND SHARD = shard_num " + 
-//				    "    ); " + 
-//				    
-//				    "    FOR i IN 1 .. partition_names.COUNT LOOP " + 
-//				    "        BEGIN " + 
-//				    "            EXECUTE IMMEDIATE " + 
-//				    "                'SELECT MAX(SEQ_NUM) FROM ' || " + 
-//				    "                DBMS_ASSERT.SQL_OBJECT_NAME('AQ$_' || queue_name || '_L') || " + 
-//				    "                ' PARTITION (' || partition_names(i) || ') " + 
-//				    "                WHERE SUBSCRIBER# = (SELECT SUBSCRIBER_ID " + 
-//				    "                                     FROM USER_QUEUE_SUBSCRIBERS " + 
-//				    "                                     WHERE CONSUMER_NAME = ''' || subscriber_name || ''') " + 
-//				    "                AND FLAGS = 1' " + 
-//				    "            INTO current_max_seq_num; " + 
-//
-//				    "            IF current_max_seq_num > max_seq_num_global THEN " + 
-//				    "                max_seq_num_global := current_max_seq_num; " + 
-//				    "            END IF; " + 
-//				    "        EXCEPTION " + 
-//				    "            WHEN OTHERS THEN " + 
-//				    "                RAISE; " + 
-//				    "        END; " + 
-//				    "    END LOOP; " + 
-//				    "END;";
-	
+
 	private static final String COMMITTED_OFFSET_PLSQL = 
 					"DECLARE " + 
 				    "    queue_name VARCHAR2(128) := ?; " + 
@@ -183,7 +143,8 @@ public class FetchOffsets {
 				    "    SELECT subshard, LOWER(PARTNAME) " + 
 				    "    INTO subshard, dequeue_log_partition_name " + 
 				    "    FROM user_dequeue_log_partition_map " + 
-				    "    WHERE subshard = ( " + 
+				    "	 WHERE QUEUE_TABLE = queue_name " +
+				    "    AND subshard = ( " + 
 				    "        SELECT MAX(subshard) " + 
 				    "        FROM user_dequeue_log_partition_map " + 
 				    "        WHERE QUEUE_PART# IN ( " + 
@@ -210,13 +171,14 @@ public class FetchOffsets {
 				    "                                 WHERE CONSUMER_NAME = ''' || subscriber_name || ''') " + 
 				    "            AND FLAGS != 4294967295' " + 
 				    "        INTO max_seq_num; " + 
-
+				    
+				    "    	 max_seq_num := NVL(max_seq_num, -1); " +
 				    "    EXCEPTION " + 
 				    "        WHEN OTHERS THEN " + 
 				    "            RAISE; " + 
 				    "    END; " + 
-			        "    ? := max_seq_num; " +
 			        "    ? := subshard; " +
+			        "    ? := max_seq_num; " +
 				    "END;";
 	
 	public static ListOffsetsPartitionResponse fetchEarliestOffset(String topic, int partition, Connection jdbcConn)
@@ -402,7 +364,6 @@ public class FetchOffsets {
 	public static long fetchCommittedOffset(String topic, int partition, String subscriberName, Connection jdbcConn) throws SQLException {
 		
 		CallableStatement cStmt = null;
-		
 		try {
 			cStmt = jdbcConn.prepareCall(COMMITTED_OFFSET_PLSQL);
 			cStmt.setString(1, topic);
@@ -414,13 +375,18 @@ public class FetchOffsets {
 
 			cStmt.executeQuery();
 			
-			int subshard = cStmt.getInt(5);
-			long offset = subshard*20000 + cStmt.getInt(4);
-			
+			int subshard = cStmt.getInt(4);
+			long sequence = cStmt.getInt(5);
+			if(sequence == -1)
+				return -1;
+			long offset = subshard*MessageIdConverter.DEFAULT_SUBPARTITION_SIZE + sequence;
 			return offset;
 			
-		} catch(Exception sqle) {
-			System.out.println(sqle);
+		} catch(SQLException sqle) {
+			if (sqle.getErrorCode() == 1403) {
+				return -1;
+			} else
+				throw sqle;
 		} finally {
 			try {
 				if(cStmt!=null)
@@ -429,7 +395,6 @@ public class FetchOffsets {
 				// do nothing
 			}
 		}
-		return 0L;
 	}
 }
 
