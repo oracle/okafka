@@ -1516,6 +1516,21 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 			release();
 		}
 	}
+	
+	@Override
+	public Map<TopicPartition, OffsetAndMetadata> committed(Set<TopicPartition> partitions) {
+		return committed(partitions, Duration.ofMillis(defaultApiTimeoutMs));
+	}
+	
+	@Override
+	public Map<TopicPartition, OffsetAndMetadata> committed(Set<TopicPartition> partitions, Duration timeout) {
+        acquireAndEnsureOpen();
+        try {
+        	return client.fetchCommittedOffsets(partitions, time.timer(timeout));
+        }finally {
+        	release();
+        }
+	}
 
 	/**
 	 * This method is not yet supported.
@@ -1807,22 +1822,6 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 	 */
 	@Override
 	public void seek(TopicPartition partition, OffsetAndMetadata offsetAndMetadata) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-	}
-
-	/**
-	 * This method is not yet supported.
-	 */
-	@Override
-	public Map<TopicPartition, OffsetAndMetadata> committed(Set<TopicPartition> partitions) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-	}
-
-	/**
-	 * This method is not yet supported.
-	 */
-	@Override
-	public Map<TopicPartition, OffsetAndMetadata> committed(Set<TopicPartition> partitions, Duration timeout) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
