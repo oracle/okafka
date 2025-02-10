@@ -983,6 +983,8 @@ public class ConsumerNetworkClient {
 	
 	public Map<TopicPartition, OffsetAndMetadata> fetchCommittedOffsets(Set<TopicPartition> partitions, Timer timer) {
 
+		if (partitions.isEmpty()) return Collections.emptyMap();
+		
 		long now = time.milliseconds();
 		OffsetFetchRequest.Builder requestBuilder = new OffsetFetchRequest.Builder(consumerGroupId,
 				new ArrayList<>(partitions));
@@ -1023,7 +1025,7 @@ public class ConsumerNetworkClient {
 
 		} while (retry && timer.notExpired());
 
-		throw new TimeoutException("Timeout expired while fetching topic metadata");
+		throw new TimeoutException("Timeout expired while fetching Committed Offsets");
 
 	}
 

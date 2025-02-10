@@ -31,9 +31,10 @@ public class OkafkaFetchCommittedOffset {
         	System.out.println(committedMap);
         	
 		} catch (Exception e) {
-			System.out.println("Exception from consumer " + e);
+			System.out.println("Exception while Fetching Committed Offset " + e);
 			e.printStackTrace();
 		} finally {
+			System.out.println("Test: OkafkaFetchCommittedOffset complete");
 			System.out.println("Closing Consumer");
 			consumer.close();
 		}

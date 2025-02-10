@@ -1186,6 +1186,7 @@ public final class AQKafkaConsumer extends AQClient{
 				try {
 					int totalPartition = getQueueParameter(SHARDNUM_PARAM, tp.topic(), jdbcConn);
 					if (tp.partition() >= totalPartition) {
+						log.warn("Invalid partition number for {}",tp);
 						offsetFetchResponseMap.put(tp, null);
 						continue;
 					}
@@ -1195,8 +1196,10 @@ public final class AQKafkaConsumer extends AQClient{
 					else
 						offsetFetchResponseMap.put(tp, null);
 				} catch (SQLException sqlE) {
-					if (sqlE.getErrorCode() == 24010)
+					if (sqlE.getErrorCode() == 24010) {
+						log.warn("Topic '{}' doesn't exist",tp.topic());
 						offsetFetchResponseMap.put(tp, null);
+					}
 					else
 						throw sqlE;
 
