@@ -22,7 +22,7 @@ public class OkafkaAutoOffsetReset {
 		prop.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
 		prop.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
 		prop.put("auto.offset.reset", "earliest");
-		
+
 		Consumer<String, String> consumer = new KafkaConsumer<String, String>(prop);
 		
 		consumer.subscribe(Arrays.asList("TEQ"));

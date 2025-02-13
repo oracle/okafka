@@ -104,7 +104,7 @@ public class FetchOffsets {
 			        "END;";
 	
 	private static final String MAX_TIMESTAMP_OFFSET_PLSQL = 
-				"DECLARE " +
+					"DECLARE " +
 			        "    shard_num NUMBER := ?; " +
 			        "    queue_name VARCHAR2(128) := ?; " +
 			        "    partition_name VARCHAR2(50); " +
@@ -130,6 +130,56 @@ public class FetchOffsets {
 			        "    WHEN OTHERS THEN " +
 			        "        RAISE; " +
 			        "END;";
+
+	private static final String COMMITTED_OFFSET_PLSQL = 
+					"DECLARE " + 
+				    "    queue_name VARCHAR2(128) := ?; " + 
+				    "    shard_num NUMBER := ?; " + 
+				    "    subscriber_name VARCHAR(128) := ?; " + 
+				    "    dequeue_log_partition_name VARCHAR(20); " + 
+				    "    subshard NUMBER; " + 
+				    "    max_seq_num NUMBER; " + 
+				    "BEGIN " + 
+				    "    SELECT subshard, LOWER(PARTNAME) " + 
+				    "    INTO subshard, dequeue_log_partition_name " + 
+				    "    FROM user_dequeue_log_partition_map " + 
+				    "	 WHERE QUEUE_TABLE = queue_name " +
+				    "    AND subshard = ( " + 
+				    "        SELECT MAX(subshard) " + 
+				    "        FROM user_dequeue_log_partition_map " + 
+				    "        WHERE QUEUE_PART# IN ( " + 
+				    "            SELECT PARTITION# " + 
+				    "            FROM user_queue_partition_map " + 
+				    "            WHERE QUEUE_TABLE = queue_name " + 
+				    "            AND SHARD = shard_num " + 
+				    "        ) " + 
+				    "    ) " + 
+				    "    AND QUEUE_PART# IN ( " + 
+				    "        SELECT PARTITION# " + 
+				    "        FROM user_queue_partition_map " + 
+				    "        WHERE QUEUE_TABLE = queue_name " + 
+				    "        AND SHARD = shard_num " + 
+				    "    ); " + 
+				    
+				    "    BEGIN " + 
+				    "        EXECUTE IMMEDIATE " + 
+				    "            'SELECT MAX(SEQ_NUM) FROM ' || " + 
+				    "            DBMS_ASSERT.SQL_OBJECT_NAME('AQ$_' || queue_name || '_L') || " + 
+				    "            ' PARTITION (' || dequeue_log_partition_name || ') " + 
+				    "            WHERE SUBSCRIBER# = (SELECT DISTINCT(SUBSCRIBER_ID) " + 
+				    "                                 FROM USER_QUEUE_SUBSCRIBERS " + 
+				    "                                 WHERE CONSUMER_NAME = ''' || subscriber_name || ''') " + 
+				    "            AND FLAGS != 4294967295' " + 
+				    "        INTO max_seq_num; " + 
+				    
+				    "    	 max_seq_num := NVL(max_seq_num, -1); " +
+				    "    EXCEPTION " + 
+				    "        WHEN OTHERS THEN " + 
+				    "            RAISE; " + 
+				    "    END; " + 
+			        "    ? := subshard; " +
+			        "    ? := max_seq_num; " +
+				    "END;";
 	
 	public static ListOffsetsPartitionResponse fetchEarliestOffset(String topic, int partition, Connection jdbcConn)
 			throws SQLException {
@@ -310,4 +360,62 @@ public class FetchOffsets {
 		return response;
 
 	}
+	
+	public static long fetchCommittedOffset(String topic, int partition, String subscriberName, Connection jdbcConn)
+			throws SQLException {
+
+		CallableStatement cStmt = null;
+		try {
+			cStmt = jdbcConn.prepareCall(COMMITTED_OFFSET_PLSQL);
+			cStmt.setString(1, topic);
+			cStmt.setInt(2, partition * 2);
+			cStmt.setString(3, subscriberName);
+
+			cStmt.registerOutParameter(4, Types.INTEGER);
+			cStmt.registerOutParameter(5, Types.INTEGER);
+
+			cStmt.executeQuery();
+
+			int subshard = cStmt.getInt(4);
+			long sequence = cStmt.getInt(5);
+			if (sequence == -1)
+				return -1;
+			long offset = subshard * MessageIdConverter.DEFAULT_SUBPARTITION_SIZE + sequence;
+			return offset;
+
+		} catch (SQLException sqle) {
+			if (sqle.getErrorCode() == 1403) {
+				return -1;
+			} else
+				throw sqle;
+		} finally {
+			try {
+				if (cStmt != null)
+					cStmt.close();
+			} catch (Exception ex) {
+				// do nothing
+			}
+		}
+	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
