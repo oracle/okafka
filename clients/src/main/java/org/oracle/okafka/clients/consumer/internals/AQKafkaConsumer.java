@@ -73,6 +73,7 @@ import org.oracle.okafka.common.requests.JoinGroupResponse;
 import org.oracle.okafka.common.requests.MetadataResponse;
 import org.oracle.okafka.common.requests.OffsetFetchRequest;
 import org.oracle.okafka.common.requests.OffsetFetchResponse;
+import org.oracle.okafka.common.requests.OffsetFetchResponse.PartitionOffsetData;
 import org.oracle.okafka.common.requests.OffsetResetRequest;
 import org.oracle.okafka.common.requests.OffsetResetResponse;
 import org.oracle.okafka.common.requests.SubscribeRequest;
@@ -1169,7 +1170,7 @@ public final class AQKafkaConsumer extends AQClient{
 		OffsetFetchRequest offsetFetchRequest = builder.build();
 		List<TopicPartition> topicPartitions = offsetFetchRequest.partitions();
 		String groupId = offsetFetchRequest.groupId();
-		Map<TopicPartition, Long> offsetFetchResponseMap = new HashMap<>();
+		Map<TopicPartition, PartitionOffsetData> offsetFetchResponseMap = new HashMap<>();
 		boolean disconnected = false;
 		Exception exception = null;
 		Connection jdbcConn = null;
@@ -1192,7 +1193,7 @@ public final class AQKafkaConsumer extends AQClient{
 					}
 					long offset = FetchOffsets.fetchCommittedOffset(tp.topic(), tp.partition(), groupId, jdbcConn);
 					if (offset != -1)
-						offsetFetchResponseMap.put(tp, offset);
+						offsetFetchResponseMap.put(tp, new PartitionOffsetData(offset,null));
 					else
 						offsetFetchResponseMap.put(tp, null);
 				} catch (SQLException sqlE) {
@@ -1200,15 +1201,22 @@ public final class AQKafkaConsumer extends AQClient{
 						log.warn("Topic '{}' doesn't exist",tp.topic());
 						offsetFetchResponseMap.put(tp, null);
 					}
-					else
-						throw sqlE;
+					else {
+						int errorCode = sqlE.getErrorCode();
+						log.error("SQL Error:ORA-" + errorCode);
+						if(errorCode == 28 || errorCode == 17410) {
+							disconnected = true;
+							throw sqlE;
+						}
+						else
+							offsetFetchResponseMap.put(tp, new PartitionOffsetData(-1L,sqlE));
+					}
 
 				}
 			}
 
 		} catch (Exception e) {
 			try {
-				disconnected = true;
 				exception = e;
 				log.debug("Unexcepted error occured with connection to node {}, closing the connection",
 						request.destination());

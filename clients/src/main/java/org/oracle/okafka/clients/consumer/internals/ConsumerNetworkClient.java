@@ -92,6 +92,7 @@ import org.oracle.okafka.common.requests.JoinGroupResponse;
 import org.oracle.okafka.common.requests.MetadataRequest;
 import org.oracle.okafka.common.requests.OffsetFetchRequest;
 import org.oracle.okafka.common.requests.OffsetFetchResponse;
+import org.oracle.okafka.common.requests.OffsetFetchResponse.PartitionOffsetData;
 import org.oracle.okafka.common.requests.OffsetResetRequest;
 import org.oracle.okafka.common.requests.OffsetResetResponse;
 import org.oracle.okafka.common.requests.SubscribeRequest;
@@ -1005,11 +1006,15 @@ public class ConsumerNetworkClient {
 
 			if (offsetResponse.getException() == null && !response.wasDisconnected()) {
 				Map<TopicPartition, OffsetAndMetadata> offsetResponseMap = new HashMap<>();
-				Map<TopicPartition, Long> offsetFetchResponseMap = offsetResponse.getOffsetFetchResponseMap();
+				Map<TopicPartition, PartitionOffsetData> offsetFetchResponseMap = offsetResponse.getOffsetFetchResponseMap();
 
-				for (Map.Entry<TopicPartition, Long> entry : offsetFetchResponseMap.entrySet()) {
-					if (entry.getValue() != null) {
-						offsetResponseMap.put(entry.getKey(), new OffsetAndMetadata(entry.getValue()));
+				for (Map.Entry<TopicPartition, PartitionOffsetData> entry : offsetFetchResponseMap.entrySet()) {
+					PartitionOffsetData offsetData = entry.getValue();
+					if (offsetData != null) {
+						if(offsetData.error == null)
+							offsetResponseMap.put(entry.getKey(), new OffsetAndMetadata(offsetData.offset));
+						else
+							log.warn("Skipping return offset for {} due to error {}.", entry.getKey(), offsetData.error);
 					} else {
 						offsetResponseMap.put(entry.getKey(), null);
 					}
