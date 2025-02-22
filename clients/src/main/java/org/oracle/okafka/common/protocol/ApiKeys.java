@@ -50,7 +50,8 @@ public enum ApiKeys {
 	JOIN_GROUP(9, "JoinGroup"),
 	SYNC_GROUP(10, "SyncGroup"),
 	CONNECT_ME(11,"ConnectMe"),
-	LIST_OFFSETS(12,"ListOffsets");
+	LIST_OFFSETS(12,"ListOffsets"),
+	OFFSET_FETCH(13,"FetchOffsets");
     private static final ApiKeys[] ID_TO_TYPE;
     private static final int MIN_API_KEY = 0;
     public static final int MAX_API_KEY;
@@ -136,7 +137,7 @@ public enum ApiKeys {
     		return org.apache.kafka.common.protocol.ApiKeys.DESCRIBE_GROUPS;
     	case OFFSETRESET:
     		//Seek operation. 
-    		return org.apache.kafka.common.protocol.ApiKeys.OFFSET_FETCH;
+    		return org.apache.kafka.common.protocol.ApiKeys.FETCH_SNAPSHOT;
     	case UNSUBSCRIBE:
     		return org.apache.kafka.common.protocol.ApiKeys.DELETE_GROUPS;
     	case JOIN_GROUP:
@@ -148,6 +149,8 @@ public enum ApiKeys {
     		return org.apache.kafka.common.protocol.ApiKeys.FIND_COORDINATOR;
     	case LIST_OFFSETS:
     		return org.apache.kafka.common.protocol.ApiKeys.LIST_OFFSETS;
+    	case OFFSET_FETCH:
+    		return org.apache.kafka.common.protocol.ApiKeys.OFFSET_FETCH;
     	default: 
     		// Default to HEARTBEAT. No SUpport for HEARTBEAT for oKafka.
     		return org.apache.kafka.common.protocol.ApiKeys.HEARTBEAT;
@@ -173,7 +176,7 @@ public enum ApiKeys {
     	case DESCRIBE_GROUPS:
     		//Not present in Apache Kafka. Dummy set to DESCRIBE_GROUPS
     		return SUBSCRIBE;
-    	case OFFSET_FETCH:
+    	case FETCH_SNAPSHOT:
     		//Seek operation. 
     		return OFFSETRESET;
     	case DELETE_GROUPS:
@@ -187,6 +190,8 @@ public enum ApiKeys {
     		return CONNECT_ME;
     	case LIST_OFFSETS:
     		return LIST_OFFSETS;
+    	case OFFSET_FETCH:
+    		return OFFSET_FETCH;
     	default: 
     		// Default to FETCH.
     		return FETCH;

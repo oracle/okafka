@@ -43,6 +43,7 @@ import org.apache.kafka.common.errors.AuthenticationException;
 import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
 import org.apache.kafka.common.metrics.Sensor;
 import org.oracle.okafka.common.network.AQClient;
+import org.oracle.okafka.common.protocol.ApiKeys;
 import org.oracle.okafka.common.requests.AbstractRequest;
 import org.oracle.okafka.common.requests.MetadataRequest;
 import org.oracle.okafka.common.requests.MetadataResponse;
@@ -405,9 +406,9 @@ public class NetworkClient implements KafkaClient {
 					throw new IllegalStateException("Attempt to send a request to node " + node + " which is not ready.");
 				}
 			}
-			log.debug("Sending Request: " + clientRequest.apiKey().name);
+			log.debug("Sending Request: " + ApiKeys.convertToOracleApiKey(clientRequest.apiKey()).name());
 			response =  aqClient.send(clientRequest);
-			log.debug("Response Received "  + clientRequest.apiKey().name);
+			log.debug("Response Received "  + ApiKeys.convertToOracleApiKey(clientRequest.apiKey()).name());
 			handleDisconnection(node, response.wasDisconnected(), time.milliseconds());
 		} catch(Exception e)
 		{
