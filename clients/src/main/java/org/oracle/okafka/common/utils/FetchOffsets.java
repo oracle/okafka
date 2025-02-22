@@ -132,54 +132,59 @@ public class FetchOffsets {
 			        "END;";
 
 	private static final String COMMITTED_OFFSET_PLSQL = 
-					"DECLARE " + 
-				    "    queue_name VARCHAR2(128) := ?; " + 
-				    "    shard_num NUMBER := ?; " + 
-				    "    subscriber_name VARCHAR(128) := ?; " + 
-				    "    dequeue_log_partition_name VARCHAR(20); " + 
-				    "    subshard NUMBER; " + 
-				    "    max_seq_num NUMBER; " + 
-				    "BEGIN " + 
-				    "    SELECT subshard, LOWER(PARTNAME) " + 
-				    "    INTO subshard, dequeue_log_partition_name " + 
-				    "    FROM user_dequeue_log_partition_map " + 
-				    "	 WHERE QUEUE_TABLE = queue_name " +
-				    "    AND subshard = ( " + 
-				    "        SELECT MAX(subshard) " + 
-				    "        FROM user_dequeue_log_partition_map " + 
-				    "        WHERE QUEUE_PART# IN ( " + 
-				    "            SELECT PARTITION# " + 
-				    "            FROM user_queue_partition_map " + 
-				    "            WHERE QUEUE_TABLE = queue_name " + 
-				    "            AND SHARD = shard_num " + 
-				    "        ) " + 
-				    "    ) " + 
-				    "    AND QUEUE_PART# IN ( " + 
-				    "        SELECT PARTITION# " + 
-				    "        FROM user_queue_partition_map " + 
-				    "        WHERE QUEUE_TABLE = queue_name " + 
-				    "        AND SHARD = shard_num " + 
-				    "    ); " + 
-				    
-				    "    BEGIN " + 
-				    "        EXECUTE IMMEDIATE " + 
-				    "            'SELECT MAX(SEQ_NUM) FROM ' || " + 
-				    "            DBMS_ASSERT.SQL_OBJECT_NAME('AQ$_' || queue_name || '_L') || " + 
-				    "            ' PARTITION (' || dequeue_log_partition_name || ') " + 
-				    "            WHERE SUBSCRIBER# = (SELECT DISTINCT(SUBSCRIBER_ID) " + 
-				    "                                 FROM USER_QUEUE_SUBSCRIBERS " + 
-				    "                                 WHERE CONSUMER_NAME = ''' || subscriber_name || ''') " + 
-				    "            AND FLAGS != 4294967295' " + 
-				    "        INTO max_seq_num; " + 
-				    
-				    "    	 max_seq_num := NVL(max_seq_num, -1); " +
-				    "    EXCEPTION " + 
-				    "        WHEN OTHERS THEN " + 
-				    "            RAISE; " + 
-				    "    END; " + 
-			        "    ? := subshard; " +
-			        "    ? := max_seq_num; " +
-				    "END;";
+			"DECLARE " + 
+		    "    queue_name VARCHAR2(128) := ?; " + 
+		    "    shard_num NUMBER := ?; " + 
+		    "    subscriber_name VARCHAR(128) := ?; " + 
+		    "	 subshard_num NUMBER; " +
+		    "    dequeue_log_partition_names SYS.ODCIVARCHAR2LIST; " + 
+		    "    subshard_list SYS.ODCINUMBERLIST; " + 
+		    "    seq_num NUMBER; " + 
+		    "    max_seq_num NUMBER; " + 
+		    "	 subscriber_id NUMBER; " +
+		    "BEGIN " + 
+		    "	 SELECT DISTINCT(SUBSCRIBER_ID) " +
+		    "	 INTO subscriber_id " +
+		    "	 FROM USER_QUEUE_SUBSCRIBERS " +
+		    "	 WHERE CONSUMER_NAME = subscriber_name; " +
+		    
+		    "	 EXECUTE IMMEDIATE " +
+		    "    'SELECT subshard, LOWER(PARTNAME) " + 
+		    "    FROM user_dequeue_log_partition_map " + 
+		    "	 WHERE QUEUE_TABLE = :queue_name " +
+		    "    AND subshard IN ( " + 
+		    "            SELECT SUBSHARD " + 
+		    "            FROM user_queue_partition_map " + 
+		    "            WHERE QUEUE_TABLE = :queue_name " + 
+		    "            AND SHARD = :shard_num " + 
+		    "    ) " + 
+		    "    AND QUEUE_PART# IN ( " + 
+		    "        SELECT PARTITION# " + 
+		    "        FROM user_queue_partition_map " + 
+		    "        WHERE QUEUE_TABLE = :queue_name " + 
+		    "        AND SHARD = :shard_num " + 
+		    "    ) " + 
+		    "	 AND SUBSCRIBER_ID = :subscriber_id'" +
+		    "    BULK COLLECT INTO subshard_list, dequeue_log_partition_names " + 
+		    "	 USING queue_name, queue_name, shard_num, queue_name, shard_num, subscriber_id; " +
+
+			"    FOR i IN 1..dequeue_log_partition_names.COUNT LOOP " +
+		    "    EXECUTE IMMEDIATE " + 
+		    "        'SELECT MAX(SEQ_NUM) FROM ' || " + 
+		    "        DBMS_ASSERT.SQL_OBJECT_NAME('AQ$_' || queue_name || '_L') || " + 
+		    "        ' PARTITION (' || dequeue_log_partition_names(i) || ') " + 
+		    "        WHERE SUBSCRIBER# = ''' || subscriber_id || ''' " + 
+		    "        AND FLAGS != 4294967295 AND FLAGS != 5' " + 
+		    "    INTO seq_num; " + 
+		    "	 EXIT WHEN seq_num IS NULL; " +
+		    "	 max_seq_num := seq_num; " +
+		    "	 subshard_num := subshard_list(i); " +
+	        "    END LOOP; " +
+		    
+		    "    max_seq_num := NVL(max_seq_num, -1); " +
+	        "    ? := subshard_num; " +
+	        "    ? := max_seq_num; " +
+		    "END;";
 	
 	public static ListOffsetsPartitionResponse fetchEarliestOffset(String topic, int partition, Connection jdbcConn)
 			throws SQLException {
@@ -398,24 +403,3 @@ public class FetchOffsets {
 		}
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

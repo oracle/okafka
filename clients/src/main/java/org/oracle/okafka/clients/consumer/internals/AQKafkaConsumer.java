@@ -1168,8 +1168,8 @@ public final class AQKafkaConsumer extends AQClient{
 
 		OffsetFetchRequest.Builder builder = (OffsetFetchRequest.Builder) request.requestBuilder();
 		OffsetFetchRequest offsetFetchRequest = builder.build();
-		List<TopicPartition> topicPartitions = offsetFetchRequest.partitions();
-		String groupId = offsetFetchRequest.groupId();
+		List<TopicPartition> topicPartitions = offsetFetchRequest.perGroupTopicpartitions().values().iterator().next();
+		String groupId = offsetFetchRequest.perGroupTopicpartitions().keySet().iterator().next();
 		Map<TopicPartition, PartitionOffsetData> offsetFetchResponseMap = new HashMap<>();
 		boolean disconnected = false;
 		Exception exception = null;
@@ -1185,23 +1185,14 @@ public final class AQKafkaConsumer extends AQClient{
 			jdbcConn = topicConsumer.getDBConnection();
 			for (TopicPartition tp : topicPartitions) {
 				try {
-					int totalPartition = getQueueParameter(SHARDNUM_PARAM, tp.topic(), jdbcConn);
-					if (tp.partition() >= totalPartition) {
-						log.warn("Invalid partition number for {}",tp);
-						offsetFetchResponseMap.put(tp, null);
-						continue;
-					}
 					long offset = FetchOffsets.fetchCommittedOffset(tp.topic(), tp.partition(), groupId, jdbcConn);
-					if (offset != -1)
+					if (offset != -1) {
+						log.warn("No Committed Offset found for Queue:" + tp.topic() + "Partition:" + tp.partition());
 						offsetFetchResponseMap.put(tp, new PartitionOffsetData(offset,null));
+					}
 					else
 						offsetFetchResponseMap.put(tp, null);
 				} catch (SQLException sqlE) {
-					if (sqlE.getErrorCode() == 24010) {
-						log.warn("Topic '{}' doesn't exist",tp.topic());
-						offsetFetchResponseMap.put(tp, null);
-					}
-					else {
 						int errorCode = sqlE.getErrorCode();
 						log.error("SQL Error:ORA-" + errorCode);
 						if(errorCode == 28 || errorCode == 17410) {
@@ -1210,8 +1201,6 @@ public final class AQKafkaConsumer extends AQClient{
 						}
 						else
 							offsetFetchResponseMap.put(tp, new PartitionOffsetData(-1L,sqlE));
-					}
-
 				}
 			}
 
@@ -1229,7 +1218,7 @@ public final class AQKafkaConsumer extends AQClient{
 			}
 		}
 
-		OffsetFetchResponse offsetResponse = new OffsetFetchResponse(offsetFetchResponseMap);
+		OffsetFetchResponse offsetResponse = new OffsetFetchResponse(Collections.singletonMap(groupId, offsetFetchResponseMap));
 		offsetResponse.setException(exception);
 
 		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),

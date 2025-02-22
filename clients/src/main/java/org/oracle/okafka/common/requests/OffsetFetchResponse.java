@@ -10,7 +10,7 @@ import org.oracle.okafka.common.protocol.ApiKeys;
 
 public class OffsetFetchResponse extends AbstractResponse {
 	
-	private final Map<TopicPartition, PartitionOffsetData> offsetFetchResponseMap;
+	private final Map<String,Map<TopicPartition, PartitionOffsetData>> offsetFetchResponseMap;
 	private Exception exception;
 	
 	public static final class PartitionOffsetData {
@@ -33,7 +33,7 @@ public class OffsetFetchResponse extends AbstractResponse {
 
 		@Override
 		public String toString() {
-			return "PartitionData(" + "offset=" + offset + ", error='" + error.toString() + ")";
+			return "PartitionData(" + "offset=" + offset + ", error='" + error != null ? error.toString() : null + ")";
 		}
 
 		@Override
@@ -42,7 +42,7 @@ public class OffsetFetchResponse extends AbstractResponse {
 		}
 	}
 	
-	public OffsetFetchResponse(Map<TopicPartition, PartitionOffsetData> offsetFetchResponseMap) {
+	public OffsetFetchResponse(Map<String,Map<TopicPartition, PartitionOffsetData>> offsetFetchResponseMap) {
 		super(ApiKeys.OFFSET_FETCH);
 		this.offsetFetchResponseMap = offsetFetchResponseMap;
 		exception = null;
@@ -52,7 +52,7 @@ public class OffsetFetchResponse extends AbstractResponse {
 		this.exception=ex;
 	}
 	
-	public Map<TopicPartition, PartitionOffsetData> getOffsetFetchResponseMap(){
+	public Map<String,Map<TopicPartition, PartitionOffsetData>> getOffsetFetchResponseMap(){
 		return offsetFetchResponseMap;
 	}
 	

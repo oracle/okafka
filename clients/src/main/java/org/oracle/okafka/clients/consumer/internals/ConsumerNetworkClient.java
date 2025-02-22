@@ -984,21 +984,24 @@ public class ConsumerNetworkClient {
 	
 	public Map<TopicPartition, OffsetAndMetadata> fetchCommittedOffsets(Set<TopicPartition> partitions, Timer timer) {
 
-		if (partitions.isEmpty()) return Collections.emptyMap();
-		
+		if (partitions.isEmpty())
+			return Collections.emptyMap();
+
 		long now = time.milliseconds();
-		OffsetFetchRequest.Builder requestBuilder = new OffsetFetchRequest.Builder(consumerGroupId,
-				new ArrayList<>(partitions));
-		Node node = client.leastLoadedNode(now);
-		if (node == null || !client.ready(node, now))
-			throw new KafkaException("Couldn't connect to any node for Fetching Committed Offsets");
-		ClientRequest clientRequest = client.newClientRequest(client.leastLoadedNode(now), requestBuilder, now, true,
-				requestTimeoutMs, null);
+		OffsetFetchRequest.Builder requestBuilder = new OffsetFetchRequest.Builder(
+				Collections.singletonMap(consumerGroupId, new ArrayList<>(partitions)));
+		metadata.requestUpdate();
+		maybeUpdateMetadata(timer.remainingMs());
+	
 		boolean retry = false;
 
 		do {
 			retry = false;
-
+			Node node = client.leastLoadedNode(now);
+			if (node == null || !client.ready(node, now))
+				throw new KafkaException("Couldn't connect to any node for Fetching Committed Offsets");
+			ClientRequest clientRequest = client.newClientRequest(node, requestBuilder, now, true,
+					requestTimeoutMs, null);
 			log.debug("Sending  Fetch Offset Request");
 			ClientResponse response = this.client.send(clientRequest, now);
 			OffsetFetchResponse offsetResponse = (OffsetFetchResponse) response.responseBody();
@@ -1006,15 +1009,16 @@ public class ConsumerNetworkClient {
 
 			if (offsetResponse.getException() == null && !response.wasDisconnected()) {
 				Map<TopicPartition, OffsetAndMetadata> offsetResponseMap = new HashMap<>();
-				Map<TopicPartition, PartitionOffsetData> offsetFetchResponseMap = offsetResponse.getOffsetFetchResponseMap();
-
-				for (Map.Entry<TopicPartition, PartitionOffsetData> entry : offsetFetchResponseMap.entrySet()) {
+				Map<String,Map<TopicPartition, PartitionOffsetData>> perGroupOffsetFetchResponseMap = offsetResponse
+						.getOffsetFetchResponseMap();
+				for (Map.Entry<TopicPartition, PartitionOffsetData> entry : perGroupOffsetFetchResponseMap.get(consumerGroupId).entrySet()) {
 					PartitionOffsetData offsetData = entry.getValue();
 					if (offsetData != null) {
-						if(offsetData.error == null)
+						if (offsetData.error == null)
 							offsetResponseMap.put(entry.getKey(), new OffsetAndMetadata(offsetData.offset));
 						else
-							log.warn("Skipping return offset for {} due to error {}.", entry.getKey(), offsetData.error);
+							log.warn("Skipping return offset for {} due to error {}.", entry.getKey(),
+									offsetData.error);
 					} else {
 						offsetResponseMap.put(entry.getKey(), null);
 					}
