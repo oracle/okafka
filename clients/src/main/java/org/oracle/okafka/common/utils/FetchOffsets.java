@@ -174,7 +174,7 @@ public class FetchOffsets {
 		    "        DBMS_ASSERT.SQL_OBJECT_NAME('AQ$_' || queue_name || '_L') || " + 
 		    "        ' PARTITION (' || dequeue_log_partition_names(i) || ') " + 
 		    "        WHERE SUBSCRIBER# = ''' || subscriber_id || ''' " + 
-		    "        AND FLAGS != 4294967295 AND FLAGS != 5' " + 
+		    "        AND FLAGS != 4294967295 AND MOD(FLAGS - 5, 7) <> 0' " + 
 		    "    INTO seq_num; " + 
 		    "	 EXIT WHEN seq_num IS NULL; " +
 		    "	 max_seq_num := seq_num; " +
