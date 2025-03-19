@@ -139,8 +139,9 @@ public class FetchOffsets {
 		    "	 subshard_num NUMBER; " +
 		    "    dequeue_log_partition_names SYS.ODCIVARCHAR2LIST; " + 
 		    "    subshard_list SYS.ODCINUMBERLIST; " + 
+		    "	 rowmarkers SYS.ODCINUMBERLIST; " +
+		    "	 dequeue_log_unbound_indexes SYS.ODCINUMBERLIST; " +
 		    "    seq_num NUMBER; " + 
-		    "    max_seq_num NUMBER; " + 
 		    "	 subscriber_id NUMBER; " +
 		    "BEGIN " + 
 		    "	 SELECT DISTINCT(SUBSCRIBER_ID) " +
@@ -149,10 +150,10 @@ public class FetchOffsets {
 		    "	 WHERE CONSUMER_NAME = subscriber_name; " +
 		    
 		    "	 EXECUTE IMMEDIATE " +
-		    "    'SELECT subshard, LOWER(PARTNAME) " + 
+		    "    'SELECT SUBSHARD, LOWER(PARTNAME), ROWMARKER, UNBOUND_IDX " + 
 		    "    FROM user_dequeue_log_partition_map " + 
 		    "	 WHERE QUEUE_TABLE = :queue_name " +
-		    "    AND subshard IN ( " + 
+		    "    AND SUBSHARD IN ( " + 
 		    "            SELECT SUBSHARD " + 
 		    "            FROM user_queue_partition_map " + 
 		    "            WHERE QUEUE_TABLE = :queue_name " + 
@@ -164,26 +165,31 @@ public class FetchOffsets {
 		    "        WHERE QUEUE_TABLE = :queue_name " + 
 		    "        AND SHARD = :shard_num " + 
 		    "    ) " + 
-		    "	 AND SUBSCRIBER_ID = :subscriber_id'" +
-		    "    BULK COLLECT INTO subshard_list, dequeue_log_partition_names " + 
+		    "	 AND SUBSCRIBER_ID = :subscriber_id " +
+		    "	 ORDER BY SUBSHARD' " +
+		    "    BULK COLLECT INTO subshard_list, dequeue_log_partition_names, rowmarkers, dequeue_log_unbound_indexes " + 
 		    "	 USING queue_name, queue_name, shard_num, queue_name, shard_num, subscriber_id; " +
 
-			"    FOR i IN 1..dequeue_log_partition_names.COUNT LOOP " +
+			"    FOR i IN REVERSE 1 .. dequeue_log_partition_names.COUNT LOOP " +
 		    "    EXECUTE IMMEDIATE " + 
 		    "        'SELECT MAX(SEQ_NUM) FROM ' || " + 
 		    "        DBMS_ASSERT.SQL_OBJECT_NAME('AQ$_' || queue_name || '_L') || " + 
 		    "        ' PARTITION (' || dequeue_log_partition_names(i) || ') " + 
 		    "        WHERE SUBSCRIBER# = ''' || subscriber_id || ''' " + 
-		    "        AND FLAGS != 4294967295 AND MOD(FLAGS - 5, 7) <> 0' " + 
+		    "        AND FLAGS = ''' || rowmarkers(i) || ''' ' " + 
 		    "    INTO seq_num; " + 
-		    "	 EXIT WHEN seq_num IS NULL; " +
-		    "	 max_seq_num := seq_num; " +
-		    "	 subshard_num := subshard_list(i); " +
+		    "	 IF seq_num IS NOT NULL THEN " +
+		    "	 	IF dequeue_log_unbound_indexes(i) > 0 THEN " +
+		    "	 		seq_num := seq_num - 20000*dequeue_log_unbound_indexes(i); " +
+		    "	 	END IF; " +
+		    "	 	subshard_num := subshard_list(i); " +
+		    "	 	EXIT; " +
+		    "	 END IF; " +
 	        "    END LOOP; " +
 		    
-		    "    max_seq_num := NVL(max_seq_num, -1); " +
+		    "    seq_num := NVL(seq_num, -1); " +
 	        "    ? := subshard_num; " +
-	        "    ? := max_seq_num; " +
+	        "    ? := seq_num; " +
 		    "END;";
 	
 	public static ListOffsetsPartitionResponse fetchEarliestOffset(String topic, int partition, Connection jdbcConn)

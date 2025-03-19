@@ -1186,12 +1186,12 @@ public final class AQKafkaConsumer extends AQClient{
 			for (TopicPartition tp : topicPartitions) {
 				try {
 					long offset = FetchOffsets.fetchCommittedOffset(tp.topic(), tp.partition(), groupId, jdbcConn);
-					if (offset != -1) {
-						log.warn("No Committed Offset found for Queue:" + tp.topic() + "Partition:" + tp.partition());
+					if (offset != -1) 
 						offsetFetchResponseMap.put(tp, new PartitionOffsetData(offset,null));
-					}
-					else
+					else {
+						log.warn("No Committed Offset found for Queue:" + tp.topic() + "Partition:" + tp.partition());
 						offsetFetchResponseMap.put(tp, null);
+					}
 				} catch (SQLException sqlE) {
 						int errorCode = sqlE.getErrorCode();
 						log.error("SQL Error:ORA-" + errorCode);
