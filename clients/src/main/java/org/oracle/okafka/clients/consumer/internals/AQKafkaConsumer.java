@@ -1194,7 +1194,7 @@ public final class AQKafkaConsumer extends AQClient{
 					}
 				} catch (SQLException sqlE) {
 						int errorCode = sqlE.getErrorCode();
-						log.error("SQL Error:ORA-" + errorCode);
+						log.error("SQL ERROR while fetching commit offset: ORA- " + errorCode, sqlE);
 						if(errorCode == 28 || errorCode == 17410) {
 							disconnected = true;
 							throw sqlE;
@@ -1205,6 +1205,7 @@ public final class AQKafkaConsumer extends AQClient{
 			}
 
 		} catch (Exception e) {
+			log.error("Exception while fetching offsets " + e.getMessage(), e);
 			try {
 				exception = e;
 				log.debug("Unexcepted error occured with connection to node {}, closing the connection",
