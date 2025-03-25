@@ -35,14 +35,12 @@ public class TopicMetadataFetcher {
 		boolean retry = false;
 
 		do {
-
 			retry = false;
 			ClientResponse response = client.sendMetadataRequest(builder);
 			MetadataResponse metadataResponse = (MetadataResponse) response.responseBody();
 
 			if (metadataResponse.getException() == null && !response.wasDisconnected()) {
 				Map<String, List<PartitionInfo>> listTopicsMap = new HashMap<>();
-
 				List<PartitionInfo> partitionInfoList = metadataResponse.partitions();
 				for (int i = 0; i < partitionInfoList.size(); i++) {
 					String topic = partitionInfoList.get(i).topic();
@@ -52,14 +50,13 @@ public class TopicMetadataFetcher {
 						listTopicsMap.put(topic, new ArrayList<>(Arrays.asList(partitionInfoList.get(i))));
 					}
 				}
-
 				return listTopicsMap;
-			} else if (metadataResponse.getException() != null) {
-				throw new KafkaException("Unexpected error while listing topics " + metadataResponse.getException());
-			} else {
+			} else if (response.wasDisconnected())
 				retry = true;
+			else {
+				log.error("Exception Caught: ", metadataResponse.getException());
+				throw new KafkaException("Unexpected error listing topics", metadataResponse.getException());
 			}
-
 		} while (retry && timer.notExpired());
 
 		throw new TimeoutException("Timeout expired while fetching topic metadata");

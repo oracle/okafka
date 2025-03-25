@@ -48,6 +48,7 @@ import org.apache.kafka.clients.consumer.ConsumerPartitionAssignor;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.common.errors.InterruptException;
 import org.apache.kafka.common.errors.InvalidTopicException;
+import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.metrics.Measurable;
 import org.apache.kafka.common.metrics.Metrics;
 import org.apache.kafka.common.metrics.Sensor;
@@ -89,7 +90,9 @@ import org.oracle.okafka.common.requests.FetchResponse;
 import org.oracle.okafka.common.requests.JoinGroupRequest;
 import org.oracle.okafka.common.requests.JoinGroupResponse;
 import org.oracle.okafka.common.requests.MetadataRequest;
-import org.oracle.okafka.common.requests.MetadataResponse;
+import org.oracle.okafka.common.requests.OffsetFetchRequest;
+import org.oracle.okafka.common.requests.OffsetFetchResponse;
+import org.oracle.okafka.common.requests.OffsetFetchResponse.PartitionOffsetData;
 import org.oracle.okafka.common.requests.OffsetResetRequest;
 import org.oracle.okafka.common.requests.OffsetResetResponse;
 import org.oracle.okafka.common.requests.SubscribeRequest;
@@ -99,6 +102,7 @@ import org.oracle.okafka.common.requests.SyncGroupResponse;
 import org.oracle.okafka.common.requests.UnsubscribeRequest;
 import org.oracle.okafka.common.requests.UnsubscribeResponse;
 import org.apache.kafka.common.utils.Time;
+import org.apache.kafka.common.utils.Timer;
 import org.slf4j.Logger;
 import oracle.jms.AQjmsBytesMessage;
 import org.oracle.okafka.common.utils.ConnectionUtils;
@@ -977,6 +981,62 @@ public class ConsumerNetworkClient {
 			nextAutoCommitDeadline = time.milliseconds() + autoCommitIntervalMs;
 		}
 	} 
+	
+	public Map<TopicPartition, OffsetAndMetadata> fetchCommittedOffsets(Set<TopicPartition> partitions, Timer timer) {
+
+		if (partitions.isEmpty())
+			return Collections.emptyMap();
+
+		long now = time.milliseconds();
+		OffsetFetchRequest.Builder requestBuilder = new OffsetFetchRequest.Builder(
+				Collections.singletonMap(consumerGroupId, new ArrayList<>(partitions)));
+		metadata.requestUpdate();
+		maybeUpdateMetadata(timer.remainingMs());
+	
+		boolean retry = false;
+
+		do {
+			retry = false;
+			Node node = client.leastLoadedNode(now);
+			if (node == null || !client.ready(node, now))
+				throw new KafkaException("Couldn't connect to any node for Fetching Committed Offsets");
+			ClientRequest clientRequest = client.newClientRequest(node, requestBuilder, now, true,
+					requestTimeoutMs, null);
+			log.debug("Sending  Fetch Offset Request");
+			ClientResponse response = this.client.send(clientRequest, now);
+			OffsetFetchResponse offsetResponse = (OffsetFetchResponse) response.responseBody();
+			log.debug("Recieved Offset Fetch Response ");
+
+			if (offsetResponse.getException() == null && !response.wasDisconnected()) {
+				Map<TopicPartition, OffsetAndMetadata> offsetResponseMap = new HashMap<>();
+				Map<String,Map<TopicPartition, PartitionOffsetData>> perGroupOffsetFetchResponseMap = offsetResponse
+						.getOffsetFetchResponseMap();
+				for (Map.Entry<TopicPartition, PartitionOffsetData> entry : perGroupOffsetFetchResponseMap.get(consumerGroupId).entrySet()) {
+					PartitionOffsetData offsetData = entry.getValue();
+					if (offsetData != null) {
+						if (offsetData.error == null)
+							offsetResponseMap.put(entry.getKey(), new OffsetAndMetadata(offsetData.offset));
+						else
+							log.warn("Skipping return offset for {} due to error {}.", entry.getKey(),
+									offsetData.error);
+					} else {
+						offsetResponseMap.put(entry.getKey(), null);
+					}
+				}
+
+				return offsetResponseMap;
+			} else if (response.wasDisconnected())
+				retry = true;
+			else {
+				log.error("Exception Caught: ", offsetResponse.getException());
+				throw new KafkaException("Unexpected error fetching Committed Offsets", offsetResponse.getException());
+			}
+
+		} while (retry && timer.notExpired());
+
+		throw new TimeoutException("Timeout expired while fetching Committed Offsets");
+
+	}
 
 	public void unsubscribe() {
 		

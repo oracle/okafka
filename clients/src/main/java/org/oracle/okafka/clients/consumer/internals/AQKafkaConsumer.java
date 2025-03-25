@@ -71,6 +71,9 @@ import org.oracle.okafka.common.requests.FetchResponse;
 import org.oracle.okafka.common.requests.JoinGroupRequest;
 import org.oracle.okafka.common.requests.JoinGroupResponse;
 import org.oracle.okafka.common.requests.MetadataResponse;
+import org.oracle.okafka.common.requests.OffsetFetchRequest;
+import org.oracle.okafka.common.requests.OffsetFetchResponse;
+import org.oracle.okafka.common.requests.OffsetFetchResponse.PartitionOffsetData;
 import org.oracle.okafka.common.requests.OffsetResetRequest;
 import org.oracle.okafka.common.requests.OffsetResetResponse;
 import org.oracle.okafka.common.requests.SubscribeRequest;
@@ -79,6 +82,7 @@ import org.oracle.okafka.common.requests.SyncGroupRequest;
 import org.oracle.okafka.common.requests.SyncGroupResponse;
 import org.oracle.okafka.common.requests.UnsubscribeResponse;
 import org.oracle.okafka.common.utils.ConnectionUtils;
+import org.oracle.okafka.common.utils.FetchOffsets;
 import org.apache.kafka.common.utils.LogContext;
 import org.oracle.okafka.common.utils.MessageIdConverter;
 import org.oracle.okafka.common.utils.MessageIdConverter.OKafkaOffset;
@@ -156,6 +160,8 @@ public final class AQKafkaConsumer extends AQClient{
 			return getMetadata(request);
 		case CONNECT_ME:
 			return connectMe(request);
+		case OFFSET_FETCH:
+			return fetchOffsets(request);
 		}
 		return null;
 	}
@@ -1157,6 +1163,68 @@ public final class AQKafkaConsumer extends AQClient{
 		return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
 				request.createdTimeMs(), time.milliseconds(), disconnected, null,null, new SyncGroupResponse(data, version, exception));
 	}
+	
+	private ClientResponse fetchOffsets(ClientRequest request) {
+
+		OffsetFetchRequest.Builder builder = (OffsetFetchRequest.Builder) request.requestBuilder();
+		OffsetFetchRequest offsetFetchRequest = builder.build();
+		List<TopicPartition> topicPartitions = offsetFetchRequest.perGroupTopicpartitions().values().iterator().next();
+		String groupId = offsetFetchRequest.perGroupTopicpartitions().keySet().iterator().next();
+		Map<TopicPartition, PartitionOffsetData> offsetFetchResponseMap = new HashMap<>();
+		boolean disconnected = false;
+		Exception exception = null;
+		Connection jdbcConn = null;
+		TopicConsumers topicConsumer = null;
+
+		for (Node nodeNow : topicConsumersMap.keySet()) {
+			if (request.destination().equals("" + nodeNow.id())) {
+				topicConsumer = topicConsumersMap.get(nodeNow);
+			}
+		}
+		try {
+			jdbcConn = topicConsumer.getDBConnection();
+			for (TopicPartition tp : topicPartitions) {
+				try {
+					long offset = FetchOffsets.fetchCommittedOffset(tp.topic(), tp.partition(), groupId, jdbcConn);
+					if (offset != -1) 
+						offsetFetchResponseMap.put(tp, new PartitionOffsetData(offset,null));
+					else {
+						log.warn("No Committed Offset found for Queue:" + tp.topic() + "Partition:" + tp.partition());
+						offsetFetchResponseMap.put(tp, null);
+					}
+				} catch (SQLException sqlE) {
+						int errorCode = sqlE.getErrorCode();
+						log.error("SQL ERROR while fetching commit offset: ORA- " + errorCode, sqlE);
+						if(errorCode == 28 || errorCode == 17410) {
+							disconnected = true;
+							throw sqlE;
+						}
+						else
+							offsetFetchResponseMap.put(tp, new PartitionOffsetData(-1L,sqlE));
+				}
+			}
+
+		} catch (Exception e) {
+			log.error("Exception while fetching offsets " + e.getMessage(), e);
+			try {
+				exception = e;
+				log.debug("Unexcepted error occured with connection to node {}, closing the connection",
+						request.destination());
+				if (jdbcConn != null)
+					jdbcConn.close();
+
+				log.trace("Connection with node {} is closed", request.destination());
+			} catch (SQLException sqlEx) {
+				log.trace("Failed to close connection with node {}", request.destination());
+			}
+		}
+
+		OffsetFetchResponse offsetResponse = new OffsetFetchResponse(Collections.singletonMap(groupId, offsetFetchResponseMap));
+		offsetResponse.setException(exception);
+
+		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
+				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null, offsetResponse);
+	}
 
 	public ClientResponse connectMe(ClientRequest request)
 	{
@@ -1448,7 +1516,7 @@ public final class AQKafkaConsumer extends AQClient{
 					topicConsumersMap.put((org.oracle.okafka.common.Node)bNode, bootStrapConsumer);
 					break;
 				}
-				// A connection was created before poll is invoked. This connection is passed on to the application and may be used for transactionala activity.
+				// A connection was created before poll is invoked. This connection is passed on to the application and may be used for transactional activity.
 				// OKafkaConsumer must use this connection going forward. Hence it should not look for optimal database instance to consume records. Hence avoid connectMe call.
 				skipConnectMe = true;
 			}

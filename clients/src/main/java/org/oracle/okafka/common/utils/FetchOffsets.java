@@ -104,7 +104,7 @@ public class FetchOffsets {
 			        "END;";
 	
 	private static final String MAX_TIMESTAMP_OFFSET_PLSQL = 
-				"DECLARE " +
+					"DECLARE " +
 			        "    shard_num NUMBER := ?; " +
 			        "    queue_name VARCHAR2(128) := ?; " +
 			        "    partition_name VARCHAR2(50); " +
@@ -130,6 +130,67 @@ public class FetchOffsets {
 			        "    WHEN OTHERS THEN " +
 			        "        RAISE; " +
 			        "END;";
+
+	private static final String COMMITTED_OFFSET_PLSQL = 
+			"DECLARE " + 
+		    "    queue_name VARCHAR2(128) := ?; " + 
+		    "    shard_num NUMBER := ?; " + 
+		    "    subscriber_name VARCHAR(128) := ?; " + 
+		    "	 subshard_num NUMBER; " +
+		    "    dequeue_log_partition_names SYS.ODCIVARCHAR2LIST; " + 
+		    "    subshard_list SYS.ODCINUMBERLIST; " + 
+		    "	 rowmarkers SYS.ODCINUMBERLIST; " +
+		    "	 dequeue_log_unbound_indexes SYS.ODCINUMBERLIST; " +
+		    "    seq_num NUMBER; " + 
+		    "	 subscriber_id NUMBER; " +
+		    "BEGIN " + 
+		    "	 SELECT DISTINCT(SUBSCRIBER_ID) " +
+		    "	 INTO subscriber_id " +
+		    "	 FROM USER_QUEUE_SUBSCRIBERS " +
+		    "	 WHERE CONSUMER_NAME = subscriber_name; " +
+		    
+		    "	 EXECUTE IMMEDIATE " +
+		    "    'SELECT SUBSHARD, LOWER(PARTNAME), ROWMARKER, UNBOUND_IDX " + 
+		    "    FROM user_dequeue_log_partition_map " + 
+		    "	 WHERE QUEUE_TABLE = :queue_name " +
+		    "    AND SUBSHARD IN ( " + 
+		    "            SELECT SUBSHARD " + 
+		    "            FROM user_queue_partition_map " + 
+		    "            WHERE QUEUE_TABLE = :queue_name " + 
+		    "            AND SHARD = :shard_num " + 
+		    "    ) " + 
+		    "    AND QUEUE_PART# IN ( " + 
+		    "        SELECT PARTITION# " + 
+		    "        FROM user_queue_partition_map " + 
+		    "        WHERE QUEUE_TABLE = :queue_name " + 
+		    "        AND SHARD = :shard_num " + 
+		    "    ) " + 
+		    "	 AND SUBSCRIBER_ID = :subscriber_id " +
+		    "	 ORDER BY SUBSHARD' " +
+		    "    BULK COLLECT INTO subshard_list, dequeue_log_partition_names, rowmarkers, dequeue_log_unbound_indexes " + 
+		    "	 USING queue_name, queue_name, shard_num, queue_name, shard_num, subscriber_id; " +
+
+			"    FOR i IN REVERSE 1 .. dequeue_log_partition_names.COUNT LOOP " +
+		    "    EXECUTE IMMEDIATE " + 
+		    "        'SELECT MAX(SEQ_NUM) FROM ' || " + 
+		    "        DBMS_ASSERT.SQL_OBJECT_NAME('AQ$_' || queue_name || '_L') || " + 
+		    "        ' PARTITION (' || dequeue_log_partition_names(i) || ') " + 
+		    "        WHERE SUBSCRIBER# = ''' || subscriber_id || ''' " + 
+		    "        AND FLAGS = ''' || rowmarkers(i) || ''' ' " + 
+		    "    INTO seq_num; " + 
+		    "	 IF seq_num IS NOT NULL THEN " +
+		    "	 	IF dequeue_log_unbound_indexes(i) > 0 THEN " +
+		    "	 		seq_num := seq_num - 20000*dequeue_log_unbound_indexes(i); " +
+		    "	 	END IF; " +
+		    "	 	subshard_num := subshard_list(i); " +
+		    "	 	EXIT; " +
+		    "	 END IF; " +
+	        "    END LOOP; " +
+		    
+		    "    seq_num := NVL(seq_num, -1); " +
+	        "    ? := subshard_num; " +
+	        "    ? := seq_num; " +
+		    "END;";
 	
 	public static ListOffsetsPartitionResponse fetchEarliestOffset(String topic, int partition, Connection jdbcConn)
 			throws SQLException {
@@ -309,5 +370,42 @@ public class FetchOffsets {
 		}
 		return response;
 
+	}
+	
+	public static long fetchCommittedOffset(String topic, int partition, String subscriberName, Connection jdbcConn)
+			throws SQLException {
+
+		CallableStatement cStmt = null;
+		try {
+			cStmt = jdbcConn.prepareCall(COMMITTED_OFFSET_PLSQL);
+			cStmt.setString(1, topic);
+			cStmt.setInt(2, partition * 2);
+			cStmt.setString(3, subscriberName);
+
+			cStmt.registerOutParameter(4, Types.INTEGER);
+			cStmt.registerOutParameter(5, Types.INTEGER);
+
+			cStmt.executeQuery();
+
+			int subshard = cStmt.getInt(4);
+			long sequence = cStmt.getInt(5);
+			if (sequence == -1)
+				return -1;
+			long offset = subshard * MessageIdConverter.DEFAULT_SUBPARTITION_SIZE + sequence;
+			return offset;
+
+		} catch (SQLException sqle) {
+			if (sqle.getErrorCode() == 1403) {
+				return -1;
+			} else
+				throw sqle;
+		} finally {
+			try {
+				if (cStmt != null)
+					cStmt.close();
+			} catch (Exception ex) {
+				// do nothing
+			}
+		}
 	}
 }

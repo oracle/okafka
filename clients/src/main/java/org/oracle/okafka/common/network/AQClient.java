@@ -128,6 +128,7 @@ public abstract class AQClient {
 	 * */
 	public ClientResponse getMetadataNow(ClientRequest request, Connection con, Node currentNode,
 			boolean metadataRequested) {
+		
 		log.debug("AQClient: Getting Metadata now");
 
 		MetadataRequest.Builder builder = (MetadataRequest.Builder) request.requestBuilder();
