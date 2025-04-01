@@ -59,7 +59,7 @@ public class ConnectionUtils {
 		return url;
 	}
 	
-	public static Connection createJDBCConnection(Node node, AbstractConfig configs) throws SQLException{
+	public static Connection createJDBCConnection(Node node, AbstractConfig configs, Logger log) throws SQLException{
 		OracleDataSource s=new OracleDataSource();
 		String dbUrl = createUrl(node, configs);
 		s.setURL(dbUrl);
@@ -76,7 +76,7 @@ public class ConnectionUtils {
 			node.updateHashCode();
 		}catch(Exception e)
 		{
-			System.out.println("Exception while connecting to database with connection string " + dbUrl +":" + e);
+			log.error("Exception while connecting to database with connection string " + dbUrl +":" + e);
 			e.printStackTrace();
 			//log.error("Exception while setting new instance ids " + e);
 			throw e;

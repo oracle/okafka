@@ -10,7 +10,7 @@ import org.oracle.okafka.common.protocol.ApiKeys;
 
 public class OffsetFetchRequest extends AbstractRequest{
 	
-	private static final List<TopicPartition> ALL_TOPIC_PARTITIONS = null;
+	public static final List<TopicPartition> ALL_TOPIC_PARTITIONS = null;
     private final Map<String,List<TopicPartition>> perGroupTopicPartitions;
 
 	public static class Builder extends AbstractRequest.Builder<OffsetFetchRequest> {

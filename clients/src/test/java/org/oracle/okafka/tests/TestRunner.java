@@ -10,8 +10,9 @@ class TestRunner {
 		Result result = new Result();
 
 		result = JUnitCore.runClasses(SimpleOkafkaAdmin.class, SimpleOkafkaProducer.class, OkafkaListOffsets.class,
-				OkafkaAutoOffsetReset.class, OkafkaFetchCommittedOffset.class, SimpleOkafkaProducer.class,
-				OkafkaSeekToEnd.class, OkafkaSeekToBeginning.class, SimpleOkafkaProducer.class, OkafkaUnsubscribe.class,
+				OkafkaAutoOffsetReset.class, OkafkaFetchCommittedOffset.class, ListConsumerGroups.class,
+				ListConsumerGroupOffsets.class, SimpleOkafkaProducer.class, OkafkaSeekToEnd.class,
+				OkafkaSeekToBeginning.class, SimpleOkafkaProducer.class, OkafkaUnsubscribe.class,
 				ProducerMetricsTest.class, ConsumerMetricsTest.class, OkafkaDescribeTopics.class,
 				OkafkaListTopics.class, OkafkaDescribeTopicsById.class, OkafkaDeleteTopic.class,
 				OkafkaDeleteTopicById.class);
