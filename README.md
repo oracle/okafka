@@ -7,7 +7,7 @@ This distribution contains Java source code to provide Kafka Java client compati
 
 You need to have [Gradle 7.3 or above](http://www.gradle.org/installation) and [Java](http://www.oracle.com/technetwork/java/javase/downloads/index.html) installed.
 
-This distribution contains version 23.4.0.0 of the `Kafka Java Client for Oracle Transactional Event Queues` project. It will be referred as OKafka-23.4.0.0 henceforth. This is tested with JDK 11.0.22 but we recommend using the latest version.
+This distribution contains version 23.4.0.0 of the `Kafka Java Client for Oracle Transactional Event Queues` project. It will be referred as OKafka-23.4.0.0 henceforth. This is tested with JDK 11.0.22, but we recommend using the latest version.
 
 The Kafka Java Client works with Oracle Database 23ai Free version as well as Oracle Database 23ai available on Oracle Autonomous Cloud platform.
 
@@ -81,7 +81,7 @@ end;
 1. PLAINTEXT
 2. SSL
 
-1.PLAINTEXT: In this protocol a JDBC connection is setup by providing username and password in plain text in ojdbc.prperties file. To use PLAINTEXT protocol user must provide following properties through application.
+1.PLAINTEXT: In this protocol a JDBC connection is setup by providing username and password in plain text in ojdbc.properties file. To use PLAINTEXT protocol user must provide following properties through application.
 
 ```text
 security.protocol = "PLAINTEXT"
