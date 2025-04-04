@@ -13,9 +13,9 @@ class TestRunner {
 				OkafkaAutoOffsetReset.class, OkafkaFetchCommittedOffset.class, ListConsumerGroups.class,
 				ListConsumerGroupOffsets.class, SimpleOkafkaProducer.class, OkafkaSeekToEnd.class,
 				OkafkaSeekToBeginning.class, SimpleOkafkaProducer.class, OkafkaUnsubscribe.class,
-				ProducerMetricsTest.class, ConsumerMetricsTest.class, OkafkaDescribeTopics.class,
-				OkafkaListTopics.class, OkafkaDescribeTopicsById.class, OkafkaDeleteTopic.class,
-				OkafkaDeleteTopicById.class);
+				ProducerMetricsTest.class, ConsumerMetricsTest.class, DeleteConsumerGroups.class,
+				OkafkaDescribeTopics.class, OkafkaListTopics.class, OkafkaDescribeTopicsById.class,
+				OkafkaDeleteTopic.class, OkafkaDeleteTopicById.class);
 
 		for (Failure failure : result.getFailures()) {
 			System.out.println("Test failure : " + failure.toString());

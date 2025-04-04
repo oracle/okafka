@@ -11,6 +11,7 @@ import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLSyntaxErrorException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,6 +32,8 @@ import org.oracle.okafka.common.network.AQClient;
 import org.oracle.okafka.common.protocol.ApiKeys;
 import org.oracle.okafka.common.requests.CreateTopicsRequest;
 import org.oracle.okafka.common.requests.CreateTopicsResponse;
+import org.oracle.okafka.common.requests.DeleteGroupsRequest;
+import org.oracle.okafka.common.requests.DeleteGroupsResponse;
 import org.oracle.okafka.common.requests.DeleteTopicsRequest;
 import org.oracle.okafka.common.requests.DeleteTopicsResponse;
 import org.oracle.okafka.common.requests.ListGroupsResponse;
@@ -45,6 +48,7 @@ import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.errors.DisconnectException;
+import org.apache.kafka.common.errors.GroupIdNotFoundException;
 import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.Time;
 
@@ -97,6 +101,8 @@ public class AQKafkaAdmin extends AQClient{
 			return getCommittedOffsets(request);
 		if(key == ApiKeys.LIST_GROUPS)
 			return getConsumerGroups(request);
+		if(key == ApiKeys.DELETE_GROUPS)
+			return deleteConsumerGroups(request);
 		return null;
 		
 	}
@@ -512,6 +518,94 @@ public class AQKafkaAdmin extends AQClient{
 		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
 				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null, offsetResponse);
 
+	}
+	
+	private ClientResponse deleteConsumerGroups(ClientRequest request) {
+		DeleteGroupsRequest.Builder builder = (DeleteGroupsRequest.Builder) request.requestBuilder();
+		DeleteGroupsRequest deleteGroupsRequest = builder.build();
+		List<String> groups = deleteGroupsRequest.groups();
+		Map<String, Exception> errors = new HashMap<>();
+
+		Node node = (org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
+		if (node == null) {
+			List<org.apache.kafka.common.Node> nodeList = metadataManager.updater().fetchNodes();
+			for (org.apache.kafka.common.Node nodeNow : nodeList) {
+				if (nodeNow.id() == Integer.parseInt(request.destination())) {
+					node = (org.oracle.okafka.common.Node) nodeNow;
+				}
+			}
+		}
+
+		Connection jdbcConn = connections.get(node);
+		Exception exception = null;
+		boolean disconnected = false;
+		
+		String plsql = 
+			    "BEGIN " +
+			    "  DBMS_AQADM.REMOVE_SUBSCRIBER( " +
+			    "    queue_name => ?, " +
+			    "    subscriber => sys.aq$_agent(?, NULL, NULL) " +
+			    "  ); " +
+			    "END;";
+		CallableStatement cStmt = null;
+		try {
+			for(String group : groups) {
+					List<String> subscribedTopics = fetchSubscribedQueues(group, jdbcConn);
+
+					if(subscribedTopics.isEmpty())
+						errors.put(group, new GroupIdNotFoundException("The group doesn't exist"));
+					else {
+						jdbcConn.setAutoCommit(false);	
+						cStmt = jdbcConn.prepareCall(plsql);
+
+						for(String topic: subscribedTopics) {
+							cStmt.setString(1, topic);
+							cStmt.setString(2, group);
+							cStmt.execute();  
+						}
+						jdbcConn.commit();
+						errors.put(group, null);
+					}
+			}
+		}catch (SQLException sqlE) {
+			exception = sqlE;
+			if(jdbcConn != null)
+				try {
+					jdbcConn.rollback();
+				} catch (SQLException e) {
+					log.trace("Failed to rollback the group deletion transaction");
+				}
+
+			if (sqlE.getErrorCode() == 6550) {
+				log.error("Not all privileges granted to the database user.",
+						sqlE.getMessage());
+				log.info("Please grant all the documented privileges to database user.");
+				if (sqlE instanceof SQLSyntaxErrorException) {
+					log.trace("Please grant all the documented privileges to database user.");
+				}
+			}
+
+			int errorCode = sqlE.getErrorCode();
+			log.error("SQL Error:ORA-" + errorCode);
+			if (errorCode == 28 || errorCode == 17410) {
+				disconnected = true;
+				exception = new DisconnectException(sqlE.getMessage(), sqlE);
+			}
+			try {
+				log.debug("Unexcepted error occured with connection to node {}, closing the connection",
+						request.destination());
+				if (jdbcConn != null)
+					jdbcConn.close();
+
+				log.trace("Connection with node {} is closed", request.destination());
+			} catch (SQLException sqlEx) {
+				log.trace("Failed to close connection with node {}", request.destination());
+			}
+		} 
+		DeleteGroupsResponse deleteGroupsResponse = new DeleteGroupsResponse(errors);
+		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
+				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null, deleteGroupsResponse);
+		
 	}
 	
 	/**

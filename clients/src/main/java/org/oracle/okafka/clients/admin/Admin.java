@@ -33,6 +33,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.admin.CreateTopicsOptions;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
+import org.apache.kafka.clients.admin.DeleteConsumerGroupsOptions;
+import org.apache.kafka.clients.admin.DeleteConsumerGroupsResult;
 import org.apache.kafka.clients.admin.DeleteTopicsOptions;
 import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.admin.ListTopicsOptions;
@@ -430,6 +432,23 @@ public interface Admin extends org.apache.kafka.clients.admin.Admin {
      */
     default ListConsumerGroupOffsetsResult listConsumerGroupOffsets(Map<String, ListConsumerGroupOffsetsSpec> groupSpecs) {
         return listConsumerGroupOffsets(groupSpecs, new ListConsumerGroupOffsetsOptions());
+    }
+    
+    /**
+     * Delete consumer groups from the cluster.
+     *
+     * @param options The options to use when deleting a consumer group.
+     * @return The DeleteConsumerGroupsResult.
+     */
+    DeleteConsumerGroupsResult deleteConsumerGroups(Collection<String> groupIds, DeleteConsumerGroupsOptions options);
+
+    /**
+     * Delete consumer groups from the cluster with the default options.
+     *
+     * @return The DeleteConsumerGroupResult.
+     */
+    default DeleteConsumerGroupsResult deleteConsumerGroups(Collection<String> groupIds) {
+        return deleteConsumerGroups(groupIds, new DeleteConsumerGroupsOptions());
     }
     
 }

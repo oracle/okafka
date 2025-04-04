@@ -190,6 +190,8 @@ import org.apache.kafka.common.requests.AbstractResponse;
 import org.oracle.okafka.common.requests.AbstractRequest;
 import org.oracle.okafka.common.requests.CreateTopicsRequest;
 import org.oracle.okafka.common.requests.CreateTopicsResponse;
+import org.oracle.okafka.common.requests.DeleteGroupsRequest;
+import org.oracle.okafka.common.requests.DeleteGroupsResponse;
 import org.oracle.okafka.common.requests.DeleteTopicsRequest;
 import org.oracle.okafka.common.requests.DeleteTopicsResponse;
 import org.oracle.okafka.common.requests.ListGroupsRequest;
@@ -2265,6 +2267,72 @@ public class KafkaAdminClient extends AdminClient {
 	}
 	
 	@Override
+	public DeleteConsumerGroupsResult deleteConsumerGroups(Collection<String> groupIds,
+			DeleteConsumerGroupsOptions options) {
+
+		final Map<String, KafkaFutureImpl<Void>> groupFutures = new HashMap<>(groupIds.size());
+		for (String groupId : groupIds) {
+			groupFutures.put(groupId, new KafkaFutureImpl<>());
+		}
+		long now = time.milliseconds();
+
+		runnable.call(new Call("deleteGroups", calcDeadlineMs(now, options.timeoutMs()), new ControllerNodeProvider()) {
+
+			@Override
+			AbstractRequest.Builder createRequest(int timeoutMs) {
+				return new DeleteGroupsRequest.Builder(new ArrayList<>(groupIds));
+			}
+
+			@Override
+			void handleResponse(AbstractResponse abstractResponse) {
+				DeleteGroupsResponse response = (DeleteGroupsResponse) abstractResponse;
+				Map<String, Exception> errors = response.errors();
+				Exception exception = response.getException();
+				for (Map.Entry<String, KafkaFutureImpl<Void>> entry : groupFutures.entrySet()) {
+					String group = entry.getKey();
+					if (errors.containsKey(group)) {
+						if (errors.get(group) != null)
+							entry.getValue().completeExceptionally(errors.get(group));
+						else
+							entry.getValue().complete(null);
+					} else
+						entry.getValue().completeExceptionally(exception);
+				}
+			}
+
+			@Override
+			void handleFailure(Throwable throwable) {
+				if (throwable instanceof DisconnectException)
+					this.fail(now, throwable);
+				else {
+					completeAllExceptionally(groupFutures.values(), throwable);
+				}
+			}
+		}, now);
+
+		Constructor<DeleteConsumerGroupsResult> constructor;
+		DeleteConsumerGroupsResult dcgr;
+		try {
+			constructor = DeleteConsumerGroupsResult.class.getDeclaredConstructor(Map.class);
+
+			constructor.setAccessible(true);
+			try {
+				dcgr = constructor.newInstance(groupFutures);
+				return dcgr;
+			} catch (InstantiationException | IllegalAccessException | IllegalArgumentException
+					| InvocationTargetException e) {
+				dcgr = null;
+				log.error("Exception caught: ", e);
+			}
+		} catch (NoSuchMethodException | SecurityException e) {
+			log.error("Exception caught: ", e);
+			constructor = null;
+			dcgr = null;
+		}
+		return dcgr;
+	}
+	
+	@Override
 	public ListConsumerGroupsResult listConsumerGroups(ListConsumerGroupsOptions options) {
 
 		final KafkaFutureImpl<Collection<ConsumerGroupListing>> all = new KafkaFutureImpl<>();
@@ -2561,16 +2629,6 @@ public class KafkaAdminClient extends AdminClient {
 	@Override
 	public DescribeConsumerGroupsResult describeConsumerGroups(final Collection<String> groupIds,
 			final DescribeConsumerGroupsOptions options) {
-
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-	}
-
-	/**
-	 * This method is not yet supported.
-	 */
-	@Override
-	public DeleteConsumerGroupsResult deleteConsumerGroups(Collection<String> groupIds,
-			DeleteConsumerGroupsOptions options) {
 
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
