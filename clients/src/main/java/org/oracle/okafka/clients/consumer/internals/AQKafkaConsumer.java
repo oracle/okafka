@@ -731,7 +731,7 @@ public final class AQKafkaConsumer extends AQClient{
 				SQLException sqlExcp = (SQLException)exception;
 				int errorCode = sqlExcp.getErrorCode();
 				log.error("SQL Error:ORA-" + errorCode);
-				if(errorCode == 28 || errorCode == 17410) {
+2				if(errorCode == 28 || errorCode == 17410 || errorCode == 1403) {
 					disconnected = true;
 				}
 			}
@@ -1116,7 +1116,7 @@ public final class AQKafkaConsumer extends AQClient{
 			{
 				SQLException sqlExcp = (SQLException) exception;
 				int sqlErrorCode = sqlExcp.getErrorCode();
-				if(sqlErrorCode == 28 || sqlErrorCode == 17410)
+				if(sqlErrorCode == 28 || sqlErrorCode == 17410 || sqlErrorCode == 1403)
 					disconnected = true;
 			}
 			return createSyncResponse(request, null, -1, exception, disconnected);
