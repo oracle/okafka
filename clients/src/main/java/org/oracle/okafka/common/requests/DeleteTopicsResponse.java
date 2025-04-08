@@ -69,7 +69,6 @@ public class DeleteTopicsResponse extends AbstractResponse {
     	return requestResult;
     }
     
-
 	@Override
 	public ApiMessage data() {
 		// TODO Auto-generated method stub

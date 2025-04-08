@@ -1184,6 +1184,7 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 		try {
 			jdbcConn = topicConsumer.getDBConnection();
+			
 			for (TopicPartition tp : topicPartitions) {
 				try {
 					long offset = FetchOffsets.fetchCommittedOffset(tp.topic(), tp.partition(), groupId, jdbcConn);
@@ -1205,6 +1206,7 @@ public final class AQKafkaConsumer extends AQClient{
 				}
 			}
 
+
 		} catch (Exception e) {
 			log.error("Exception while fetching offsets " + e.getMessage(), e);
 			try {
@@ -1221,6 +1223,7 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 
 		OffsetFetchResponse offsetResponse = new OffsetFetchResponse(Collections.singletonMap(groupId, offsetFetchResponseMap));
+		
 		offsetResponse.setException(exception);
 
 		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),

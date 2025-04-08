@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
@@ -29,6 +30,7 @@ import org.oracle.okafka.clients.TopicTeqParameters;
 import org.oracle.okafka.common.Node;
 import org.oracle.okafka.common.errors.RecordNotFoundSQLException;
 import org.apache.kafka.common.PartitionInfo;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.oracle.okafka.common.requests.MetadataRequest;
@@ -38,6 +40,7 @@ import org.oracle.okafka.common.requests.ListOffsetsRequest;
 import org.oracle.okafka.common.requests.ListOffsetsRequest.ListOffsetsPartition;
 import org.oracle.okafka.common.requests.ListOffsetsResponse;
 import org.oracle.okafka.common.requests.ListOffsetsResponse.ListOffsetsPartitionResponse;
+import org.oracle.okafka.common.requests.OffsetFetchResponse.PartitionOffsetData;
 import org.oracle.okafka.common.utils.ConnectionUtils;
 import org.oracle.okafka.common.utils.CreateTopics;
 import org.oracle.okafka.common.utils.FetchOffsets;
@@ -327,7 +330,7 @@ public abstract class AQClient {
 	// Fetches existing cluster nodes 
 	// Returns TRUE if new node is added, existing node went down, or if the startup time changed for the nodes
 	// otherwise return false
-	private boolean getNodes(List<Node> nodes, Connection con, Node connectedNode, boolean metadataRequested) throws SQLException {
+	public boolean getNodes(List<Node> nodes, Connection con, Node connectedNode, boolean metadataRequested) throws SQLException {
 		Statement stmt = null;
 		ResultSet result = null;
 		String user = "";
@@ -776,6 +779,29 @@ public abstract class AQClient {
 		return topicTeqParam;
 	} 
 	
+	public static List<String> fetchSubscribedQueues(String groupId, Connection jdbcConn) throws SQLException {
+		List<String> subscribedQueues = null;
+		CallableStatement cStmt = null;
+		String query = "select queue_name from user_queue_subscribers where consumer_name = ? ";
+
+		cStmt = jdbcConn.prepareCall(query);
+		cStmt.setString(1, groupId);
+
+		ResultSet rs = cStmt.executeQuery();
+		subscribedQueues = new ArrayList<>();
+		while (rs.next()) {
+			subscribedQueues.add(rs.getString(1));
+		}
+
+		try {
+			if (cStmt != null)
+				cStmt.close();
+		} catch (Exception ex) {
+			// do nothing
+		}
+		return subscribedQueues;
+	}
+	
 	public ClientResponse getOffsetsResponse(ClientRequest request, Connection jdbcConn) {
 		log.debug("AQClient: Getting Offsets now");
 
@@ -848,6 +874,36 @@ public abstract class AQClient {
 
 		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
 				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null, listOffsetResponse);
+	}
+	
+	public Map<TopicPartition, PartitionOffsetData> fetchCommittedOffsets(String groupId,
+			List<TopicPartition> topicPartitions, AtomicBoolean disconnected, Connection jdbcConn) throws SQLException {
+		Map<TopicPartition, PartitionOffsetData> committedOffsetsMap = new HashMap<>();
+		for (TopicPartition tp : topicPartitions) {
+			try {
+				
+				long offset = FetchOffsets.fetchCommittedOffset(tp.topic(), tp.partition(), groupId, jdbcConn);
+				if (offset != -1)
+					committedOffsetsMap.put(tp, new PartitionOffsetData(offset, null));
+				else
+					committedOffsetsMap.put(tp, null);
+			} catch (SQLException sqlE) {
+				if (sqlE.getErrorCode() == 24010) {
+					log.warn("Topic '{}' doesn't exist", tp.topic());
+					committedOffsetsMap.put(tp, null);
+				} else {
+					int errorCode = sqlE.getErrorCode();
+					log.error("SQL Error:ORA-" + errorCode);
+					if (errorCode == 28 || errorCode == 17410) {
+						disconnected.set(true);
+						throw sqlE;
+					} else
+						committedOffsetsMap.put(tp, new PartitionOffsetData(-1L, sqlE));
+				}
+
+			}
+		}
+		return committedOffsetsMap;
 	}
 
 	public static String getProperty(String str, String property) {

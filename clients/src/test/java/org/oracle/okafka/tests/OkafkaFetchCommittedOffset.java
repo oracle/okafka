@@ -27,6 +27,10 @@ public class OkafkaFetchCommittedOffset {
 			Set<TopicPartition> topicPartitons = new HashSet<>();
 			topicPartitons.add(new TopicPartition("TEQ",0));
 			topicPartitons.add(new TopicPartition("TEQ",1));
+			topicPartitons.add(new TopicPartition("TEQ",2));
+			topicPartitons.add(new TopicPartition("TEQ",3));
+			topicPartitons.add(new TopicPartition("TEQ",4));
+
         	Map<TopicPartition,OffsetAndMetadata> committedMap = consumer.committed(topicPartitons);
         	System.out.println(committedMap);
         	

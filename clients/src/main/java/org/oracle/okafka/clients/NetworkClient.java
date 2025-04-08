@@ -534,7 +534,6 @@ public class NetworkClient implements KafkaClient {
 		try {
 
 			log.info("Initiating connection to node {}", node);
-			//Thread.dumpStack();
 			aqClient.connect(node);
 			this.connectionStates.connecting(node, now);
 			this.connectionStates.ready(node);
@@ -560,7 +559,9 @@ public class NetworkClient implements KafkaClient {
 				metadataManager.requestUpdate();
 			
 			log.warn("Error connecting to node {}", node, e);
-			if(e instanceof JMSSecurityException || ((JMSException)e).getErrorCode().equals("12505"))
+
+			if (e instanceof JMSSecurityException
+					|| (e instanceof JMSException && ((JMSException) e).getErrorCode().equals("12505")))
 				throw new InvalidLoginCredentialsException("Invalid login details provided:" + e.getMessage());
 			return false;
 		}

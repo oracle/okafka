@@ -5,7 +5,6 @@ import java.util.Map;
 
 import org.apache.kafka.common.protocol.ApiMessage;
 import org.apache.kafka.common.requests.AbstractResponse;
-import org.apache.kafka.common.utils.Utils;
 import org.oracle.okafka.common.protocol.ApiKeys;
 
 public class ListOffsetsRequest extends AbstractRequest {

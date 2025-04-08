@@ -50,6 +50,7 @@ import org.apache.kafka.clients.admin.AlterReplicaLogDirsResult;
 import org.apache.kafka.clients.admin.AlterUserScramCredentialsOptions;
 import org.apache.kafka.clients.admin.AlterUserScramCredentialsResult;
 import org.apache.kafka.clients.admin.Config;
+import org.apache.kafka.clients.admin.ConsumerGroupListing;
 import org.apache.kafka.clients.admin.CreateAclsOptions;
 import org.apache.kafka.clients.admin.CreateAclsResult;
 import org.apache.kafka.clients.admin.CreateDelegationTokenOptions;
@@ -143,9 +144,11 @@ import org.oracle.okafka.clients.KafkaClient;
 import org.oracle.okafka.clients.NetworkClient;
 import org.oracle.okafka.clients.TopicTeqParameters;
 import org.apache.kafka.clients.admin.internals.AdminMetadataManager;
+import org.apache.kafka.clients.admin.internals.CoordinatorKey;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.oracle.okafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.Cluster;
+import org.apache.kafka.common.ConsumerGroupState;
 import org.apache.kafka.common.ElectionType;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.KafkaFuture;
@@ -187,19 +190,27 @@ import org.apache.kafka.common.requests.AbstractResponse;
 import org.oracle.okafka.common.requests.AbstractRequest;
 import org.oracle.okafka.common.requests.CreateTopicsRequest;
 import org.oracle.okafka.common.requests.CreateTopicsResponse;
+import org.oracle.okafka.common.requests.DeleteGroupsRequest;
+import org.oracle.okafka.common.requests.DeleteGroupsResponse;
 import org.oracle.okafka.common.requests.DeleteTopicsRequest;
 import org.oracle.okafka.common.requests.DeleteTopicsResponse;
+import org.oracle.okafka.common.requests.ListGroupsRequest;
+import org.oracle.okafka.common.requests.ListGroupsResponse;
 import org.oracle.okafka.common.requests.MetadataRequest;
 import org.oracle.okafka.common.requests.ListOffsetsRequest;
 import org.oracle.okafka.common.requests.ListOffsetsRequest.ListOffsetsPartition;
 import org.oracle.okafka.common.requests.ListOffsetsResponse.ListOffsetsPartitionResponse;
+import org.oracle.okafka.common.requests.OffsetFetchResponse.PartitionOffsetData;
 import org.oracle.okafka.common.requests.ListOffsetsResponse;
 import org.oracle.okafka.common.requests.MetadataResponse;
+import org.oracle.okafka.common.requests.OffsetFetchRequest;
+import org.oracle.okafka.common.requests.OffsetFetchResponse;
 import org.oracle.okafka.common.requests.CreateTopicsRequest.TopicDetails;
 import org.apache.kafka.common.utils.AppInfoParser;
 import org.apache.kafka.common.utils.ExponentialBackoff;
 import org.apache.kafka.common.utils.KafkaThread;
 import org.apache.kafka.common.utils.LogContext;
+import org.oracle.okafka.common.utils.ReflectionUtil;
 import org.oracle.okafka.common.utils.TNSParser;
 import org.apache.kafka.common.utils.Time;
 import org.oracle.okafka.clients.admin.internals.AQKafkaAdmin;
@@ -208,8 +219,6 @@ import org.slf4j.Logger;
 
 import static org.apache.kafka.common.utils.Utils.closeQuietly;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.sql.SQLException;
@@ -544,7 +553,7 @@ public class KafkaAdminClient extends AdminClient {
 			}
 			Cluster bootStrapCluster = new Cluster(null, bootStrapNodeList, new ArrayList<>(0), Collections.emptySet(),
 					Collections.emptySet());
-
+			
 			this.metadataManager.update(bootStrapCluster, time.milliseconds());
 		}
 
@@ -1149,8 +1158,8 @@ public class KafkaAdminClient extends AdminClient {
 					} else {
 						log.debug("Closing connection to {} to time out {}", nodeId, call);
 						call.aborted = true;
-						client.disconnect(
-								(org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(nodeId)));
+						client.disconnect((org.oracle.okafka.common.Node) metadataManager
+								.nodeById(Integer.parseInt(nodeId.replace("INSTANCE_", ""))));
 						numTimedOut++;
 						// We don't remove anything from the callsInFlight data structure. Because the
 						// connection
@@ -1379,6 +1388,7 @@ public class KafkaAdminClient extends AdminClient {
 				 * current time and handle the latest responses. now = time.milliseconds();
 				 * handleResponses(now, responses);
 				 */
+                now = time.milliseconds();
 			}
 		}
 
@@ -1932,20 +1942,20 @@ public class KafkaAdminClient extends AdminClient {
 			}
 
 			@Override
-			void handleResponse(AbstractResponse abstractResponse){
+			void handleResponse(AbstractResponse abstractResponse) {
 				MetadataResponse response = (MetadataResponse) abstractResponse;
-				if(response.getException()==null) {
-				Map<String, TopicListing> topicListing = new HashMap<>();
-				Map<String, TopicTeqParameters> topicTeqParameters = response.teqParameters();
+				if (response.getException() == null) {
+					Map<String, TopicListing> topicListing = new HashMap<>();
+					Map<String, TopicTeqParameters> topicTeqParameters = response.teqParameters();
 
-				for (Map.Entry<String, TopicTeqParameters> entry : topicTeqParameters.entrySet()) {
-					String topicName = entry.getKey();
-					if (entry.getValue().getStickyDeq() == 2)
-						topicListing.put(topicName, new TopicListing(topicName, null, false));
-				}
+					for (Map.Entry<String, TopicTeqParameters> entry : topicTeqParameters.entrySet()) {
+						String topicName = entry.getKey();
+						if (entry.getValue().getStickyDeq() == 2)
+							topicListing.put(topicName, new TopicListing(topicName, null, false));
+					}
 
-				topicListingFuture.complete(topicListing);
-				}else {
+					topicListingFuture.complete(topicListing);
+				} else {
 					handleFailure(response.getException());
 				}
 			}
@@ -1956,26 +1966,9 @@ public class KafkaAdminClient extends AdminClient {
 			}
 		}, now);
 
-		Constructor<ListTopicsResult> constructor;
-		ListTopicsResult ltr;
-		try {
-			constructor = ListTopicsResult.class.getDeclaredConstructor(KafkaFuture.class);
-
-			constructor.setAccessible(true);
-			try {
-				ltr = constructor.newInstance(topicListingFuture);
-				return ltr;
-			} catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-					| InvocationTargetException e) {
-				ltr = null;
-				log.error("Exception caught: ",e);
-			}
-		} catch (NoSuchMethodException | SecurityException e) {
-			log.error("Exception caught: ",e);
-			constructor = null;
-			ltr = null;
-		}
-		return ltr;
+		ListTopicsResult result = ReflectionUtil.createInstance(ListTopicsResult.class,
+				new Class<?>[] { KafkaFuture.class }, topicListingFuture);
+		return result;
 	}
 	
 	
@@ -2255,6 +2248,185 @@ public class KafkaAdminClient extends AdminClient {
 		return ListOffsetsRequest.LATEST_TIMESTAMP;
 	}
 	
+	@Override
+	public DeleteConsumerGroupsResult deleteConsumerGroups(Collection<String> groupIds,
+			DeleteConsumerGroupsOptions options) {
+
+		final Map<String, KafkaFutureImpl<Void>> groupFutures = new HashMap<>(groupIds.size());
+		for (String groupId : groupIds) {
+			groupFutures.put(groupId, new KafkaFutureImpl<>());
+		}
+		long now = time.milliseconds();
+
+		runnable.call(new Call("deleteGroups", calcDeadlineMs(now, options.timeoutMs()), new ControllerNodeProvider()) {
+
+			@Override
+			AbstractRequest.Builder createRequest(int timeoutMs) {
+				return new DeleteGroupsRequest.Builder(new ArrayList<>(groupIds));
+			}
+
+			@Override
+			void handleResponse(AbstractResponse abstractResponse) {
+				DeleteGroupsResponse response = (DeleteGroupsResponse) abstractResponse;
+				Map<String, Exception> errors = response.errors();
+				Exception exception = response.getException();
+				for (Map.Entry<String, KafkaFutureImpl<Void>> entry : groupFutures.entrySet()) {
+					String group = entry.getKey();
+					if (errors.containsKey(group)) {
+						if (errors.get(group) != null)
+							entry.getValue().completeExceptionally(errors.get(group));
+						else
+							entry.getValue().complete(null);
+					} else
+						entry.getValue().completeExceptionally(exception);
+				}
+			}
+
+			@Override
+			void handleFailure(Throwable throwable) {
+				if (throwable instanceof DisconnectException)
+					this.fail(now, throwable);
+				else {
+					completeAllExceptionally(groupFutures.values(), throwable);
+				}
+			}
+		}, now);
+
+		DeleteConsumerGroupsResult result = ReflectionUtil.createInstance(DeleteConsumerGroupsResult.class,
+				new Class<?>[] { Map.class }, groupFutures);
+		return result;
+	}
+	
+	@Override
+	public ListConsumerGroupsResult listConsumerGroups(ListConsumerGroupsOptions options) {
+
+		final KafkaFutureImpl<Collection<ConsumerGroupListing>> all = new KafkaFutureImpl<>();
+		final long now = time.milliseconds();
+
+		runnable.call(new Call("listGroups", calcDeadlineMs(now, options.timeoutMs()), new LeastLoadedNodeProvider()) {
+
+			@Override
+			AbstractRequest.Builder createRequest(int timeoutMs) {
+				return new ListGroupsRequest.Builder();
+			}
+
+			@Override
+			void handleResponse(AbstractResponse abstractResponse) {
+
+				ListGroupsResponse response = (ListGroupsResponse) abstractResponse;
+
+				if (response.getException() == null) {
+					List<ConsumerGroupListing> consumerGroups = response.groups().stream()
+							.map(groupName -> new ConsumerGroupListing(groupName, false,
+									Optional.of(ConsumerGroupState.STABLE)))
+							.collect(Collectors.toList());
+					all.complete(consumerGroups);
+				} else {
+					handleFailure(response.getException());
+
+				}
+			}
+
+			@Override
+			void handleFailure(Throwable throwable) {
+				if (throwable instanceof DisconnectException)
+					this.fail(now, throwable);
+				else
+					completeAllExceptionally(Collections.singletonList(all), throwable);
+			}
+		}, now);
+
+		ListConsumerGroupsResult result = ReflectionUtil.createInstance(ListConsumerGroupsResult.class,
+				new Class<?>[] { KafkaFuture.class }, all);
+		return result;
+	}
+
+	@Override
+	public ListConsumerGroupOffsetsResult listConsumerGroupOffsets(Map<String, ListConsumerGroupOffsetsSpec> groupSpecs,
+			ListConsumerGroupOffsetsOptions options) {
+
+		Map<CoordinatorKey, KafkaFutureImpl<Map<TopicPartition, OffsetAndMetadata>>> listOffsetResultFuturesMap = new HashMap<>();
+		Map<String, List<TopicPartition>> requestMap = new HashMap<>();
+
+		for (Map.Entry<String, ListConsumerGroupOffsetsSpec> entry : groupSpecs.entrySet()) {
+
+			String groupId = entry.getKey();
+			Collection<TopicPartition> topicPartitions = entry.getValue().topicPartitions();
+
+			if (topicPartitions != null)
+				requestMap.put(groupId, topicPartitions.stream().collect(Collectors.toList()));
+			else
+				requestMap.put(groupId, OffsetFetchRequest.ALL_TOPIC_PARTITIONS);
+
+			listOffsetResultFuturesMap.put(CoordinatorKey.byGroupId(groupId),
+					new KafkaFutureImpl<Map<TopicPartition, OffsetAndMetadata>>());
+		}
+
+		long now = time.milliseconds();
+		runnable.call(
+				new Call("offsetsFetch", calcDeadlineMs(now, options.timeoutMs()), new LeastLoadedNodeProvider()) {
+
+					@Override
+					AbstractRequest.Builder createRequest(int timeoutMs) {
+						return new OffsetFetchRequest.Builder(requestMap);
+					}
+
+					@Override
+					void handleResponse(AbstractResponse abstractResponse) {
+						OffsetFetchResponse response = (OffsetFetchResponse) abstractResponse;
+
+						if (response.getException() == null) {
+							Map<String, Map<TopicPartition, PartitionOffsetData>> perGroupOffsetFetchResponseMap = response
+									.getOffsetFetchResponseMap();
+
+							for (Map.Entry<CoordinatorKey, KafkaFutureImpl<Map<TopicPartition, OffsetAndMetadata>>> groupEntry : listOffsetResultFuturesMap
+									.entrySet()) {
+								Map<TopicPartition, PartitionOffsetData> partitionOffsetDataMap = perGroupOffsetFetchResponseMap
+										.get(groupEntry.getKey().idValue);
+								if (partitionOffsetDataMap == null) {
+									groupEntry.getValue().complete(null);
+									continue;
+								}
+								Map<TopicPartition, OffsetAndMetadata> topicPartitionOffsetMap = new HashMap<>();
+								for (Map.Entry<TopicPartition, PartitionOffsetData> tpEntry : partitionOffsetDataMap
+										.entrySet()) {
+									PartitionOffsetData offsetData = tpEntry.getValue();
+									if (offsetData != null) {
+										if (offsetData.error == null)
+											topicPartitionOffsetMap.put(tpEntry.getKey(),
+													new OffsetAndMetadata(offsetData.offset));
+										else
+											log.warn("Skipping return offset for {} due to error {}.", tpEntry.getKey(),
+													offsetData.error);
+									} else {
+										topicPartitionOffsetMap.put(tpEntry.getKey(), null);
+									}
+								}
+								groupEntry.getValue().complete(topicPartitionOffsetMap);
+							}
+						} else
+							handleFailure(response.getException());
+					}
+
+					@Override
+					void handleFailure(Throwable throwable) {
+						if (throwable instanceof DisconnectException)
+							this.fail(now, throwable);
+						else {
+							for (Map.Entry<CoordinatorKey, KafkaFutureImpl<Map<TopicPartition, OffsetAndMetadata>>> entry : listOffsetResultFuturesMap
+									.entrySet()) {
+								entry.getValue().completeExceptionally(throwable);
+							}
+
+						}
+					}
+				}, now);
+
+		ListConsumerGroupOffsetsResult result = ReflectionUtil.createInstance(ListConsumerGroupOffsetsResult.class,
+				new Class<?>[] { Map.class }, listOffsetResultFuturesMap);
+		return result;
+	}
+	
 	/**
 	 * This method is not yet supported.
 	 */
@@ -2397,33 +2569,6 @@ public class KafkaAdminClient extends AdminClient {
 	 * This method is not yet supported.
 	 */
 	@Override
-	public ListConsumerGroupsResult listConsumerGroups(ListConsumerGroupsOptions options) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-	}
-
-	/**
-	 * This method is not yet supported.
-	 */
-	@Override
-	public ListConsumerGroupOffsetsResult listConsumerGroupOffsets(final String groupId,
-			final ListConsumerGroupOffsetsOptions options) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-	}
-
-	/**
-	 * This method is not yet supported.
-	 */
-	@Override
-	public DeleteConsumerGroupsResult deleteConsumerGroups(Collection<String> groupIds,
-			DeleteConsumerGroupsOptions options) {
-
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-	}
-
-	/**
-	 * This method is not yet supported.
-	 */
-	@Override
 	public AlterConfigsResult incrementalAlterConfigs(Map<ConfigResource, Collection<AlterConfigOp>> configs,
 			AlterConfigsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
@@ -2550,15 +2695,6 @@ public class KafkaAdminClient extends AdminClient {
 	 */
 	@Override
 	public Map<MetricName, ? extends Metric> metrics() {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-	}
-
-	/**
-	 * This method is not yet supported.
-	 */
-	@Override
-	public ListConsumerGroupOffsetsResult listConsumerGroupOffsets(Map<String, ListConsumerGroupOffsetsSpec> groupSpecs,
-			ListConsumerGroupOffsetsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 

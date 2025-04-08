@@ -26,12 +26,15 @@ package org.oracle.okafka.clients.admin;
 
 import java.time.Duration;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.admin.CreateTopicsOptions;
 import org.apache.kafka.clients.admin.CreateTopicsResult;
+import org.apache.kafka.clients.admin.DeleteConsumerGroupsOptions;
+import org.apache.kafka.clients.admin.DeleteConsumerGroupsResult;
 import org.apache.kafka.clients.admin.DeleteTopicsOptions;
 import org.apache.kafka.clients.admin.DeleteTopicsResult;
 import org.apache.kafka.clients.admin.ListTopicsOptions;
@@ -44,6 +47,11 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.annotation.InterfaceStability;
 import org.apache.kafka.clients.admin.DescribeTopicsOptions;
 import org.apache.kafka.clients.admin.DescribeTopicsResult;
+import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsOptions;
+import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsResult;
+import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsSpec;
+import org.apache.kafka.clients.admin.ListConsumerGroupsOptions;
+import org.apache.kafka.clients.admin.ListConsumerGroupsResult;
 import org.apache.kafka.clients.admin.ListOffsetsOptions;
 import org.apache.kafka.clients.admin.ListOffsetsResult;
 
@@ -354,5 +362,93 @@ public interface Admin extends org.apache.kafka.clients.admin.Admin {
      * @return The ListOffsetsResult.
      */
     ListOffsetsResult listOffsets(Map<TopicPartition, OffsetSpec> topicPartitionOffsets, ListOffsetsOptions options);
+    
+    /**
+     * List the consumer groups available in the cluster.
+     *
+     * @param options The options to use when listing the consumer groups.
+     * @return The ListConsumerGroupsResult.
+     */
+    ListConsumerGroupsResult listConsumerGroups(ListConsumerGroupsOptions options);
+
+    /**
+     * List the consumer groups available in the cluster with the default options.
+     * <p>
+     * This is a convenience method for {@link #listConsumerGroups(ListConsumerGroupsOptions)} with default options.
+     * See the overload for more details.
+     *
+     * @return The ListConsumerGroupsResult.
+     */
+    default ListConsumerGroupsResult listConsumerGroups() {
+        return listConsumerGroups(new ListConsumerGroupsOptions());
+    }
+
+    /**
+     * List the consumer group offsets available in the cluster.
+     *
+     * @param options The options to use when listing the consumer group offsets.
+     * @return The ListConsumerGroupOffsetsResult
+     */
+    default ListConsumerGroupOffsetsResult listConsumerGroupOffsets(String groupId, ListConsumerGroupOffsetsOptions options) {
+        @SuppressWarnings("deprecation")
+        ListConsumerGroupOffsetsSpec groupSpec = new ListConsumerGroupOffsetsSpec()
+            .topicPartitions(options.topicPartitions());
+
+        // We can use the provided options with the batched API, which uses topic partitions from
+        // the group spec and ignores any topic partitions set in the options.
+        return listConsumerGroupOffsets(Collections.singletonMap(groupId, groupSpec), options);
+    }
+
+    /**
+     * List the consumer group offsets available in the cluster with the default options.
+     * <p>
+     * This is a convenience method for {@link #listConsumerGroupOffsets(Map, ListConsumerGroupOffsetsOptions)}
+     * to list offsets of all partitions of one group with default options.
+     *
+     * @return The ListConsumerGroupOffsetsResult.
+     */
+    default ListConsumerGroupOffsetsResult listConsumerGroupOffsets(String groupId) {
+        return listConsumerGroupOffsets(groupId, new ListConsumerGroupOffsetsOptions());
+    }
+
+    /**
+     * List the consumer group offsets available in the cluster for the specified consumer groups.
+     *
+     * @param groupSpecs Map of consumer group ids to a spec that specifies the topic partitions of the group to list offsets for.
+     *
+     * @param options The options to use when listing the consumer group offsets.
+     * @return The ListConsumerGroupOffsetsResult
+     */
+    ListConsumerGroupOffsetsResult listConsumerGroupOffsets(Map<String, ListConsumerGroupOffsetsSpec> groupSpecs, ListConsumerGroupOffsetsOptions options);
+
+    /**
+     * List the consumer group offsets available in the cluster for the specified groups with the default options.
+     * <p>
+     * This is a convenience method for
+     * {@link #listConsumerGroupOffsets(Map, ListConsumerGroupOffsetsOptions)} with default options.
+     *
+     * @param groupSpecs Map of consumer group ids to a spec that specifies the topic partitions of the group to list offsets for.
+     * @return The ListConsumerGroupOffsetsResult.
+     */
+    default ListConsumerGroupOffsetsResult listConsumerGroupOffsets(Map<String, ListConsumerGroupOffsetsSpec> groupSpecs) {
+        return listConsumerGroupOffsets(groupSpecs, new ListConsumerGroupOffsetsOptions());
+    }
+    
+    /**
+     * Delete consumer groups from the cluster.
+     *
+     * @param options The options to use when deleting a consumer group.
+     * @return The DeleteConsumerGroupsResult.
+     */
+    DeleteConsumerGroupsResult deleteConsumerGroups(Collection<String> groupIds, DeleteConsumerGroupsOptions options);
+
+    /**
+     * Delete consumer groups from the cluster with the default options.
+     *
+     * @return The DeleteConsumerGroupResult.
+     */
+    default DeleteConsumerGroupsResult deleteConsumerGroups(Collection<String> groupIds) {
+        return deleteConsumerGroups(groupIds, new DeleteConsumerGroupsOptions());
+    }
     
 }
