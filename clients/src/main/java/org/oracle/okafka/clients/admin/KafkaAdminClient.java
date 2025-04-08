@@ -210,6 +210,7 @@ import org.apache.kafka.common.utils.AppInfoParser;
 import org.apache.kafka.common.utils.ExponentialBackoff;
 import org.apache.kafka.common.utils.KafkaThread;
 import org.apache.kafka.common.utils.LogContext;
+import org.oracle.okafka.common.utils.Reflection;
 import org.oracle.okafka.common.utils.TNSParser;
 import org.apache.kafka.common.utils.Time;
 import org.oracle.okafka.clients.admin.internals.AQKafkaAdmin;
@@ -218,8 +219,6 @@ import org.slf4j.Logger;
 
 import static org.apache.kafka.common.utils.Utils.closeQuietly;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.InetSocketAddress;
 import java.sql.SQLException;
@@ -1943,20 +1942,20 @@ public class KafkaAdminClient extends AdminClient {
 			}
 
 			@Override
-			void handleResponse(AbstractResponse abstractResponse){
+			void handleResponse(AbstractResponse abstractResponse) {
 				MetadataResponse response = (MetadataResponse) abstractResponse;
-				if(response.getException()==null) {
-				Map<String, TopicListing> topicListing = new HashMap<>();
-				Map<String, TopicTeqParameters> topicTeqParameters = response.teqParameters();
+				if (response.getException() == null) {
+					Map<String, TopicListing> topicListing = new HashMap<>();
+					Map<String, TopicTeqParameters> topicTeqParameters = response.teqParameters();
 
-				for (Map.Entry<String, TopicTeqParameters> entry : topicTeqParameters.entrySet()) {
-					String topicName = entry.getKey();
-					if (entry.getValue().getStickyDeq() == 2)
-						topicListing.put(topicName, new TopicListing(topicName, null, false));
-				}
+					for (Map.Entry<String, TopicTeqParameters> entry : topicTeqParameters.entrySet()) {
+						String topicName = entry.getKey();
+						if (entry.getValue().getStickyDeq() == 2)
+							topicListing.put(topicName, new TopicListing(topicName, null, false));
+					}
 
-				topicListingFuture.complete(topicListing);
-				}else {
+					topicListingFuture.complete(topicListing);
+				} else {
 					handleFailure(response.getException());
 				}
 			}
@@ -1967,26 +1966,9 @@ public class KafkaAdminClient extends AdminClient {
 			}
 		}, now);
 
-		Constructor<ListTopicsResult> constructor;
-		ListTopicsResult ltr;
-		try {
-			constructor = ListTopicsResult.class.getDeclaredConstructor(KafkaFuture.class);
-
-			constructor.setAccessible(true);
-			try {
-				ltr = constructor.newInstance(topicListingFuture);
-				return ltr;
-			} catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-					| InvocationTargetException e) {
-				ltr = null;
-				log.error("Exception caught: ",e);
-			}
-		} catch (NoSuchMethodException | SecurityException e) {
-			log.error("Exception caught: ",e);
-			constructor = null;
-			ltr = null;
-		}
-		return ltr;
+		ListTopicsResult result = Reflection.createInstance(ListTopicsResult.class,
+				new Class<?>[] { KafkaFuture.class }, topicListingFuture);
+		return result;
 	}
 	
 	
@@ -2310,26 +2292,9 @@ public class KafkaAdminClient extends AdminClient {
 			}
 		}, now);
 
-		Constructor<DeleteConsumerGroupsResult> constructor;
-		DeleteConsumerGroupsResult dcgr;
-		try {
-			constructor = DeleteConsumerGroupsResult.class.getDeclaredConstructor(Map.class);
-
-			constructor.setAccessible(true);
-			try {
-				dcgr = constructor.newInstance(groupFutures);
-				return dcgr;
-			} catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-					| InvocationTargetException e) {
-				dcgr = null;
-				log.error("Exception caught: ", e);
-			}
-		} catch (NoSuchMethodException | SecurityException e) {
-			log.error("Exception caught: ", e);
-			constructor = null;
-			dcgr = null;
-		}
-		return dcgr;
+		DeleteConsumerGroupsResult result = Reflection.createInstance(DeleteConsumerGroupsResult.class,
+				new Class<?>[] { Map.class }, groupFutures);
+		return result;
 	}
 	
 	@Override
@@ -2371,26 +2336,9 @@ public class KafkaAdminClient extends AdminClient {
 			}
 		}, now);
 
-		Constructor<ListConsumerGroupsResult> constructor;
-		ListConsumerGroupsResult lcgr;
-		try {
-			constructor = ListConsumerGroupsResult.class.getDeclaredConstructor(KafkaFuture.class);
-
-			constructor.setAccessible(true);
-			try {
-				lcgr = constructor.newInstance(all);
-				return lcgr;
-			} catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-					| InvocationTargetException e) {
-				lcgr = null;
-				log.error("Exception caught: ", e);
-			}
-		} catch (NoSuchMethodException | SecurityException e) {
-			log.error("Exception caught: ", e);
-			constructor = null;
-			lcgr = null;
-		}
-		return lcgr;
+		ListConsumerGroupsResult result = Reflection.createInstance(ListConsumerGroupsResult.class,
+				new Class<?>[] { KafkaFuture.class }, all);
+		return result;
 	}
 
 	@Override
@@ -2415,84 +2363,68 @@ public class KafkaAdminClient extends AdminClient {
 		}
 
 		long now = time.milliseconds();
-		runnable.call(new Call("offsetsFetch", calcDeadlineMs(now, options.timeoutMs()), new LeastLoadedNodeProvider()) {
+		runnable.call(
+				new Call("offsetsFetch", calcDeadlineMs(now, options.timeoutMs()), new LeastLoadedNodeProvider()) {
 
-			@Override
-			AbstractRequest.Builder createRequest(int timeoutMs) {
-				return new OffsetFetchRequest.Builder(requestMap);
-			}
+					@Override
+					AbstractRequest.Builder createRequest(int timeoutMs) {
+						return new OffsetFetchRequest.Builder(requestMap);
+					}
 
-			@Override
-			void handleResponse(AbstractResponse abstractResponse) {
-				OffsetFetchResponse response = (OffsetFetchResponse) abstractResponse;
+					@Override
+					void handleResponse(AbstractResponse abstractResponse) {
+						OffsetFetchResponse response = (OffsetFetchResponse) abstractResponse;
 
-				if (response.getException() == null) {
-					Map<String, Map<TopicPartition, PartitionOffsetData>> perGroupOffsetFetchResponseMap = response
-							.getOffsetFetchResponseMap();
+						if (response.getException() == null) {
+							Map<String, Map<TopicPartition, PartitionOffsetData>> perGroupOffsetFetchResponseMap = response
+									.getOffsetFetchResponseMap();
 
-					for (Map.Entry<CoordinatorKey, KafkaFutureImpl<Map<TopicPartition, OffsetAndMetadata>>> groupEntry : listOffsetResultFuturesMap
-							.entrySet()) {
-						Map<TopicPartition, PartitionOffsetData> partitionOffsetDataMap = perGroupOffsetFetchResponseMap
-								.get(groupEntry.getKey().idValue);
-						if (partitionOffsetDataMap == null) {
-							groupEntry.getValue().complete(null);
-							continue;
-						}
-						Map<TopicPartition, OffsetAndMetadata> topicPartitionOffsetMap = new HashMap<>();
-						for (Map.Entry<TopicPartition, PartitionOffsetData> tpEntry : partitionOffsetDataMap
-								.entrySet()) {
-							PartitionOffsetData offsetData = tpEntry.getValue();
-							if (offsetData != null) {
-								if (offsetData.error == null)
-									topicPartitionOffsetMap.put(tpEntry.getKey(),
-											new OffsetAndMetadata(offsetData.offset));
-								else
-									log.warn("Skipping return offset for {} due to error {}.", tpEntry.getKey(),
-											offsetData.error);
-							} else {
-								topicPartitionOffsetMap.put(tpEntry.getKey(), null);
+							for (Map.Entry<CoordinatorKey, KafkaFutureImpl<Map<TopicPartition, OffsetAndMetadata>>> groupEntry : listOffsetResultFuturesMap
+									.entrySet()) {
+								Map<TopicPartition, PartitionOffsetData> partitionOffsetDataMap = perGroupOffsetFetchResponseMap
+										.get(groupEntry.getKey().idValue);
+								if (partitionOffsetDataMap == null) {
+									groupEntry.getValue().complete(null);
+									continue;
+								}
+								Map<TopicPartition, OffsetAndMetadata> topicPartitionOffsetMap = new HashMap<>();
+								for (Map.Entry<TopicPartition, PartitionOffsetData> tpEntry : partitionOffsetDataMap
+										.entrySet()) {
+									PartitionOffsetData offsetData = tpEntry.getValue();
+									if (offsetData != null) {
+										if (offsetData.error == null)
+											topicPartitionOffsetMap.put(tpEntry.getKey(),
+													new OffsetAndMetadata(offsetData.offset));
+										else
+											log.warn("Skipping return offset for {} due to error {}.", tpEntry.getKey(),
+													offsetData.error);
+									} else {
+										topicPartitionOffsetMap.put(tpEntry.getKey(), null);
+									}
+								}
+								groupEntry.getValue().complete(topicPartitionOffsetMap);
 							}
+						} else
+							handleFailure(response.getException());
+					}
+
+					@Override
+					void handleFailure(Throwable throwable) {
+						if (throwable instanceof DisconnectException)
+							this.fail(now, throwable);
+						else {
+							for (Map.Entry<CoordinatorKey, KafkaFutureImpl<Map<TopicPartition, OffsetAndMetadata>>> entry : listOffsetResultFuturesMap
+									.entrySet()) {
+								entry.getValue().completeExceptionally(throwable);
+							}
+
 						}
-						groupEntry.getValue().complete(topicPartitionOffsetMap);
 					}
-				} else
-					handleFailure(response.getException());
-			}
+				}, now);
 
-			@Override
-			void handleFailure(Throwable throwable) {
-				if (throwable instanceof DisconnectException)
-					this.fail(now, throwable);
-				else {
-					for (Map.Entry<CoordinatorKey, KafkaFutureImpl<Map<TopicPartition, OffsetAndMetadata>>> entry : listOffsetResultFuturesMap
-							.entrySet()) {
-						entry.getValue().completeExceptionally(throwable);
-					}
-
-				}
-			}
-		}, now);
-
-		Constructor<ListConsumerGroupOffsetsResult> constructor;
-		ListConsumerGroupOffsetsResult lcgor;
-		try {
-			constructor = ListConsumerGroupOffsetsResult.class.getDeclaredConstructor(Map.class);
-
-			constructor.setAccessible(true);
-			try {
-				lcgor = constructor.newInstance(listOffsetResultFuturesMap);
-				return lcgor;
-			} catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-					| InvocationTargetException e) {
-				lcgor = null;
-				log.error("Exception caught: ", e);
-			}
-		} catch (NoSuchMethodException | SecurityException e) {
-			log.error("Exception caught: ", e);
-			constructor = null;
-			lcgor = null;
-		}
-		return lcgor;
+		ListConsumerGroupOffsetsResult result = Reflection.createInstance(ListConsumerGroupOffsetsResult.class,
+				new Class<?>[] { Map.class }, listOffsetResultFuturesMap);
+		return result;
 	}
 	
 	/**

@@ -20,6 +20,10 @@ public class DeleteGroupsResponse extends AbstractResponse {
     	return errorMap;
     }
     
+    public void setException(Exception exception) {
+    	this.exception = exception;
+    }
+    
     public Exception getException() {
     	return exception;
     }

@@ -377,7 +377,7 @@ public class AQKafkaAdmin extends AQClient{
 			exception = sqlE;
 			
 			int errorCode = sqlE.getErrorCode();
-			log.error("SQL Error:ORA-" + errorCode);
+			log.error("ListGroup: SQL Error:ORA-" + errorCode,sqlE);
 			if (errorCode == 28 || errorCode == 17410) {
 				disconnected = true;
 				exception = new DisconnectException(sqlE.getMessage(),sqlE);
@@ -474,7 +474,7 @@ public class AQKafkaAdmin extends AQClient{
 							offsetFetchResponseMap.put(tp, null);
 					} catch (SQLException sqlE) {
 						int errorCode = sqlE.getErrorCode();
-						log.error("SQL Error:ORA-" + errorCode);
+						log.error("ListConsumerGroupOffset: SQL Error:ORA-" + errorCode, sqlE);
 						if (errorCode == 28 || errorCode == 17410) {
 							disconnected = true;
 							throw new DisconnectException(sqlE.getMessage(),sqlE);
@@ -555,7 +555,6 @@ public class AQKafkaAdmin extends AQClient{
 					if(subscribedTopics.isEmpty())
 						errors.put(group, new GroupIdNotFoundException("The group doesn't exist"));
 					else {
-						jdbcConn.setAutoCommit(false);	
 						cStmt = jdbcConn.prepareCall(plsql);
 
 						for(String topic: subscribedTopics) {
@@ -563,18 +562,11 @@ public class AQKafkaAdmin extends AQClient{
 							cStmt.setString(2, group);
 							cStmt.execute();  
 						}
-						jdbcConn.commit();
 						errors.put(group, null);
 					}
 			}
 		}catch (SQLException sqlE) {
 			exception = sqlE;
-			if(jdbcConn != null)
-				try {
-					jdbcConn.rollback();
-				} catch (SQLException e) {
-					log.trace("Failed to rollback the group deletion transaction");
-				}
 
 			if (sqlE.getErrorCode() == 6550) {
 				log.error("Not all privileges granted to the database user.",
@@ -586,7 +578,7 @@ public class AQKafkaAdmin extends AQClient{
 			}
 
 			int errorCode = sqlE.getErrorCode();
-			log.error("SQL Error:ORA-" + errorCode);
+			log.error("DeleteConsumerGroups: SQL Error:ORA-" + errorCode, sqlE);
 			if (errorCode == 28 || errorCode == 17410) {
 				disconnected = true;
 				exception = new DisconnectException(sqlE.getMessage(), sqlE);
@@ -603,6 +595,7 @@ public class AQKafkaAdmin extends AQClient{
 			}
 		} 
 		DeleteGroupsResponse deleteGroupsResponse = new DeleteGroupsResponse(errors);
+		deleteGroupsResponse.setException(exception);
 		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
 				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null, deleteGroupsResponse);
 		
