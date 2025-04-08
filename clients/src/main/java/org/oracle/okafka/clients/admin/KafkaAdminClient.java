@@ -210,7 +210,7 @@ import org.apache.kafka.common.utils.AppInfoParser;
 import org.apache.kafka.common.utils.ExponentialBackoff;
 import org.apache.kafka.common.utils.KafkaThread;
 import org.apache.kafka.common.utils.LogContext;
-import org.oracle.okafka.common.utils.Reflection;
+import org.oracle.okafka.common.utils.ReflectionUtil;
 import org.oracle.okafka.common.utils.TNSParser;
 import org.apache.kafka.common.utils.Time;
 import org.oracle.okafka.clients.admin.internals.AQKafkaAdmin;
@@ -1966,7 +1966,7 @@ public class KafkaAdminClient extends AdminClient {
 			}
 		}, now);
 
-		ListTopicsResult result = Reflection.createInstance(ListTopicsResult.class,
+		ListTopicsResult result = ReflectionUtil.createInstance(ListTopicsResult.class,
 				new Class<?>[] { KafkaFuture.class }, topicListingFuture);
 		return result;
 	}
@@ -2292,7 +2292,7 @@ public class KafkaAdminClient extends AdminClient {
 			}
 		}, now);
 
-		DeleteConsumerGroupsResult result = Reflection.createInstance(DeleteConsumerGroupsResult.class,
+		DeleteConsumerGroupsResult result = ReflectionUtil.createInstance(DeleteConsumerGroupsResult.class,
 				new Class<?>[] { Map.class }, groupFutures);
 		return result;
 	}
@@ -2336,7 +2336,7 @@ public class KafkaAdminClient extends AdminClient {
 			}
 		}, now);
 
-		ListConsumerGroupsResult result = Reflection.createInstance(ListConsumerGroupsResult.class,
+		ListConsumerGroupsResult result = ReflectionUtil.createInstance(ListConsumerGroupsResult.class,
 				new Class<?>[] { KafkaFuture.class }, all);
 		return result;
 	}
@@ -2422,7 +2422,7 @@ public class KafkaAdminClient extends AdminClient {
 					}
 				}, now);
 
-		ListConsumerGroupOffsetsResult result = Reflection.createInstance(ListConsumerGroupOffsetsResult.class,
+		ListConsumerGroupOffsetsResult result = ReflectionUtil.createInstance(ListConsumerGroupOffsetsResult.class,
 				new Class<?>[] { Map.class }, listOffsetResultFuturesMap);
 		return result;
 	}

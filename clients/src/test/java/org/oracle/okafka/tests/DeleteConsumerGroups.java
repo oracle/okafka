@@ -17,7 +17,7 @@ public class DeleteConsumerGroups {
 
 		try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
 			
-			DeleteConsumerGroupsResult delResult = admin.deleteConsumerGroups(new ArrayList<>(Arrays.asList("S2")));
+			DeleteConsumerGroupsResult delResult = admin.deleteConsumerGroups(new ArrayList<>(Arrays.asList("S1")));
 			try {
 				KafkaFuture<Void> groupFutures = delResult.all();
 				groupFutures.get();

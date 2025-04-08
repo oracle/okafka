@@ -3,7 +3,7 @@ package org.oracle.okafka.common.utils;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 
-public class Reflection {
+public class ReflectionUtil {
 	public static <T> T createInstance(Class<T> clazz, Class<?>[] paramTypes, Object... args) {
 		T instance = null;
 		try {
