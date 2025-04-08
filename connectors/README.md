@@ -56,7 +56,7 @@ exec sys.dbms_aqadm.start_queue('TxEventQ');
 exec sys.dbms_aqadm.add_subscriber('TxEventQ', SYS.AQ$_AGENT('SUB1', NULL, 0));
 ```
 
-**If using the Source Connector and ordering of the events are important then the Transactional Event Queue that the Kakfa Source connector will be pulling from should have the `STICKY_DEQUEUE` parameter set. The `SHARD_NUM` assigned to the queue should be less than or equal to the number of Kafka partitions assigned to the Kafka topic.**
+**If using the Source Connector and ordering of the events are important then the Transactional Event Queue that the Kafka Source connector will be pulling from should have the `STICKY_DEQUEUE` parameter set. The `SHARD_NUM` assigned to the queue should be less than or equal to the number of Kafka partitions assigned to the Kafka topic.**
 
 **Note: If running on a database version less than 23.4 with `STICKY_DEQUEUE` the `tasks.max` value must be equal to the `SHARD_NUM` specified. If the `tasks.max` is not equal to the `SHARD_NUM` dequeue from all event streams will not be performed.**
 
@@ -117,7 +117,7 @@ The wallet directory that will need to be specified in the connection properties
 ### Setup the Connection Properties
 
 Copy the example properties files for the sink connector or the source connector below into a text editor and update all the required fields as noted below and save the properties
-file as any file name, for example `connect-txeventq-sink.properties` or `connect-txeventq-source.properties` and place the properites file in the Kafka config directory.
+file as any file name, for example `connect-txeventq-sink.properties` or `connect-txeventq-source.properties` and place the properties file in the Kafka config directory.
 
 Here is the full `connect-txeventq-sink.properties` file below.
 
