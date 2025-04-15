@@ -758,7 +758,7 @@ public class ConsumerNetworkClient {
 				prev = time.milliseconds();
 				client.maybeUpdateMetadata(curr);
 				curr = time.milliseconds();
-				elapsed = elapsed + (prev - curr);
+				elapsed = elapsed + (curr - prev);
 			}
 			log.debug("Metadata updated:Current Metadata Version " + metadata.version());
 

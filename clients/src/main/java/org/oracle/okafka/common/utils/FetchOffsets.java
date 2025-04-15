@@ -133,7 +133,7 @@ public class FetchOffsets {
 
 	private static final String COMMITTED_OFFSET_PLSQL = 
 			"DECLARE " + 
-		    "    queue_name VARCHAR2(128) := ?; " + 
+		    "    queue VARCHAR2(128) := ?; " + 
 		    "    shard_num NUMBER := ?; " + 
 		    "    subscriber_name VARCHAR(128) := ?; " + 
 		    "	 subshard_num NUMBER; " +
@@ -144,10 +144,11 @@ public class FetchOffsets {
 		    "    seq_num NUMBER; " + 
 		    "	 subscriber_id NUMBER; " +
 		    "BEGIN " + 
-		    "	 SELECT DISTINCT(SUBSCRIBER_ID) " +
+		    "	 SELECT SUBSCRIBER_ID " +
 		    "	 INTO subscriber_id " +
 		    "	 FROM USER_QUEUE_SUBSCRIBERS " +
-		    "	 WHERE CONSUMER_NAME = subscriber_name; " +
+		    "	 WHERE CONSUMER_NAME = subscriber_name " +
+		    "	 AND QUEUE_NAME = queue; " +
 		    
 		    "	 EXECUTE IMMEDIATE " +
 		    "    'SELECT SUBSHARD, LOWER(PARTNAME), ROWMARKER, UNBOUND_IDX " + 
@@ -168,12 +169,12 @@ public class FetchOffsets {
 		    "	 AND SUBSCRIBER_ID = :subscriber_id " +
 		    "	 ORDER BY SUBSHARD' " +
 		    "    BULK COLLECT INTO subshard_list, dequeue_log_partition_names, rowmarkers, dequeue_log_unbound_indexes " + 
-		    "	 USING queue_name, queue_name, shard_num, queue_name, shard_num, subscriber_id; " +
+		    "	 USING queue, queue, shard_num, queue, shard_num, subscriber_id; " +
 
 			"    FOR i IN REVERSE 1 .. dequeue_log_partition_names.COUNT LOOP " +
 		    "    EXECUTE IMMEDIATE " + 
 		    "        'SELECT MAX(SEQ_NUM) FROM ' || " + 
-		    "        DBMS_ASSERT.SQL_OBJECT_NAME('AQ$_' || queue_name || '_L') || " + 
+		    "        DBMS_ASSERT.SQL_OBJECT_NAME('AQ$_' || queue || '_L') || " + 
 		    "        ' PARTITION (' || dequeue_log_partition_names(i) || ') " + 
 		    "        WHERE SUBSCRIBER# = ''' || subscriber_id || ''' " + 
 		    "        AND FLAGS = ''' || rowmarkers(i) || ''' ' " + 
@@ -200,7 +201,7 @@ public class FetchOffsets {
 		try {
 			cStmt = jdbcConn.prepareCall(EARLIEST_OFFSET_PLSQL);
 			cStmt.setInt(1, partition * 2);
-			cStmt.setString(2, topic);
+			cStmt.setString(2, topic.toUpperCase());
 
 			cStmt.registerOutParameter(3, Types.BINARY);
 
@@ -241,7 +242,7 @@ public class FetchOffsets {
 		try {
 			cStmt = jdbcConn.prepareCall(LATEST_OFFSET_PLSQL);
 			cStmt.setInt(1, partition * 2);
-			cStmt.setString(2, topic);
+			cStmt.setString(2, topic.toUpperCase());
 
 			cStmt.registerOutParameter(3, Types.BINARY);
 
@@ -283,7 +284,7 @@ public class FetchOffsets {
 		try {
 			cStmt = jdbcConn.prepareCall(OFFSET_BY_TIMESTAMP_PLSQL);
 			cStmt.setInt(1, partition * 2);
-			cStmt.setString(2, topic);
+			cStmt.setString(2, topic.toUpperCase());
 			Instant instant = Instant.ofEpochMilli(timestamp);
 
 			DateTimeFormatter formatter = DateTimeFormatter
@@ -335,7 +336,7 @@ public class FetchOffsets {
 		try {
 			cStmt = jdbcConn.prepareCall(MAX_TIMESTAMP_OFFSET_PLSQL);
 			cStmt.setInt(1, partition * 2);
-			cStmt.setString(2, topic);
+			cStmt.setString(2, topic.toUpperCase());
 
 			cStmt.registerOutParameter(3, Types.BINARY);
 			cStmt.registerOutParameter(4, Types.TIMESTAMP_WITH_TIMEZONE);
@@ -378,9 +379,9 @@ public class FetchOffsets {
 		CallableStatement cStmt = null;
 		try {
 			cStmt = jdbcConn.prepareCall(COMMITTED_OFFSET_PLSQL);
-			cStmt.setString(1, topic);
+			cStmt.setString(1, topic.toUpperCase());
 			cStmt.setInt(2, partition * 2);
-			cStmt.setString(3, subscriberName);
+			cStmt.setString(3, subscriberName.toUpperCase());
 
 			cStmt.registerOutParameter(4, Types.INTEGER);
 			cStmt.registerOutParameter(5, Types.INTEGER);

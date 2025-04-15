@@ -1246,9 +1246,16 @@ public final class AQKafkaProducer extends AQClient {
 				pingStmt = oConn.prepareStatement(PING_QUERY);
 				pingStmt.setQueryTimeout(1);
 				isAlive = true;
-			}catch(Exception setupException)
-			{
-				JMSException crPublisherException = new JMSException(setupException.getMessage());
+
+			}catch(JMSException jme) {
+				throw jme;
+			}
+			catch(Exception setupException)
+			{	
+				String errorCode = null;
+				if(setupException instanceof SQLException)
+					errorCode = String.valueOf(((SQLException)setupException).getErrorCode());
+				JMSException crPublisherException = new JMSException(setupException.getMessage(), errorCode);
 				crPublisherException.setLinkedException(setupException);
 				throw crPublisherException;
 			}
