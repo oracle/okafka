@@ -63,8 +63,8 @@ public class ConnectionUtils {
 		OracleDataSource s=new OracleDataSource();
 		String dbUrl = createUrl(node, configs);
 		s.setURL(dbUrl);
-		Connection conn =  s.getConnection();
 		try {
+			Connection conn =  s.getConnection();
 			int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection)conn).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
 			String serviceName = ((oracle.jdbc.internal.OracleConnection)conn).getServerSessionInfo().getProperty("SERVICE_NAME");
 			String instanceName = ((oracle.jdbc.internal.OracleConnection)conn).getServerSessionInfo().getProperty("INSTANCE_NAME");
@@ -74,14 +74,12 @@ public class ConnectionUtils {
 			node.setInstanceName(instanceName);
 			node.setUser(userName);
 			node.updateHashCode();
+			return conn;
 		}catch(Exception e)
 		{
 			log.error("Exception while connecting to database with connection string " + dbUrl +":" + e);
-			e.printStackTrace();
-			//log.error("Exception while setting new instance ids " + e);
 			throw e;
 		}
-		return conn;
 	}
 	
 	public static TopicConnection createTopicConnection(java.sql.Connection dbConn, AbstractConfig configs, Logger log)
@@ -112,7 +110,7 @@ public class ConnectionUtils {
 			dataSource.setURL(url);	
 		}
 		catch(SQLException sql) {
-			throw new JMSException(sql.toString());
+			throw new JMSException(sql.toString(), String.valueOf(sql.getErrorCode()));
 		}
 		TopicConnectionFactory connFactory = AQjmsFactory.getTopicConnectionFactory(dataSource);
 		TopicConnection conn = connFactory.createTopicConnection();

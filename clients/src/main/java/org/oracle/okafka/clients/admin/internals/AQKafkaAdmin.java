@@ -621,8 +621,6 @@ public class AQKafkaAdmin extends AQClient{
 			this.metadataManager.update(newCluster, System.currentTimeMillis());
 		} catch (SQLException excp) {
 			log.error("Exception while connecting to Oracle Database " + excp, excp);
-
-			excp.printStackTrace();
 			if (excp.getErrorCode() == 1017)
 				throw new InvalidLoginCredentialsException(excp);
 

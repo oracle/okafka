@@ -40,6 +40,7 @@ import org.apache.kafka.clients.RequestCompletionHandler;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.errors.AuthenticationException;
+import org.oracle.okafka.common.errors.ConnectionException;
 import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
 import org.apache.kafka.common.metrics.Sensor;
 import org.oracle.okafka.common.network.AQClient;
@@ -532,10 +533,9 @@ public class NetworkClient implements KafkaClient {
 	 */
 	public boolean initiateConnect(Node node, long now) {
 		try {
-
 			log.info("Initiating connection to node {}", node);
-			aqClient.connect(node);
 			this.connectionStates.connecting(node, now);
+			aqClient.connect(node);
 			this.connectionStates.ready(node);
 			log.debug("Connection is established to node {}", node);
 		} catch(Exception e) { 
@@ -543,13 +543,15 @@ public class NetworkClient implements KafkaClient {
 				JMSException jmsExcp = (JMSException)e;
 				String jmsError = jmsExcp.getErrorCode();
 				log.error("Connection Error " +jmsExcp );
+				if(jmsError != null && (jmsError.equals("12514") || jmsError.equals("12541"))) {
+					throw new ConnectionException(e);
+				}
 				if(jmsError != null && jmsError.equals("1405")) {
 					log.error("create session privilege is not assigned", e.getMessage());
 					log.info("create session, execute on dbms_aqin, execute on dbms_aqadm privileges required for producer to work");
 				} 
 
 			}
-
 			/* attempt failed, we'll try again after the backoff */
 			connectionStates.disconnected(node, now);
 			/* maybe the problem is our metadata, update it */
@@ -559,10 +561,10 @@ public class NetworkClient implements KafkaClient {
 				metadataManager.requestUpdate();
 			
 			log.warn("Error connecting to node {}", node, e);
-
-			if (e instanceof JMSSecurityException
-					|| (e instanceof JMSException && ((JMSException) e).getErrorCode().equals("12505")))
+			
+			if (e instanceof JMSSecurityException)
 				throw new InvalidLoginCredentialsException("Invalid login details provided:" + e.getMessage());
+			
 			return false;
 		}
 		return true;
