@@ -50,6 +50,7 @@ import org.oracle.okafka.common.requests.MetadataRequest;
 import org.oracle.okafka.common.requests.MetadataResponse;
 import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.Time;
+import org.junit.platform.commons.util.FunctionUtils;
 import org.slf4j.Logger;
 
 import java.util.ArrayList;
@@ -535,7 +536,12 @@ public class NetworkClient implements KafkaClient {
 		try {
 			log.info("Initiating connection to node {}", node);
 			this.connectionStates.connecting(node, now);
+			Node copyNode = new Node(node);
 			aqClient.connect(node);
+			if(!node.equals(copyNode)) {
+				this.connectionStates.remove(copyNode);
+				this.connectionStates.connecting(node, now);
+			}
 			this.connectionStates.ready(node);
 			log.debug("Connection is established to node {}", node);
 		} catch(Exception e) { 
