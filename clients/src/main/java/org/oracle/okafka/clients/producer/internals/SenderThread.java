@@ -29,6 +29,7 @@
 
 package org.oracle.okafka.clients.producer.internals;
 
+import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -37,6 +38,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
+
+import javax.jms.JMSException;
 
 import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
@@ -54,6 +57,8 @@ import org.oracle.okafka.common.requests.ProduceResponse;
 import org.oracle.okafka.common.utils.MessageIdConverter;
 import org.oracle.okafka.common.utils.MessageIdConverter.OKafkaOffset;
 import org.oracle.okafka.common.Node;
+import org.oracle.okafka.common.errors.ConnectionException;
+import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
 import org.apache.kafka.common.InvalidRecordException;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.MetricName;
@@ -163,8 +168,16 @@ public class SenderThread implements Runnable {
 		while (running) {
 			try {
 				run(time.milliseconds());
+			} catch (ConnectionException ce) {
+				log.error("Connection error in Kafka Producer I/O Thread: ", ce);
+				Throwable e = ce.getCause();
+				if (e instanceof ConnectException) {
+					running = false;
+				}
 			} catch (Exception e) {
 				log.error("Uncaught error in kafka producer I/O thread: ", e);
+				if (e instanceof InvalidLoginCredentialsException)
+					running = false;
 			}
 		}
 		log.debug("Beginning shutdown of Kafka producer I/O thread, sending remaining records.");

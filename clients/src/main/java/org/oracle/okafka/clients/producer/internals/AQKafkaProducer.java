@@ -380,7 +380,7 @@ public final class AQKafkaProducer extends AQClient {
 			}
 			else { 
 				//Create Empty or Invalid Offset
-				thisOffset= MessageIdConverter.getOKafkaOffset("",false,false);
+				thisOffset= MessageIdConverter.getOKafkaOffset(null,false,false);
 			}
 
 			produceResult = new ProduceRequestResult(tp);
@@ -476,7 +476,7 @@ public final class AQKafkaProducer extends AQClient {
 		}
 
 		do
-		{
+		{	
 			disconnected = false;
 			checkForCommit = false;
 			notALeader = false;
@@ -618,7 +618,11 @@ public final class AQKafkaProducer extends AQClient {
 							if( !stopReconnect && retryCnt > 0)
 							{
 								log.info("Reconnecting to node " + node);
+								Node copyNode = new Node(node);
 								boolean reCreate = nodePublishers.reCreate();
+								if(!node.equals(copyNode)) {
+									
+								}
 								if(!reCreate) {
 									log.info("Failed to reconnect to  " + node +" . Failing this batch for " + topicPartition);
 									disconnected = true;

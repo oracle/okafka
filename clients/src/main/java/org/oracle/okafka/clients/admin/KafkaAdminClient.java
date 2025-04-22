@@ -171,6 +171,7 @@ import org.oracle.okafka.common.config.SslConfigs;
 import org.apache.kafka.common.errors.ApiException;
 import org.apache.kafka.common.errors.AuthenticationException;
 import org.apache.kafka.common.errors.DisconnectException;
+import org.oracle.okafka.common.errors.ConnectionException;
 import org.oracle.okafka.common.errors.FeatureNotSupportedException;
 import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
 import org.apache.kafka.common.errors.InvalidTopicException;
@@ -220,6 +221,7 @@ import org.slf4j.Logger;
 import static org.apache.kafka.common.utils.Utils.closeQuietly;
 
 import java.lang.reflect.Method;
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -240,6 +242,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+
+import javax.jms.JMSException;
 
 /**
  * The default implementation of {@link AdminClient}. An instance of this class
@@ -1048,6 +1052,14 @@ public class KafkaAdminClient extends AdminClient {
 					return false;
 				}
 			} catch (Throwable t) {
+				if(t instanceof InvalidLoginCredentialsException)
+					throw t;
+				if(t instanceof ConnectionException) {
+					Throwable e = t.getCause();
+					if(e instanceof ConnectException) {
+						throw t;
+					}
+				}
 				// Handle authentication errors while choosing nodes.
 				log.debug("Unable to choose node for {}", call, t);
 				call.fail(now, t);

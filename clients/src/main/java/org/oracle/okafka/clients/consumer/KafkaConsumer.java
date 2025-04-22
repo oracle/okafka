@@ -29,6 +29,7 @@
 
 package org.oracle.okafka.clients.consumer;
 
+import java.net.ConnectException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.sql.Connection;
@@ -100,6 +101,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.oracle.okafka.common.config.SslConfigs;
 import org.apache.kafka.common.errors.AuthenticationException;
+import org.oracle.okafka.common.errors.ConnectionException;
 import org.oracle.okafka.common.errors.FeatureNotSupportedException;
 import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
 import org.oracle.okafka.common.network.AQClient;
@@ -976,11 +978,13 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 			// final long fetchEnd = time.milliseconds();
 			// elapsedTime += fetchEnd - fetchStart;
 			return ConsumerRecords.empty();
-		} catch (InvalidLoginCredentialsException exception) {
+		} catch (ConnectionException | InvalidLoginCredentialsException exception) {
 			log.error("Exception from poll: " + exception.getMessage(), exception);
 			log.info("Closing the consumer due to exception : " + exception.getMessage());
 			close();
-			throw new AuthenticationException(exception.getMessage());
+			if(exception instanceof InvalidLoginCredentialsException)
+				throw new AuthenticationException(exception.getMessage());
+			throw exception;
 		} finally {
 			release();
 			this.okcMetrics.recordPollEnd(timer.currentTimeMs());
