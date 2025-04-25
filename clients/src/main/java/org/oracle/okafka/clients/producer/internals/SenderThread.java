@@ -351,7 +351,6 @@ public class SenderThread implements Runnable {
 	 * basis
 	 */
 	private void sendProduceRequests(Map<Integer, List<ProducerBatch>> collated, long pollTimeout) {
-
 		for (Map.Entry<Integer, List<ProducerBatch>> entry : collated.entrySet()) {
 			sendProduceRequest(metadata.getNodeById(entry.getKey()), entry.getValue());
 		}
