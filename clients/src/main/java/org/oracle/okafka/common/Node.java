@@ -66,6 +66,10 @@ public class Node  extends org.apache.kafka.common.Node{
     public static Node noNode() {
         return NO_NODE;
     }
+    
+    public Node(Node node) {
+    	this(node.id(), node.host(), node.port(),node.serviceName(), node.instanceName());    	
+    }
 
     public boolean isEmpty() {
         return host == null || host.isEmpty() || port < 0 || serviceName.isEmpty() ;
@@ -189,7 +193,7 @@ public class Node  extends org.apache.kafka.common.Node{
         
         Node other = (Node) obj;
         return (host== null ? other.host() == null : host.equals(other.host())) &&
-           // id == other.id() &&
+            id == other.id() &&
             port == other.port() &&          
             (serviceName == null ? other.serviceName() == null : serviceName.equals(other.serviceName())) &&
             (instanceName == null ? other.instanceName() == null : instanceName.equals(other.instanceName())); 

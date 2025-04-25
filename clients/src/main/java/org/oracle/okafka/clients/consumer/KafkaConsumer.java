@@ -46,13 +46,11 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Properties;
 import java.util.Set;
-import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
-import java.lang.instrument.Instrumentation;
 
 import javax.jms.JMSException;
 
@@ -60,7 +58,6 @@ import oracle.jms.AQjmsBytesMessage;
 import oracle.jms.AQjmsDestination;
 
 //import org.oracle.okafka.clients.consumer.OffsetResetStrategy;
-import org.oracle.okafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.ClientDnsLookup;
 import org.apache.kafka.clients.ClientUtils;
 //import org.oracle.okafka.clients.consumer.internals.PartitionAssignor;
@@ -100,12 +97,12 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.oracle.okafka.common.config.SslConfigs;
 import org.apache.kafka.common.errors.AuthenticationException;
+import org.oracle.okafka.common.errors.ConnectionException;
 import org.oracle.okafka.common.errors.FeatureNotSupportedException;
 import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
 import org.oracle.okafka.common.network.AQClient;
 import org.apache.kafka.common.header.internals.RecordHeaders;
 import org.apache.kafka.common.internals.ClusterResourceListeners;
-import org.apache.kafka.common.metrics.Gauge;
 import org.apache.kafka.common.metrics.JmxReporter;
 import org.apache.kafka.common.metrics.MetricConfig;
 import org.apache.kafka.common.metrics.Metrics;
@@ -114,8 +111,6 @@ import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.metrics.stats.Avg;
 import org.apache.kafka.common.metrics.stats.Max;
 import org.apache.kafka.common.metrics.stats.Meter;
-import org.apache.kafka.common.metrics.stats.Min;
-import org.apache.kafka.common.metrics.stats.Value;
 import org.apache.kafka.common.metrics.stats.WindowedCount;
 import org.apache.kafka.common.record.TimestampType;
 import org.oracle.okafka.common.requests.IsolationLevel;
@@ -976,11 +971,13 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 			// final long fetchEnd = time.milliseconds();
 			// elapsedTime += fetchEnd - fetchStart;
 			return ConsumerRecords.empty();
-		} catch (InvalidLoginCredentialsException exception) {
+		} catch (ConnectionException | InvalidLoginCredentialsException exception) {
 			log.error("Exception from poll: " + exception.getMessage(), exception);
 			log.info("Closing the consumer due to exception : " + exception.getMessage());
 			close();
-			throw new AuthenticationException(exception.getMessage());
+			if(exception instanceof InvalidLoginCredentialsException)
+				throw new AuthenticationException(exception.getMessage());
+			throw exception;
 		} finally {
 			release();
 			this.okcMetrics.recordPollEnd(timer.currentTimeMs());

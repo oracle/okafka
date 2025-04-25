@@ -29,6 +29,7 @@
 
 package org.oracle.okafka.clients.producer.internals;
 
+import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -44,16 +45,15 @@ import org.oracle.okafka.clients.KafkaClient;
 import org.oracle.okafka.clients.Metadata;
 import org.apache.kafka.clients.RequestCompletionHandler;
 import org.oracle.okafka.common.requests.ProduceRequest;
-import org.oracle.okafka.clients.producer.KafkaProducer;
 import org.oracle.okafka.clients.producer.ProducerConfig;
-import org.oracle.okafka.clients.producer.internals.ProducerBatch;
-import org.oracle.okafka.clients.producer.internals.RecordAccumulator;
 import org.apache.kafka.clients.producer.internals.SenderMetricsRegistry;
 //import org.oracle.okafka.clients.producer.internals.SenderMetricsRegistry;
 import org.oracle.okafka.common.requests.ProduceResponse;
 import org.oracle.okafka.common.utils.MessageIdConverter;
 import org.oracle.okafka.common.utils.MessageIdConverter.OKafkaOffset;
 import org.oracle.okafka.common.Node;
+import org.oracle.okafka.common.errors.ConnectionException;
+import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
 import org.apache.kafka.common.InvalidRecordException;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.MetricName;
@@ -163,8 +163,16 @@ public class SenderThread implements Runnable {
 		while (running) {
 			try {
 				run(time.milliseconds());
+			} catch (ConnectionException ce) {
+				log.error("Connection error in Kafka Producer I/O Thread: ", ce);
+				Throwable e = ce.getCause();
+				if (e instanceof ConnectException) {
+					running = false;
+				}
 			} catch (Exception e) {
 				log.error("Uncaught error in kafka producer I/O thread: ", e);
+				if (e instanceof InvalidLoginCredentialsException)
+					running = false;
 			}
 		}
 		log.debug("Beginning shutdown of Kafka producer I/O thread, sending remaining records.");
@@ -343,7 +351,6 @@ public class SenderThread implements Runnable {
 	 * basis
 	 */
 	private void sendProduceRequests(Map<Integer, List<ProducerBatch>> collated, long pollTimeout) {
-
 		for (Map.Entry<Integer, List<ProducerBatch>> entry : collated.entrySet()) {
 			sendProduceRequest(metadata.getNodeById(entry.getKey()), entry.getValue());
 		}

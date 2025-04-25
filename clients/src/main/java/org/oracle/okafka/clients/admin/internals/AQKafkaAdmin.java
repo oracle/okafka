@@ -7,6 +7,7 @@
 
 package org.oracle.okafka.clients.admin.internals;
 
+import java.net.ConnectException;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -621,10 +622,13 @@ public class AQKafkaAdmin extends AQClient{
 			this.metadataManager.update(newCluster, System.currentTimeMillis());
 		} catch (SQLException excp) {
 			log.error("Exception while connecting to Oracle Database " + excp, excp);
-			if (excp.getErrorCode() == 1017)
+			int errorCode = excp.getErrorCode();
+			if (errorCode == 1017)
 				throw new InvalidLoginCredentialsException(excp);
-
-			throw new ConnectionException(excp.getMessage());
+			if(errorCode==12514 || errorCode==12541)
+				throw new ConnectionException(new ConnectException(excp.getMessage()));
+			
+			throw new ConnectionException(excp);
 		}
 		return connections.get(node);
 	}

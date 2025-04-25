@@ -52,6 +52,7 @@ import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.Time;
 import org.slf4j.Logger;
 
+import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -535,36 +536,49 @@ public class NetworkClient implements KafkaClient {
 		try {
 			log.info("Initiating connection to node {}", node);
 			this.connectionStates.connecting(node, now);
+			Node copyNode = new Node(node);
 			aqClient.connect(node);
+			if (!node.equals(copyNode)) {
+				this.connectionStates.remove(copyNode);
+				this.connectionStates.connecting(node, now);
+			}
 			this.connectionStates.ready(node);
 			log.debug("Connection is established to node {}", node);
-		} catch(Exception e) { 
-			if(e instanceof JMSException) {
-				JMSException jmsExcp = (JMSException)e;
-				String jmsError = jmsExcp.getErrorCode();
-				log.error("Connection Error " +jmsExcp );
-				if(jmsError != null && (jmsError.equals("12514") || jmsError.equals("12541"))) {
-					throw new ConnectionException(e);
-				}
-				if(jmsError != null && jmsError.equals("1405")) {
-					log.error("create session privilege is not assigned", e.getMessage());
-					log.info("create session, execute on dbms_aqin, execute on dbms_aqadm privileges required for producer to work");
-				} 
+		} catch (Exception e) {
+			log.error("Failed to connect to node {} with error {}", node, e.getMessage());
 
+			if (e instanceof JMSException) { // from Producer or Consumer
+				JMSException jmsExcp = (JMSException) e;
+				String jmsError = jmsExcp.getErrorCode();
+				if (jmsError != null && (jmsError.equals("12514") || jmsError.equals("12541"))) {
+					throw new ConnectionException(new ConnectException(e.getMessage()));
+				}
+				if (jmsError != null && jmsError.equals("1405")) {
+					log.error("create session privilege is not granted", e.getMessage());
+					log.info(
+							"Check Oracle Documentation for Kafka Java Client Interface for Oracle Transactional"
+							+ " Event Queues to get the complete list of privileges required for the database user.");
+				}
 			}
+
+			if (e instanceof JMSSecurityException)
+				throw new InvalidLoginCredentialsException("Invalid login details provided:" + e.getMessage());
+
 			/* attempt failed, we'll try again after the backoff */
 			connectionStates.disconnected(node, now);
 			/* maybe the problem is our metadata, update it */
-			if(!(metadataUpdater instanceof AdminMetadataUpdater))
-				((DefaultMetadataUpdater)metadataUpdater).requestUpdate();
+			if (!(metadataUpdater instanceof AdminMetadataUpdater))
+				((DefaultMetadataUpdater) metadataUpdater).requestUpdate();
 			else
 				metadataManager.requestUpdate();
-			
+
+			if (e instanceof ConnectionException) // from Admin
+				throw (ConnectionException) e;
+			if (e instanceof InvalidLoginCredentialsException)
+				throw (InvalidLoginCredentialsException) e;
+
 			log.warn("Error connecting to node {}", node, e);
-			
-			if (e instanceof JMSSecurityException)
-				throw new InvalidLoginCredentialsException("Invalid login details provided:" + e.getMessage());
-			
+
 			return false;
 		}
 		return true;
@@ -726,31 +740,25 @@ public class NetworkClient implements KafkaClient {
 				log.debug("Cannot send Request. connect Now to node: " + node);
 				if (connectionStates.canConnect(node, now)) {
 					// we don't have a connection to this node right now, make one
-					//log.info(this.toString() + " Initialize connection to node {} for sending metadata request", node);
-					try {
-						if( !initiateConnect(node, now))
-							return reconnectBackoffMs;
-					} catch(InvalidLoginCredentialsException ilc) {
-						log.error("Failed to connect to node {} with error {}", node, ilc.getMessage());
-						this.metadata.failedUpdate(now, new AuthenticationException(ilc.getMessage()));
+					// log.info(this.toString() + " Initialize connection to node {} for sending
+					// metadata request", node);
+
+					if (!initiateConnect(node, now))
 						return reconnectBackoffMs;
-					}   
-				} else return reconnectBackoffMs;            
+				} else
+					return reconnectBackoffMs;
 			}
 			this.metadataFetchInProgress = true;
 			MetadataRequest.Builder metadataRequest;
 			if (metadata.needMetadataForAllTopics()) {
 				metadataRequest = MetadataRequest.Builder.allTopics();
-			}
-			else           	
-			{
+			} else {
 				List<String> topicList = new ArrayList<>(metadata.topics());
-				metadataRequest = new MetadataRequest.Builder(topicList,
-						metadata.allowAutoTopicCreation(), topicList);
+				metadataRequest = new MetadataRequest.Builder(topicList, metadata.allowAutoTopicCreation(), topicList);
 			}
 			log.debug("Sending metadata request {} to node {}", metadataRequest, node);
 			sendInternalMetadataRequest(metadataRequest, node, now);
-			return defaultRequestTimeoutMs; 
+			return defaultRequestTimeoutMs;
 		}
 
 		@Override

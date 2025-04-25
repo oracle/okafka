@@ -380,7 +380,7 @@ public final class AQKafkaProducer extends AQClient {
 			}
 			else { 
 				//Create Empty or Invalid Offset
-				thisOffset= MessageIdConverter.getOKafkaOffset("",false,false);
+				thisOffset= MessageIdConverter.getOKafkaOffset(null,false,false);
 			}
 
 			produceResult = new ProduceRequestResult(tp);
@@ -476,7 +476,7 @@ public final class AQKafkaProducer extends AQClient {
 		}
 
 		do
-		{
+		{	
 			disconnected = false;
 			checkForCommit = false;
 			notALeader = false;
