@@ -39,18 +39,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 
-import javax.jms.JMSException;
-
 import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
 import org.oracle.okafka.clients.KafkaClient;
 import org.oracle.okafka.clients.Metadata;
 import org.apache.kafka.clients.RequestCompletionHandler;
 import org.oracle.okafka.common.requests.ProduceRequest;
-import org.oracle.okafka.clients.producer.KafkaProducer;
 import org.oracle.okafka.clients.producer.ProducerConfig;
-import org.oracle.okafka.clients.producer.internals.ProducerBatch;
-import org.oracle.okafka.clients.producer.internals.RecordAccumulator;
 import org.apache.kafka.clients.producer.internals.SenderMetricsRegistry;
 //import org.oracle.okafka.clients.producer.internals.SenderMetricsRegistry;
 import org.oracle.okafka.common.requests.ProduceResponse;

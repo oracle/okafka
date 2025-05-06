@@ -70,7 +70,7 @@ public class Node  extends org.apache.kafka.common.Node{
     public Node(Node node) {
     	this(node.id(), node.host(), node.port(),node.serviceName(), node.instanceName());    	
     }
-    
+
     public boolean isEmpty() {
         return host == null || host.isEmpty() || port < 0 || serviceName.isEmpty() ;
     }

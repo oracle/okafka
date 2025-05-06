@@ -566,9 +566,10 @@ public class NetworkClient implements KafkaClient {
 					throw new ConnectionException(new ConnectException(e.getMessage()));
 				}
 				if (jmsError != null && jmsError.equals("1405")) {
-					log.error("create session privilege is not assigned", e.getMessage());
+					log.error("create session privilege is not granted", e.getMessage());
 					log.info(
-							"create session, execute on dbms_aqin, execute on dbms_aqadm privileges required for producer to work");
+							"Check Oracle Documentation for Kafka Java Client Interface for Oracle Transactional"
+							+ " Event Queues to get the complete list of privileges required for the database user.");
 				}
 			}
 

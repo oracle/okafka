@@ -243,8 +243,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
-import javax.jms.JMSException;
-
 /**
  * The default implementation of {@link AdminClient}. An instance of this class
  * is created by invoking one of the {@code create()} methods in

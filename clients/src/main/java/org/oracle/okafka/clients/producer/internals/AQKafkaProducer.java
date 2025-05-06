@@ -627,21 +627,25 @@ public final class AQKafkaProducer extends AQClient {
 							if( !stopReconnect && retryCnt > 0)
 							{
 								log.info("Reconnecting to node " + node);
+
 								int hash = node.hashCode();
 								boolean reCreate = nodePublishers.reCreate();
-								if(hash != node.hashCode()) {
-									Iterator<Map.Entry<Node, TopicPublishers>> iterator = topicPublishersMap.entrySet().iterator();
-									while(iterator.hasNext()) {
+								if (hash != node.hashCode()) {
+									Iterator<Map.Entry<Node, TopicPublishers>> iterator = topicPublishersMap.entrySet()
+											.iterator();
+									while (iterator.hasNext()) {
 										Map.Entry<Node, TopicPublishers> entry = iterator.next();
-										if(entry.getKey().equals(node)) {
+										if (entry.getKey().equals(node)) {
 											iterator.remove();
 											break;
 										}
 									}
 									topicPublishersMap.put(node, nodePublishers);
 								}
-								if(!reCreate) {
-									log.info("Failed to reconnect to  " + node +" . Failing this batch for " + topicPartition);
+
+								if (!reCreate) {
+									log.info("Failed to reconnect to  " + node + " . Failing this batch for "
+											+ topicPartition);
 									disconnected = true;
 								}
 							}else {
