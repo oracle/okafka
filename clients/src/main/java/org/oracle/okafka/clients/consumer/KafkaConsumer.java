@@ -101,6 +101,7 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.oracle.okafka.common.config.SslConfigs;
 import org.apache.kafka.common.errors.AuthenticationException;
+import org.apache.kafka.common.errors.DisconnectException;
 import org.oracle.okafka.common.errors.ConnectionException;
 import org.oracle.okafka.common.errors.FeatureNotSupportedException;
 import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
@@ -1327,6 +1328,8 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 			client.commitOffsetsSync(subscriptions.allConsumed(), timeout.toMillis());
 			interceptors.onCommit(this.subscriptions.allConsumed());
 		} catch (Exception exception) {
+			if(exception instanceof DisconnectException)
+				throw (DisconnectException)exception;
 			throw new KafkaException("failed to commit messages", exception);
 		} finally {
 			release();

@@ -62,6 +62,7 @@ import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
 import org.apache.kafka.common.InvalidRecordException;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.MetricName;
+import org.apache.kafka.common.errors.DisconnectException;
 import org.apache.kafka.common.errors.InvalidMetadataException;
 import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.NotLeaderForPartitionException;
@@ -214,7 +215,7 @@ public class SenderThread implements Runnable {
 	 */
 	void run(long now) {
 		long pollTimeOut = sendProducerData(now);
-		client.maybeUpdateMetadata(now);
+		client.maybeUpdateMetadata(time.milliseconds());
 		try {
 			long sleepTime = pollTimeOut;
 			if (sleepTime == Long.MAX_VALUE) {
@@ -356,7 +357,6 @@ public class SenderThread implements Runnable {
 	 * basis
 	 */
 	private void sendProduceRequests(Map<Integer, List<ProducerBatch>> collated, long pollTimeout) {
-
 		for (Map.Entry<Integer, List<ProducerBatch>> entry : collated.entrySet()) {
 			sendProduceRequest(metadata.getNodeById(entry.getKey()), entry.getValue());
 		}
@@ -418,31 +418,17 @@ public class SenderThread implements Runnable {
 		log.info("Batch Send complete, evaluating response " + batch.topicPartition);
 		ProduceResponse pResponse = (ProduceResponse) response.responseBody();
 		ProduceResponse.PartitionResponse partitionResponse = pResponse.getPartitionResponse();
-		if (response.wasDisconnected()) {
-			log.info("Connection to oracle database node " + response.destination() + " was broken. Retry again");
-
-			if (partitionResponse.getCheckDuplicate()) {
-				// During retry : check for the first message id.
-				// If first record is published successfully then entire batch would be
-				// published successfully.
-				log.debug("Exception while sending publish request. Check storage before retry.");
-				if (partitionResponse.msgIds != null && partitionResponse.msgIds.size() > 0) {
-					log.debug("Check for message id " + partitionResponse.msgIds.get(0).getMsgId());
-					batch.setRetryMsgId(partitionResponse.msgIds);
-				}
-			}
-			accumulator.reenqueue(batch, System.currentTimeMillis());
-			// Request for MetaData update since the Database instance has went down.
-			int cuVNo = this.metadata.requestUpdate();
-			log.debug("Requested for update of metadata from " + cuVNo);
-		} else if (partitionResponse.exception != null) {
+		
+		if (partitionResponse.exception != null) {
 			RuntimeException producerException = partitionResponse.exception;
-			if (producerException instanceof NotLeaderForPartitionException) {
-
+			if (producerException instanceof DisconnectException) {
+				log.info("Connection to oracle database node " + response.destination() + " was broken. Retry again");
+				int cuVNo = this.metadata.requestUpdate();
+				log.debug("Requested for update of metadata from " + cuVNo);
+			} else if (producerException instanceof NotLeaderForPartitionException) {
 				log.info("No Owner for Topic Partition " + batch.topicPartition + " retrying.");
 				this.metadata.requestUpdate();
-			}
-			if (producerException instanceof InvalidTopicException) {
+			} else if (producerException instanceof InvalidTopicException) {
 				log.info(producerException.getMessage());
 				completeResponse(response);
 			} else {
@@ -477,10 +463,12 @@ public class SenderThread implements Runnable {
 	 * Handle a produce response
 	 */
 	private void handleProduceResponse(ClientResponse response, ProducerBatch batch, long now) {
+		/*
 		if (response.wasDisconnected()) {
 			client.disconnected(metadata.getNodeById(Integer.parseInt(response.destination())), now);
 			metadata.requestUpdate();
 		}
+		*/
 
 		long receivedTimeMs = response.receivedTimeMs();
 		int correlationId = response.requestHeader().correlationId();

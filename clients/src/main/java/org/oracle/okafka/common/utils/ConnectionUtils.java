@@ -30,6 +30,7 @@ import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.common.Node;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.AbstractConfig;
+import org.apache.kafka.common.errors.DisconnectException;
 import org.oracle.okafka.common.config.SslConfigs;
 import org.oracle.okafka.common.errors.ConnectionException;
 import org.oracle.okafka.common.errors.RecordNotFoundSQLException;
@@ -125,6 +126,18 @@ public class ConnectionUtils {
 		//ToDo: Validate if caching of dequeue statement helps or not
 		((AQjmsSession)sess).setDeqStmtCachingFlag(true);
 		return sess;
+	}
+	
+	public static boolean isSessionClosed(AQjmsSession sess) {
+		Connection con;
+		try {
+			con = ((oracle.jms.AQjmsSession)sess).getDBConnection();
+			if(con == null || con.isClosed())
+				return true;
+		} catch (JMSException | SQLException e) {
+			return true;
+		}
+		return false;
 	}
 
 	public static String getUsername(AbstractConfig configs) {

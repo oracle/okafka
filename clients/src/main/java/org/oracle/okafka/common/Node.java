@@ -71,10 +71,6 @@ public class Node  extends org.apache.kafka.common.Node{
     	this(node.id(), node.host(), node.port(),node.serviceName(), node.instanceName());    	
     }
     
-    public static Node getCopy(Node node) {
-    	return new Node(node.id, node.host, node.port, node.serviceName, node.instanceName);
-    }
-
     public boolean isEmpty() {
         return host == null || host.isEmpty() || port < 0 || serviceName.isEmpty() ;
     }
@@ -163,11 +159,10 @@ public class Node  extends org.apache.kafka.common.Node{
 
     @Override
     public int hashCode() {
-    	Integer h = this.hash;
-    	if (h == null) {
-    		h  = getHashCode();
+    	if (this.hash == null) {
+    		this.hash = getHashCode();
     	} 
-    	return h;
+    	return this.hash;
     }
     
     public int updateHashCode()

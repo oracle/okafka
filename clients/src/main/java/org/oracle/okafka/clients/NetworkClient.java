@@ -394,8 +394,24 @@ public class NetworkClient implements KafkaClient {
 			else if(metadataManager != null)
 			{
 				node = (org.oracle.okafka.common.Node)metadataManager.nodeById(Integer.parseInt(clientRequest.destination()));
+				
 			}
-
+			if (node == null) {
+				List<org.apache.kafka.common.Node> nodeList = new ArrayList<>();
+				if (metadata != null) {
+					metadata.requestUpdate();
+					nodeList = metadata.fetch().nodes();
+				} else if (metadataManager != null) {
+					nodeList = metadataManager.updater().fetchNodes();
+				}
+				for (org.apache.kafka.common.Node nodeNow : nodeList) {
+					if (nodeNow.id() == Integer.parseInt(clientRequest.destination())) {
+						node = (org.oracle.okafka.common.Node) nodeNow;
+						break;
+					}
+				}
+			}
+			
 			if (node !=null && !isInternalRequest) {
 				// If this request came from outside the NetworkClient, validate
 				// that we can send data.  If the request is internal, we trust
@@ -538,10 +554,6 @@ public class NetworkClient implements KafkaClient {
 			this.connectionStates.connecting(node, now);
 			Node copyNode = new Node(node);
 			aqClient.connect(node);
-			if (!node.equals(copyNode)) {
-				this.connectionStates.remove(copyNode);
-				this.connectionStates.connecting(node, now);
-			}
 			this.connectionStates.ready(node);
 			log.debug("Connection is established to node {}", node);
 		} catch (Exception e) {

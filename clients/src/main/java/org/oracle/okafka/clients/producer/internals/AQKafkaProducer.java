@@ -53,6 +53,7 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.NotLeaderForPartitionException;
+import org.apache.kafka.common.errors.RetriableException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.metrics.Metrics;
 //import org.apache.kafka.common.network.Selector.SelectorMetrics;
@@ -292,7 +293,6 @@ public final class AQKafkaProducer extends AQClient {
 				org.apache.kafka.common.Node bootStrapNode = null;
 				if(externalDbConn != null)
 				{
-					log.debug("");
 					int instId = ConnectionUtils.getInstanceId(externalDbConn);
 					bootStrapNode =  metadata.fetch().nodeById(instId);
 					if(bootStrapNode == null )
@@ -440,6 +440,15 @@ public final class AQKafkaProducer extends AQClient {
 		ProduceRequest.Builder builder = (ProduceRequest.Builder)request.requestBuilder();
 		ProduceRequest produceRequest = builder.build();
 		Node node = metadata.getNodeById(Integer.parseInt(request.destination()));
+		if(node == null) {
+			List<org.apache.kafka.common.Node> nodeList = metadata.fetch().nodes();
+			for (org.apache.kafka.common.Node nodeNow : nodeList) {
+				if (nodeNow.id() == Integer.parseInt(request.destination())) {
+					node = (org.oracle.okafka.common.Node) nodeNow;
+					break;
+				}
+			}
+		}
 		TopicPartition topicPartition = produceRequest.getTopicpartition();
 		MemoryRecords memoryRecords = produceRequest.getMemoryRecords();
 		TopicPublishers nodePublishers = null;
@@ -518,7 +527,7 @@ public final class AQKafkaProducer extends AQClient {
 							}
 							else
 							{
-								log.info("Message Id " + checkMsgId +" exists for topic partition "+ topicPartition +" does not exist. Retrying to publish");
+								log.info("Message Id " + checkMsgId +" for topic partition "+ topicPartition +" does not exist. Retrying to publish");
 							}
 						}
 
@@ -618,10 +627,18 @@ public final class AQKafkaProducer extends AQClient {
 							if( !stopReconnect && retryCnt > 0)
 							{
 								log.info("Reconnecting to node " + node);
-								Node copyNode = new Node(node);
+								int hash = node.hashCode();
 								boolean reCreate = nodePublishers.reCreate();
-								if(!node.equals(copyNode)) {
-									
+								if(hash != node.hashCode()) {
+									Iterator<Map.Entry<Node, TopicPublishers>> iterator = topicPublishersMap.entrySet().iterator();
+									while(iterator.hasNext()) {
+										Map.Entry<Node, TopicPublishers> entry = iterator.next();
+										if(entry.getKey().equals(node)) {
+											iterator.remove();
+											break;
+										}
+									}
+									topicPublishersMap.put(node, nodePublishers);
 								}
 								if(!reCreate) {
 									log.info("Failed to reconnect to  " + node +" . Failing this batch for " + topicPartition);
@@ -652,7 +669,8 @@ public final class AQKafkaProducer extends AQClient {
 								log.debug("Connection to node is fine. Checking if previous publish was successfull or not.");
 								nodePublishers = topicPublishersMap.get(node);
 								java.sql.Connection conn = ((AQjmsSession)nodePublishers.sess).getDBConnection();
-								String msgId = msgs[0].getJMSMessageID().substring(3);
+								String jmsMsgId = msgs[0].getJMSMessageID();
+								String msgId = jmsMsgId != null ? jmsMsgId.substring(3) : null;
 								boolean msgIdExists = checkIfMsgIdExist(conn, topicPartition.topic(), msgId);
 								checkForCommit = false;
 								if(msgIdExists) {
@@ -692,7 +710,7 @@ public final class AQKafkaProducer extends AQClient {
 				partitionResponse =  createResponses(topicPartition, new NotLeaderForPartitionException(pException), msgs);  
 				this.metadata.requestUpdate();
 			}
-			if(disconnected)
+			else if(disconnected)
 			{
 				TopicPublishers tpRemoved = topicPublishersMap.remove(node);
 				log.trace("Connection with node {} is closed", request.destination());
@@ -700,6 +718,8 @@ public final class AQKafkaProducer extends AQClient {
 				org.apache.kafka.common.errors.DisconnectException disconnExcp = new org.apache.kafka.common.errors.DisconnectException(exceptionMsg,pException);
 				partitionResponse =  createResponses(topicPartition, disconnExcp, msgs);
 			}
+			else
+				partitionResponse =  createResponses(topicPartition, new KafkaException(pException), msgs);		
 		}
 		else 
 		{
@@ -724,7 +744,9 @@ public final class AQKafkaProducer extends AQClient {
 	}
 
 	private boolean checkIfMsgIdExist(Connection con,String topicName, String msgId)
-	{
+	{	
+		if(msgId == null)
+			return false;
 		boolean msgIdExists = false;
 		String qry =" Select count(*) from " +ConnectionUtils.enquote(topicName) + " where msgid = '" + msgId+"'";
 		log.debug("Executing " + qry);
