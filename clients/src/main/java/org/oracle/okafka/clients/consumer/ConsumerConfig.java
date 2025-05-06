@@ -346,7 +346,10 @@ public class ConsumerConfig extends AbstractConfig {
     private static final String SECURITY_PROVIDERS_DOC = SecurityConfig.SECURITY_PROVIDERS_DOC;
 
     private static final AtomicInteger CONSUMER_CLIENT_ID_SEQUENCE = new AtomicInteger(1);
-
+     
+    /** <code>oracle.consumer.lightweight</code> */
+    public static final String ORACLE_CONSUMER_LIGHTWEIGHT_CONFIG = "oracle.consumer.lightweight";
+    
     static {
         CONFIG = new ConfigDef().define(BOOTSTRAP_SERVERS_CONFIG,
                                         Type.LIST,

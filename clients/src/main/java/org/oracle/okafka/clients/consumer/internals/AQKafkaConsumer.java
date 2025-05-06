@@ -33,6 +33,7 @@ import javax.jms.TopicSubscriber;
 
 import oracle.jdbc.OracleData;
 import oracle.jdbc.OracleTypes;
+import oracle.jdbc.OracleArray;
 import oracle.jms.AQjmsBytesMessage;
 import oracle.jms.AQjmsConnection;
 import oracle.jms.AQjmsConsumer;
@@ -87,6 +88,7 @@ import org.apache.kafka.common.utils.LogContext;
 import org.oracle.okafka.common.utils.MessageIdConverter;
 import org.oracle.okafka.common.utils.MessageIdConverter.OKafkaOffset;
 import org.apache.kafka.common.utils.Time;
+import oracle.jdbc.OracleConnection;
 
 /**
  * This class consumes messages from AQ 
@@ -275,17 +277,26 @@ public final class AQKafkaConsumer extends AQClient{
 		log.debug("Commit Nodes. " + nodes.size());
 		for(Map.Entry<Node, List<TopicPartition>> node : nodes.entrySet()) {
 			if(node.getValue().size() > 0) {
+				String topic = node.getValue().get(0).topic();
 				TopicConsumers consumers = topicConsumersMap.get(node.getKey());
 				try {
-					log.debug("Committing now for node " + node.toString());
-					TopicSession jmsSession =consumers.getSession();
-					if(jmsSession != null)
-					{
+					String ltwtSub = configs.getString(ConsumerConfig.ORACLE_CONSUMER_LIGHTWEIGHT_CONFIG);
+
+					if(!ltwtSub.equals("true")) {
 						log.debug("Committing now for node " + node.toString());
-						jmsSession.commit();
-						log.debug("Commit done");
-					}else {
-						log.info("No valid session to commit for node " + node);
+						TopicSession jmsSession =consumers.getSession();
+						if(jmsSession != null)
+						{
+							log.debug("Committing now for node " + node.toString());
+							jmsSession.commit();
+							log.debug("Commit done");
+						}else {
+							log.info("No valid session to commit for node " + node);
+						}
+					}
+					else{
+						log.debug("Performing lightweight commit for node " + node);
+						commitOffsetsLightWeightSub(node.getKey(), topic, offsets);
 					}
 					result.put(node.getKey(), null);
 
@@ -305,6 +316,236 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 
 		return createCommitResponse(request, nodes, offsets, result, error);
+	}
+
+	private void commitOffsetsLightWeightSub(Node node, String topic, Map<TopicPartition, OffsetAndMetadata> offsets) {
+
+		final int OFFSET_DIVISOR = 20000;
+		int size = offsets.size();
+		int[] partitions = new int[size];
+		int[] priorities = new int[size];
+		long[] subshards = new long[size];
+		long[] sequences = new long[size];
+
+		int index = 0;
+		for (Map.Entry<TopicPartition, OffsetAndMetadata> offsetEntry : offsets.entrySet()) {
+			TopicPartition tp = offsetEntry.getKey();
+			OffsetAndMetadata metadata = offsetEntry.getValue();
+			partitions[index] = tp.partition() * 2;
+			priorities[index] = 0;
+			subshards[index] = metadata.offset() / OFFSET_DIVISOR;
+			sequences[index] = metadata.offset() % OFFSET_DIVISOR;
+			index++;
+		}
+
+		commitSyncAll(node, topic, partitions, priorities, subshards, sequences);
+	}
+
+	public void createLightWeightSub(String topic, Node node) throws SQLException { 
+
+		CallableStatement cStmt = null;
+		try {		 
+			Connection con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
+			cStmt = con.prepareCall("{call sys.dbms_aqadm.add_ltwt_subscriber(?, sys.aq$_agent(?,null,null))}");
+			cStmt.setString(1, ConnectionUtils.enquote(topic));
+			cStmt.setString(2, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
+			cStmt.execute();
+			log.debug("Lightweight subscriber created for topic: " + topic + ", node: " + node);
+		} 
+
+		catch(Exception ex) { 
+			log.error("Error creating lightweight subscriber for topic: " + topic + ", node: " + node, ex);
+			throw new SQLException("Failed to create lightweight subscriber", ex);
+		}
+		finally {
+			try { 
+				if(cStmt != null)
+					cStmt.close();
+			} catch(Exception e) {
+				//do nothing
+			}
+		}
+	}
+
+	public void CommitSync(Node node, String topic, int partition_id, int priority, 
+			long subshard_id, long seq_num ) {
+
+		CallableStatement cStmt = null;
+		try {		 
+
+			Connection con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
+			String user = con.getMetaData().getUserName();
+			cStmt = con.prepareCall("{call dbms_teqk.AQ$_COMMITSYNC(?, ?, ?, ?, ?, ?, ?)}");
+			cStmt.setString(1, user);
+			cStmt.setString(2, topic);
+			cStmt.setString(3, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
+			cStmt.setInt(4, partition_id);
+			cStmt.setInt(5, priority);
+			cStmt.setLong(6, subshard_id);
+			cStmt.setLong(7, seq_num);
+			cStmt.execute();
+			log.debug("CommitSync executed successfully for topic: {}, partition: {}, subshard: {}, seq: {}",
+					topic, partition_id, subshard_id, seq_num);
+		} 
+
+		catch(Exception ex) { 
+			log.error("Error during CommitSync for node: " + node + ", topic: " + topic, ex);
+		}
+		finally {
+			try { 
+				if(cStmt != null)
+					cStmt.close();
+			} catch(Exception e) {
+				//do nothing
+			}
+		}
+
+	}
+
+	public void commitSyncAll(Node node, String topic, int[] partition_id, int[] priority, 
+			long[] subshard_id, long[] seq_num ) {
+
+		CallableStatement cStmt = null;
+		try {		 
+
+			Connection con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
+
+			OracleConnection oracleCon = (OracleConnection) con;
+			String user = con.getMetaData().getUserName();
+
+			Array partitionArray = oracleCon.createOracleArray("DBMS_TEQK.INPUT_ARRAY_T", partition_id);
+			Array priorityArray = oracleCon.createOracleArray("DBMS_TEQK.INPUT_ARRAY_T", priority);
+			Array subshardArray = oracleCon.createOracleArray("DBMS_TEQK.INPUT_ARRAY_T", subshard_id);
+			Array sequenceArray = oracleCon.createOracleArray("DBMS_TEQK.INPUT_ARRAY_T", seq_num);
+
+			cStmt = con.prepareCall("{call dbms_teqk.AQ$_COMMITSYNC_ALL(?, ?, ?, ?, ?, ?, ?)}");
+			cStmt.setString(1, user);
+			cStmt.setString(2, topic);
+			cStmt.setString(3, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
+			cStmt.setArray(4, partitionArray);
+			cStmt.setArray(5, priorityArray);
+			cStmt.setArray(6, subshardArray);
+			cStmt.setArray(7, sequenceArray);
+			cStmt.execute();
+			log.debug("CommitSyncAll executed for topic: {}, partitions: {}", topic, partition_id.length);
+		} 
+
+		catch(Exception ex) { 
+			log.error("Error in commitSyncAll for topic: " + topic + ", node: " + node, ex);
+		}
+		finally {
+			try { 
+				if(cStmt != null)
+					cStmt.close();
+			} catch(Exception e) {
+				//do nothing
+			}
+		}
+
+	}
+
+	public void lightWeightSeek(Node node, String topic, int partition_id, int priority, 
+			long subshard_id, long seq_num ) {
+
+		CallableStatement cStmt = null;
+		
+		try {		 
+            Connection con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
+			String user = con.getMetaData().getUserName();
+			cStmt = con.prepareCall("{call dbms_teqk.AQ$_SEEK(?, ?, ?, ?, ?, ?, ?)}");
+			cStmt.setString(1, user);
+			cStmt.setString(2, topic);
+			cStmt.setString(3, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
+			cStmt.setInt(4, partition_id);
+			cStmt.setInt(5, priority);
+			cStmt.setLong(6, subshard_id);
+			cStmt.setLong(7, seq_num);
+			cStmt.execute();
+			log.debug("Light weight seek executed successfully for topic: {}, partition: {}, subshard: {}, seq: {}",
+					topic, partition_id, subshard_id, seq_num);
+		} 
+
+		catch(Exception ex) { 
+			log.error("Error in lightWeightseek for topic: " + topic + ", node: " + node, ex);
+		}
+		finally {
+			try { 
+				if(cStmt != null)
+					cStmt.close();
+			} catch(Exception e) {
+				//do nothing
+			}
+		}
+
+	}
+
+	public void lightWeightSeektoBeginning(Node node, String topic, int[] partition_id, int[] priority) {
+
+		CallableStatement cStmt = null;
+		
+		try {		 
+            Connection con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
+            OracleConnection oracleCon = (OracleConnection) con;
+			String user = con.getMetaData().getUserName();
+			Array partitionArray = oracleCon.createOracleArray("DBMS_TEQK.SEEK_INPUT_ARRAY_T", partition_id);
+			Array priorityArray = oracleCon.createOracleArray("DBMS_TEQK.SEEK_INPUT_ARRAY_T", priority);
+            cStmt = con.prepareCall("{call dbms_teqk.AQ$_SEEKTOBEGINNING(?, ?, ?, ?, ?)}");
+			cStmt.setString(1, user);
+			cStmt.setString(2, topic);
+			cStmt.setString(3, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
+			cStmt.setArray(4, partitionArray);
+			cStmt.setArray(5, priorityArray);
+			cStmt.execute();
+			log.debug("lightWeightSeektoBeginning executed for topic: {}, partitions: {}", topic, partition_id.length);
+		} 
+
+		catch(Exception ex) { 
+			log.error("Error in lightWeightSeektoBeginning for topic: " + topic + ", node: " + node, ex);
+		}
+		finally {
+			try { 
+				if(cStmt != null)
+					cStmt.close();
+			} catch(Exception e) {
+				//do nothing
+			}
+		}
+
+	}
+
+	public void lightWeightSeektoEnd(Node node, String topic, int[] partition_id, int[] priority) {
+
+		CallableStatement cStmt = null;
+		
+		try {		 
+			Connection con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
+			OracleConnection oracleCon = (OracleConnection) con;
+			String user = con.getMetaData().getUserName();
+			Array partitionArray = oracleCon.createOracleArray("DBMS_TEQK.SEEK_INPUT_ARRAY_T", partition_id);
+			Array priorityArray = oracleCon.createOracleArray("DBMS_TEQK.SEEK_INPUT_ARRAY_T", priority);
+
+			cStmt = con.prepareCall("{call dbms_teqk.AQ$_SEEKTOEND(?, ?, ?, ?, ?)}");
+			cStmt.setString(1, user);
+			cStmt.setString(2, topic);
+			cStmt.setString(3, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
+			cStmt.setArray(4, partitionArray);
+			cStmt.setArray(5, priorityArray);
+			cStmt.execute();
+			log.debug("lightWeightSeektoEnd executed for topic: {}, partitions: {}", topic, partition_id.length);
+		} 
+
+		catch(Exception ex) { 
+			log.error("Error in lightWeightSeektoEnd for topic: " + topic + ", node: " + node, ex);
+		}
+		finally {
+			try { 
+				if(cStmt != null)
+					cStmt.close();
+			} catch(Exception e) {
+				//do nothing
+			}
+		}
+
 	}
 
 	private ClientResponse createCommitResponse(ClientRequest request, Map<Node, List<TopicPartition>> nodes,
