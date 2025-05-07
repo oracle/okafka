@@ -390,28 +390,28 @@ public class NetworkClient implements KafkaClient {
 			if (metadata != null)
 			{
 				node = (org.oracle.okafka.common.Node)metadata.getNodeById(Integer.parseInt(clientRequest.destination()));
+				/*
+				 * During Initial metadata fetch metadata.getNodeByid(nodeId) will give null as
+				 * Map nodeById in Cluster of metadata have Node stored with the bootstrap id's
+				 * hash but after after initial connection the node id would have been updated
+				 * which will not in the nodeById map.
+				 */
+				if (node == null) {
+					List<org.apache.kafka.common.Node> nodeList = metadata.fetch().nodes();
+					for (org.apache.kafka.common.Node nodeNow : nodeList) {
+						if (nodeNow.id() == Integer.parseInt(clientRequest.destination())) {
+							node = (org.oracle.okafka.common.Node) nodeNow;
+							break;
+						}
+					}
+				}
 			}
 			else if(metadataManager != null)
 			{
 				node = (org.oracle.okafka.common.Node)metadataManager.nodeById(Integer.parseInt(clientRequest.destination()));
 				
 			}
-			if (node == null) {
-				List<org.apache.kafka.common.Node> nodeList = new ArrayList<>();
-				if (metadata != null) {
-					metadata.requestUpdate();
-					nodeList = metadata.fetch().nodes();
-				} else if (metadataManager != null) {
-					nodeList = metadataManager.updater().fetchNodes();
-				}
-				for (org.apache.kafka.common.Node nodeNow : nodeList) {
-					if (nodeNow.id() == Integer.parseInt(clientRequest.destination())) {
-						node = (org.oracle.okafka.common.Node) nodeNow;
-						break;
-					}
-				}
-			}
-			
+
 			if (node !=null && !isInternalRequest) {
 				// If this request came from outside the NetworkClient, validate
 				// that we can send data.  If the request is internal, we trust
@@ -419,7 +419,7 @@ public class NetworkClient implements KafkaClient {
 				// will be slightly different for some internal requests (for
 				// example, ApiVersionsRequests can be sent prior to being in
 				// READY state.)
-				if (!canSendRequest(node, now)) {
+				if (!this.ready(node, now)) {
 					log.info("Attempt to send a request to node " + node + " which is not ready.");
 					throw new IllegalStateException("Attempt to send a request to node " + node + " which is not ready.");
 				}
@@ -552,7 +552,6 @@ public class NetworkClient implements KafkaClient {
 		try {
 			log.info("Initiating connection to node {}", node);
 			this.connectionStates.connecting(node, now);
-			Node copyNode = new Node(node);
 			aqClient.connect(node);
 			this.connectionStates.ready(node);
 			log.debug("Connection is established to node {}", node);

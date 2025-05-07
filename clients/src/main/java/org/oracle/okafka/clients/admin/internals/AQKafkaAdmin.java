@@ -114,7 +114,6 @@ public class AQKafkaAdmin extends AQClient{
 	 * @return response for create topics request.
 	 */
 	private ClientResponse createTopics(ClientRequest request) {
-		
 		 Node node = (org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
 		 CreateTopicsRequest.Builder builder= (CreateTopicsRequest.Builder)request.requestBuilder();
 		 Map<String, TopicDetails> topics = builder.build().topics();
@@ -293,18 +292,6 @@ public class AQKafkaAdmin extends AQClient{
 	
 	private ClientResponse getMetadata(ClientRequest request) {
 		Node node =(org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
-		if (node == null)
-		{
-			List<org.apache.kafka.common.Node> nodeList = metadataManager.updater().fetchNodes();
-			for(org.apache.kafka.common.Node nodeNow : nodeList)
-			{
-				if(nodeNow.id() == Integer.parseInt(request.destination()))
-				{
-					node = (org.oracle.okafka.common.Node)nodeNow;
-				}
-			}
-			
-		}
 		ClientResponse response = getMetadataNow(request, connections.get(node), node, forceMetadata);
 		if(response.wasDisconnected()) { 
 
@@ -317,18 +304,6 @@ public class AQKafkaAdmin extends AQClient{
 	
 	private ClientResponse listOffsets(ClientRequest request) {
 		Node node =(org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
-		if (node == null)
-		{
-			List<org.apache.kafka.common.Node> nodeList = metadataManager.updater().fetchNodes();
-			for(org.apache.kafka.common.Node nodeNow : nodeList)
-			{
-				if(nodeNow.id() == Integer.parseInt(request.destination()))
-				{
-					node = (org.oracle.okafka.common.Node)nodeNow;
-				}
-			}	
-		}
-		
 		ClientResponse response = getOffsetsResponse(request,connections.get(node));
 		if(response.wasDisconnected()) { 
 			connections.remove(node);
@@ -340,18 +315,6 @@ public class AQKafkaAdmin extends AQClient{
 	
 	private ClientResponse getConsumerGroups(ClientRequest request) {
 		Node node = (org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
-		if (node == null)
-		{
-			List<org.apache.kafka.common.Node> nodeList = metadataManager.updater().fetchNodes();
-			for(org.apache.kafka.common.Node nodeNow : nodeList)
-			{
-				if(nodeNow.id() == Integer.parseInt(request.destination()))
-				{
-					node = (org.oracle.okafka.common.Node)nodeNow;
-				}
-			}	
-		}
-		
 		Connection jdbcConn = connections.get(node);
 		
 		List<String> consumerGroups = new ArrayList<>();
@@ -402,21 +365,12 @@ public class AQKafkaAdmin extends AQClient{
 	}
 	
 	private ClientResponse getCommittedOffsets(ClientRequest request) {
-
 		OffsetFetchRequest.Builder builder = (OffsetFetchRequest.Builder) request.requestBuilder();
 		OffsetFetchRequest offsetFetchRequest = builder.build();
 		Map<String, List<TopicPartition>> perGroupTopicPartitions = offsetFetchRequest.perGroupTopicpartitions();
 		Map<String, Map<TopicPartition, PartitionOffsetData>> responseMap = new HashMap<>();
 
 		Node node = (org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
-		if (node == null) {
-			List<org.apache.kafka.common.Node> nodeList = metadataManager.updater().fetchNodes();
-			for (org.apache.kafka.common.Node nodeNow : nodeList) {
-				if (nodeNow.id() == Integer.parseInt(request.destination())) {
-					node = (org.oracle.okafka.common.Node) nodeNow;
-				}
-			}
-		}
 
 		Connection jdbcConn = connections.get(node);
 		Exception exception = null;
@@ -528,15 +482,7 @@ public class AQKafkaAdmin extends AQClient{
 		Map<String, Exception> errors = new HashMap<>();
 
 		Node node = (org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
-		if (node == null) {
-			List<org.apache.kafka.common.Node> nodeList = metadataManager.updater().fetchNodes();
-			for (org.apache.kafka.common.Node nodeNow : nodeList) {
-				if (nodeNow.id() == Integer.parseInt(request.destination())) {
-					node = (org.oracle.okafka.common.Node) nodeNow;
-				}
-			}
-		}
-
+		
 		Connection jdbcConn = connections.get(node);
 		Exception exception = null;
 		boolean disconnected = false;
@@ -612,6 +558,12 @@ public class AQKafkaAdmin extends AQClient{
 		try {
 			Connection newConn = ConnectionUtils.createJDBCConnection(node, configs, this.log);
 			connections.put(node, newConn);
+			
+			/*
+			 * Fetching the nodes and updating the metadataManager to ensure that Cluster
+			 * have the correct mapping in the nodesById Map even when the bootstrap node
+			 * have been updated after the initial connection
+			 */
 			List<Node> nodes = new ArrayList<>();
 			String clusterId = ((oracle.jdbc.internal.OracleConnection) newConn).getServerSessionInfo()
 					.getProperty("DATABASE_NAME");

@@ -139,7 +139,7 @@ public final class ClusterConnectionStates {
      * @param now the current time
      */
     public void disconnected(Node node, long now) {
-    	NodeConnectionState nodeState = nodeState(node);
+    	NodeConnectionState nodeState = getNodeState(node);
         nodeState.state = ConnectionState.DISCONNECTED;
         nodeState.lastConnectAttemptMs = now;
         updateReconnectBackoff(nodeState);
@@ -160,7 +160,7 @@ public final class ClusterConnectionStates {
      * @param node the connection identifier
      */
     public void ready(Node node) {
-        NodeConnectionState nodeState = nodeState(node);
+        NodeConnectionState nodeState = getNodeState(node);
         nodeState.state = ConnectionState.READY;
         nodeState.authenticationException = null;
         resetReconnectBackoff(nodeState);
@@ -173,7 +173,7 @@ public final class ClusterConnectionStates {
      * @param exception the authentication exception
      */
     public void authenticationFailed(Node node, long now, AuthenticationException exception) {
-        NodeConnectionState nodeState = nodeState(node);
+        NodeConnectionState nodeState = getNodeState(node);
         nodeState.authenticationException = exception;
         nodeState.state = ConnectionState.AUTHENTICATION_FAILED;
         nodeState.lastConnectAttemptMs = now;
@@ -284,20 +284,17 @@ public final class ClusterConnectionStates {
     public ConnectionState connectionState(Node node) {
         return getNodeState(node).state;
     }
-
+ 
     /**
      * Get the state of a given node.
      * @param node the connection to fetch the state for
      */
-    private NodeConnectionState nodeState(Node node) {
-        NodeConnectionState state = getNodeState(node);
-        if (state == null)
-            throw new IllegalStateException("No entry found for connection " + node);
-        return state;
-    }
-    
     private NodeConnectionState getNodeState(Node node) {
     	NodeConnectionState state = this.nodeState.get(node);
+		/*
+		 * If bootstrap node got updated after connection then nodeState map have the
+		 * node with the old hashCode so there will be no entry in the Map nodeState
+		 */
     	if(state == null) {
     		Iterator<Map.Entry<Node, NodeConnectionState>> iterator = nodeState.entrySet().iterator();
     		while (iterator.hasNext()) {

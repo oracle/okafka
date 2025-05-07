@@ -53,7 +53,6 @@ import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.NotLeaderForPartitionException;
-import org.apache.kafka.common.errors.RetriableException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.metrics.Metrics;
 //import org.apache.kafka.common.network.Selector.SelectorMetrics;
@@ -440,15 +439,7 @@ public final class AQKafkaProducer extends AQClient {
 		ProduceRequest.Builder builder = (ProduceRequest.Builder)request.requestBuilder();
 		ProduceRequest produceRequest = builder.build();
 		Node node = metadata.getNodeById(Integer.parseInt(request.destination()));
-		if(node == null) {
-			List<org.apache.kafka.common.Node> nodeList = metadata.fetch().nodes();
-			for (org.apache.kafka.common.Node nodeNow : nodeList) {
-				if (nodeNow.id() == Integer.parseInt(request.destination())) {
-					node = (org.oracle.okafka.common.Node) nodeNow;
-					break;
-				}
-			}
-		}
+
 		TopicPartition topicPartition = produceRequest.getTopicpartition();
 		MemoryRecords memoryRecords = produceRequest.getMemoryRecords();
 		TopicPublishers nodePublishers = null;
@@ -624,33 +615,19 @@ public final class AQKafkaProducer extends AQClient {
 					{
 						try {
 							nodePublishers.close();
-							if( !stopReconnect && retryCnt > 0)
-							{
+							if (!stopReconnect && retryCnt > 0) {
 								log.info("Reconnecting to node " + node);
 
-								int hash = node.hashCode();
 								boolean reCreate = nodePublishers.reCreate();
-								if (hash != node.hashCode()) {
-									Iterator<Map.Entry<Node, TopicPublishers>> iterator = topicPublishersMap.entrySet()
-											.iterator();
-									while (iterator.hasNext()) {
-										Map.Entry<Node, TopicPublishers> entry = iterator.next();
-										if (entry.getKey().equals(node)) {
-											iterator.remove();
-											break;
-										}
-									}
-									topicPublishersMap.put(node, nodePublishers);
-								}
-
 								if (!reCreate) {
 									log.info("Failed to reconnect to  " + node + " . Failing this batch for "
 											+ topicPartition);
 									disconnected = true;
 								}
-							}else {
+							} else {
 								disconnected = true;
-								log.info("Failed to reconnect to  " + node +" . Failing this batch for " + topicPartition);
+								log.info("Failed to reconnect to  " + node + " . Failing this batch for "
+										+ topicPartition);
 							}
 							stopReconnect = false;
 
@@ -1179,7 +1156,7 @@ public final class AQKafkaProducer extends AQClient {
 			this.node = node;
 			this.externalConn = externalConn;
 			sessionAckMode = javax.jms.Session.SESSION_TRANSACTED;
-			createPublishers(false);
+			createPublishers();
 			topicPublishers = new HashMap<>();
 			log.debug("ExternalConnection " + externalConn);
 		}
@@ -1192,7 +1169,7 @@ public final class AQKafkaProducer extends AQClient {
 			this.sessionAckMode = mode;
 
 			try {
-				createPublishers(false);
+				createPublishers();
 				topicPublishers = new HashMap<>();
 				/*
 				Connection oConn = ((AQjmsSession)sess).getDBConnection();
@@ -1249,7 +1226,7 @@ public final class AQKafkaProducer extends AQClient {
 			return tpDesc;
 		}
 
-		private boolean createPublishers(boolean reCreate) throws JMSException {
+		private boolean createPublishers() throws JMSException {
 			try {
 				conn = createTopicConnection();
 				sess = createTopicSession(sessionAckMode);
@@ -1265,14 +1242,12 @@ public final class AQKafkaProducer extends AQClient {
 				connInfo = "Session_Info:"+ sessionId +","+serialNum+". Process Id:" + serverPid +". Instance Name:"+instanceName;
 				log.info("Database Producer "+connInfo);
 
-				if(reCreate)
-				{
-					node.setId(instId);
-					node.setService(serviceName);
-					node.setInstanceName(instanceName);
-					node.setUser(user);
-					node.updateHashCode();
-				}
+				node.setId(instId);
+				node.setService(serviceName);
+				node.setInstanceName(instanceName);
+				node.setUser(user);
+				node.updateHashCode();
+				
 				pingStmt = oConn.prepareStatement(PING_QUERY);
 				pingStmt.setQueryTimeout(1);
 				isAlive = true;
@@ -1383,7 +1358,7 @@ public final class AQKafkaProducer extends AQClient {
 		{
 			log.debug("Recreating TopicPublisher " + this.toString());
 			close();
-			boolean reCreateSucc = createPublishers(true);
+			boolean reCreateSucc = createPublishers();
 			if(!reCreateSucc) {
 				log.debug("Recreation failed");
 				return false;

@@ -30,7 +30,6 @@ import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.common.Node;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.AbstractConfig;
-import org.apache.kafka.common.errors.DisconnectException;
 import org.oracle.okafka.common.config.SslConfigs;
 import org.oracle.okafka.common.errors.ConnectionException;
 import org.oracle.okafka.common.errors.RecordNotFoundSQLException;
