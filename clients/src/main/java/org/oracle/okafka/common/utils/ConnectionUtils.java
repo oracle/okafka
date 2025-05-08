@@ -290,8 +290,6 @@ public class ConnectionUtils {
 		CallableStatement stmt = null;
 		try {
 			stmt = con.prepareCall(qry);
-			System.out.println(okafkaOffset.subPartitionId());
-			System.out.println(okafkaOffset.partitionId());
 			stmt.setString(1, topicName);
 			stmt.setLong(2, okafkaOffset.partitionId());
 			stmt.setLong(3, okafkaOffset.subPartitionId());
