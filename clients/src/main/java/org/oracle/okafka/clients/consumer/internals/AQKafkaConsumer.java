@@ -502,10 +502,11 @@ public final class AQKafkaConsumer extends AQClient{
 					}
 
 				} catch(Exception e) {
-					if(e instanceof SQLException && ((SQLException) e).getErrorCode()==6550) {
-						log.error("Not all privileges granted to the database user.",
-								e.getMessage());
-						log.info("Please grant all the documented privileges to database user.");
+					if (e instanceof SQLException && ((SQLException) e).getErrorCode() == 6550) {
+						log.error("Not all privileges granted to the database user.", e.getMessage());
+						
+						log.info("Check Oracle Documentation for Kafka Java Client Interface for Oracle Transactional"
+								+ " Event Queues to get the complete list of privileges required for the database user.");
 					}
 					for(Map.Entry<TopicPartition, Long> offsets : offsetResetTimestampOfTopic.getValue().entrySet()) {
 						responses.put(offsets.getKey(), e);

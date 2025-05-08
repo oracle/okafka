@@ -11,11 +11,13 @@ import java.io.File;
 import java.io.FileReader;
 import java.net.InetSocketAddress;
 import java.nio.ByteOrder;
+import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -33,6 +35,7 @@ import org.apache.kafka.common.config.AbstractConfig;
 import org.oracle.okafka.common.config.SslConfigs;
 import org.oracle.okafka.common.errors.ConnectionException;
 import org.oracle.okafka.common.errors.RecordNotFoundSQLException;
+import org.oracle.okafka.common.utils.MessageIdConverter.OKafkaOffset;
 import org.slf4j.Logger;
 
 import oracle.jdbc.driver.OracleConnection;
@@ -255,42 +258,62 @@ public class ConnectionUtils {
 	
 	public static boolean checkIfMsgIdExist(Connection con,String topicName, String msgId , Logger log)
 	{
-		boolean msgIdExists = false;
-		
 		if(topicName == null || msgId == null)
 			return false;
 		
-		String qry =" Select count(*) from " +ConnectionUtils.enquote(topicName) + " where msgid = '" + msgId+"'";
+		boolean msgIdExists = false;
+		OKafkaOffset okafkaOffset = MessageIdConverter.getOKafkaOffset("ID:"+msgId,true, true); 
+		
+		String qry = 
+				"DECLARE " +
+				"    queue_name VARCHAR2(128) := ?; " +
+				"    shard_num NUMBER := ?; " +
+				"    subshard_num NUMBER := ?; " +
+				"	 msg_id VARCHAR2(128) := ?; " +
+				"    partition_name VARCHAR2(50); " +
+				" 	 msgCount NUMBER; " +
+				"BEGIN " +
+				"    SELECT LOWER(PARTNAME) INTO partition_name " +
+				"    FROM USER_QUEUE_PARTITION_MAP " +
+				"    WHERE QUEUE_TABLE = queue_name AND SHARD = shard_num AND SUBSHARD = subshard_num; " +
+				"    EXECUTE IMMEDIATE " +
+				"        'SELECT COUNT(*) " +
+				"         FROM ' || DBMS_ASSERT.SQL_OBJECT_NAME(queue_name) || ' PARTITION (' || partition_name || ') " +
+				"	 	  WHERE MSGID = ''' || msg_id || ''' ' " +
+				"    INTO msgCount; " +
+				"    ? := msgCount; " +
+				"EXCEPTION " +
+				"    WHEN OTHERS THEN " +
+				"        RAISE; " +
+				"END;";
+		
 		log.debug("Executing " + qry);
-		ResultSet rs = null;
-		try (Statement stmt = con.prepareCall(qry);) {
-			stmt.execute(qry);
-			rs = stmt.getResultSet();
-			if(rs.next())
-			{
-				int msgCnt = rs.getInt(1);
+		CallableStatement stmt = null;
+		try {
+			stmt = con.prepareCall(qry);
+			System.out.println(okafkaOffset.subPartitionId());
+			System.out.println(okafkaOffset.partitionId());
+			stmt.setString(1, topicName);
+			stmt.setLong(2, okafkaOffset.partitionId());
+			stmt.setLong(3, okafkaOffset.subPartitionId());
+			stmt.setString(4, msgId);
+			stmt.registerOutParameter(5, Types.INTEGER);
 
-				if(msgCnt == 0)
-				{
-					msgIdExists = false;
-				}
-				else
-					msgIdExists = true;
-			}
-			else {
-				msgIdExists = false;
-			}
-			rs.close();
-			rs = null;
+			stmt.execute();
+
+			int msgCnt = stmt.getInt(5);
+
+			if (msgCnt != 0)
+				msgIdExists = true;
 
 		}catch(Exception e)
 		{
 			log.info("Exception while checking if msgId Exists or not. " + e,e);
-			if(rs!=null)
-			{
-				try { 
-					rs.close();
-				}catch(Exception ignoreE) {}
+			try {
+				if (stmt != null)
+					stmt.close();
+			} catch (Exception ex) {
+				// do nothing
 			}
 		}
 		log.debug("Message Id "+  msgId +" Exists?: " + msgIdExists);

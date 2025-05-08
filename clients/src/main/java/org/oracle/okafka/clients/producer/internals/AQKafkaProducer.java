@@ -9,11 +9,13 @@ package org.oracle.okafka.clients.producer.internals;
 
 
 import java.nio.ByteBuffer;
+import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -384,7 +386,8 @@ public final class AQKafkaProducer extends AQClient {
 
 			produceResult = new ProduceRequestResult(tp);
 
-			produceResult.set(thisOffset.subPartitionId(), (publishException==null)?byteMessage.getJMSTimestamp():-1, 
+			produceResult.set(thisOffset.subPartitionId() * MessageIdConverter.DEFAULT_SUBPARTITION_SIZE,
+					(publishException == null) ? byteMessage.getJMSTimestamp() : -1,
 					Collections.singletonList(thisOffset), publishException);
 
 			frm = new FutureRecordMetadata(produceResult, 0, System.currentTimeMillis(),
@@ -507,7 +510,7 @@ public final class AQKafkaProducer extends AQClient {
 								log.debug("Duplicate Check for parition " + topicPartition + "for msgId  " + checkMsgId);
 							}
 
-							boolean msgIdExist = checkIfMsgIdExist(dbConn, topicPartition.topic(), checkMsgId);
+							boolean msgIdExist = ConnectionUtils.checkIfMsgIdExist(dbConn, topicPartition.topic(), checkMsgId, log);
 							if(msgIdExist)
 							{
 								log.info("Message Id " +checkMsgId +" exists for topic partition "+ topicPartition+". Records were succesfully produced.");
@@ -652,7 +655,7 @@ public final class AQKafkaProducer extends AQClient {
 								java.sql.Connection conn = ((AQjmsSession)nodePublishers.sess).getDBConnection();
 								String jmsMsgId = msgs[0].getJMSMessageID();
 								String msgId = jmsMsgId != null ? jmsMsgId.substring(3) : null;
-								boolean msgIdExists = checkIfMsgIdExist(conn, topicPartition.topic(), msgId);
+								boolean msgIdExists = ConnectionUtils.checkIfMsgIdExist(conn, topicPartition.topic(), msgId, log);
 								checkForCommit = false;
 								if(msgIdExists) {
 									//successfully produced the message
@@ -723,49 +726,6 @@ public final class AQKafkaProducer extends AQClient {
 		}
 
 	}
-
-	private boolean checkIfMsgIdExist(Connection con,String topicName, String msgId)
-	{	
-		if(msgId == null)
-			return false;
-		boolean msgIdExists = false;
-		String qry =" Select count(*) from " +ConnectionUtils.enquote(topicName) + " where msgid = '" + msgId+"'";
-		log.debug("Executing " + qry);
-		ResultSet rs = null;
-		try (Statement stmt = con.prepareCall(qry);) {
-			stmt.execute(qry);
-			rs = stmt.getResultSet();
-			if(rs.next())
-			{
-				int msgCnt = rs.getInt(1);
-
-				if(msgCnt == 0)
-				{
-					msgIdExists = false;
-				}
-				else
-					msgIdExists = true;
-			}
-			else {
-				msgIdExists = false;
-			}
-			rs.close();
-			rs = null;
-
-		}catch(Exception e)
-		{
-			log.info("Exception while checking if msgId Exists or not. " + e,e);
-			if(rs!=null)
-			{
-				try { 
-					rs.close();
-				}catch(Exception ignoreE) {}
-			}
-		}
-		log.debug("Message Id "+  msgId +" Exists?: " + msgIdExists);
-		return msgIdExists;
-	}
-
 
 	private ClientResponse createClientResponse(ClientRequest request, TopicPartition topicPartition, ProduceResponse.PartitionResponse partitionResponse, boolean disconnected) {
 		return  new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 

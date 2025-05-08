@@ -391,10 +391,13 @@ public class NetworkClient implements KafkaClient {
 			{
 				node = (org.oracle.okafka.common.Node)metadata.getNodeById(Integer.parseInt(clientRequest.destination()));
 				/*
-				 * During Initial metadata fetch metadata.getNodeByid(nodeId) will give null as
-				 * Map nodeById in Cluster of metadata have Node stored with the bootstrap id's
-				 * hash but after after initial connection the node id would have been updated
-				 * which will not in the nodeById map.
+				 * When Bootstrap cluster is created, it does not contain much information about
+				 * the node. For Bootstrap node, the id remains 0. After connecting to the
+				 * bootstrap node, its id and name and other details are populated. Metadata
+				 * contains the HashMap of the Node. HashMap containing the node as key may not
+				 * reflect the correct Hash value of the Key on some cases and the Node returned
+				 * can be null. We handle such cases by manually traversing the HashMap to look
+				 * for the correct node with id.
 				 */
 				if (node == null) {
 					List<org.apache.kafka.common.Node> nodeList = metadata.fetch().nodes();
