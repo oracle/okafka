@@ -111,19 +111,16 @@ public class MessageIdConverter {
 			
 			int relOffset = (int)getOffset(msgId.substring(31, 35), endianIndex);
 
-			long baseOffset = -1;
+			long subPartId = -1;
 			if(getSubPartId)
-			{
-				baseOffset = getOffset(msgId.substring(3, 19), endianIndex);
-				baseOffset = baseOffset * DEFAULT_SUBPARTITION_SIZE;
-			}
+				subPartId = getOffset(msgId.substring(3, 19), endianIndex);
 			
 			long partId = -1;
 			if (getPartId)
 			{
 				partId = getOffset(msgId.substring(19,27), endianIndex);
 			}
-			OKafkaOffset okOffset = new OKafkaOffset(partId, baseOffset, relOffset, endianIndex, msgId);
+			OKafkaOffset okOffset = new OKafkaOffset(partId, subPartId, relOffset, endianIndex, msgId);
 			return okOffset;
 		} catch(RuntimeException e) {
 			throw e;
@@ -322,7 +319,7 @@ public class MessageIdConverter {
 		}
 		public long getOffset()
 		{
-			return (subPartitionId + sequenceNo);
+			return (subPartitionId*DEFAULT_SUBPARTITION_SIZE + sequenceNo);
 		}
 		
 	}

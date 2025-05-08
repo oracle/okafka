@@ -552,6 +552,8 @@ public final class RecordAccumulator {
     private List<ProducerBatch> drainBatchesForOneNode(Cluster cluster, Node node, int maxSize, long now) {
         int size = 0;
         List<PartitionInfo> parts = cluster.partitionsForNode(node.id());
+        if(parts.isEmpty())
+        	return new ArrayList<>();
         List<ProducerBatch> ready = new ArrayList<>();
         /* to make starvation less likely this loop doesn't start at 0 */
         int start = drainIndex = drainIndex % parts.size();

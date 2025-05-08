@@ -139,7 +139,7 @@ public final class FutureRecordMetadata implements Future<RecordMetadata> {
 					OKafkaOffset okOffset = this.result.msgIds().get((int) relativeOffset);
 					// OKafkaOffset okOffset = MessageIdConverter.getOKafkaOffset(msgId, true,
 					// true);
-					baseOffset = okOffset.subPartitionId();
+					baseOffset = okOffset.subPartitionId()*MessageIdConverter.DEFAULT_SUBPARTITION_SIZE;
 					relOffset = okOffset.sequenceNo();
 				}
 			} catch (RuntimeException exception) {

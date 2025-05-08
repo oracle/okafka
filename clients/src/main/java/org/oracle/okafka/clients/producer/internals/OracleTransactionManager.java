@@ -89,6 +89,11 @@ public class OracleTransactionManager {
 			conn.rollback();
 		}catch(Exception e) {
 			log.error(clientTransactionId +": Exception during rollback of transaction." + e, e);
+			if(conn.isClosed())
+			{
+				String excpMsg = "Exception while aborting kafka transaction. Database connection found closed. Exception:" +e.getMessage();				
+				throw new DisconnectException(excpMsg, e);
+			}
 			throw e;
 		}finally {
 			clientTransactionId = null;
@@ -138,11 +143,16 @@ public class OracleTransactionManager {
 				
 			}catch(Exception exeException)
 			{
+				if(conn.isClosed())
+					throw new DisconnectException(exeException.getMessage(),exeException.getCause());
 				throw exeException;
 			}
 			rException  = ((FutureRecordMetadata)frm).error();
-			if(rException != null)
+			if(rException != null) {
+				if(conn.isClosed())
+					throw new DisconnectException(rException.getMessage(), rException.getCause());
 				throw rException;
+			}
 		}
 		
 		try {

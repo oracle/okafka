@@ -390,10 +390,29 @@ public class NetworkClient implements KafkaClient {
 			if (metadata != null)
 			{
 				node = (org.oracle.okafka.common.Node)metadata.getNodeById(Integer.parseInt(clientRequest.destination()));
+				/*
+				 * When Bootstrap cluster is created, it does not contain much information about
+				 * the node. For Bootstrap node, the id remains 0. After connecting to the
+				 * bootstrap node, its id and name and other details are populated. Metadata
+				 * contains the HashMap of the Node. HashMap containing the node as key may not
+				 * reflect the correct Hash value of the Key on some cases and the Node returned
+				 * can be null. We handle such cases by manually traversing the HashMap to look
+				 * for the correct node with id.
+				 */
+				if (node == null) {
+					List<org.apache.kafka.common.Node> nodeList = metadata.fetch().nodes();
+					for (org.apache.kafka.common.Node nodeNow : nodeList) {
+						if (nodeNow.id() == Integer.parseInt(clientRequest.destination())) {
+							node = (org.oracle.okafka.common.Node) nodeNow;
+							break;
+						}
+					}
+				}
 			}
 			else if(metadataManager != null)
 			{
 				node = (org.oracle.okafka.common.Node)metadataManager.nodeById(Integer.parseInt(clientRequest.destination()));
+				
 			}
 
 			if (node !=null && !isInternalRequest) {
@@ -403,7 +422,7 @@ public class NetworkClient implements KafkaClient {
 				// will be slightly different for some internal requests (for
 				// example, ApiVersionsRequests can be sent prior to being in
 				// READY state.)
-				if (!canSendRequest(node, now)) {
+				if (!this.ready(node, now)) {
 					log.info("Attempt to send a request to node " + node + " which is not ready.");
 					throw new IllegalStateException("Attempt to send a request to node " + node + " which is not ready.");
 				}
@@ -536,12 +555,7 @@ public class NetworkClient implements KafkaClient {
 		try {
 			log.info("Initiating connection to node {}", node);
 			this.connectionStates.connecting(node, now);
-			Node copyNode = new Node(node);
 			aqClient.connect(node);
-			if (!node.equals(copyNode)) {
-				this.connectionStates.remove(copyNode);
-				this.connectionStates.connecting(node, now);
-			}
 			this.connectionStates.ready(node);
 			log.debug("Connection is established to node {}", node);
 		} catch (Exception e) {
