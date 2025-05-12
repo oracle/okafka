@@ -30,7 +30,6 @@
 package org.oracle.okafka.clients.consumer;
 
 import org.apache.kafka.clients.ClientDnsLookup;
-import org.apache.kafka.clients.CommonClientConfigs;
 import org.apache.kafka.common.IsolationLevel;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.common.config.ConfigDef;
@@ -42,6 +41,7 @@ import org.apache.kafka.common.metrics.Sensor;
 import org.apache.kafka.common.requests.JoinGroupRequest;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.oracle.okafka.common.config.SslConfigs;
+import org.oracle.okafka.clients.CommonClientConfigs;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -338,7 +338,7 @@ public class ConsumerConfig extends AbstractConfig {
             " broker allows for it using `auto.create.topics.enable` broker configuration. This configuration must" +
             " be set to `false` when using brokers older than 0.11.0";
     public static final boolean DEFAULT_ALLOW_AUTO_CREATE_TOPICS = true;
-
+    
     /**
      * <code>security.providers</code>
      */
@@ -348,7 +348,9 @@ public class ConsumerConfig extends AbstractConfig {
     private static final AtomicInteger CONSUMER_CLIENT_ID_SEQUENCE = new AtomicInteger(1);
      
     /** <code>oracle.consumer.lightweight</code> */
-    public static final String ORACLE_CONSUMER_LIGHTWEIGHT_CONFIG = "oracle.consumer.lightweight";
+    public static final String ORACLE_CONSUMER_LIGHTWEIGHT = "oracle.consumer.lightweight";
+    public static final String ORACLE_CONSUMER_LIGHTWEIGHT_DOC = "Creates a light weight subscriber";
+    
     
     static {
         CONFIG = new ConfigDef().define(BOOTSTRAP_SERVERS_CONFIG,
@@ -609,7 +611,13 @@ public class ConsumerConfig extends AbstractConfig {
                                 .define(org.oracle.okafka.clients.CommonClientConfigs.ORACLE_NET_TNS_ADMIN, 
                                 		ConfigDef.Type.STRING, 
                                 		Importance.MEDIUM, 
-                                		org.oracle.okafka.clients.CommonClientConfigs.ORACLE_NET_TNS_ADMIN_DOC);
+                                		org.oracle.okafka.clients.CommonClientConfigs.ORACLE_NET_TNS_ADMIN_DOC)
+                                .define(CommonClientConfigs.ORACLE_CONSUMER_LIGHTWEIGHT, 
+                						ConfigDef.Type.BOOLEAN,
+                						false,
+                						Importance.LOW, 
+                						CommonClientConfigs.ORACLE_CONSUMER_LIGHTWEIGHT_DOC)
+                                ;
 
     }
 

@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.jms.JMSException;
 import javax.jms.Message;
@@ -106,6 +107,15 @@ public final class AQKafkaConsumer extends AQClient{
 
 	private boolean skipConnectMe = false;
 	private boolean externalConn = false;
+	
+	private static final String LTWT_COMMIT_SYNC = "{call dbms_teqk.AQ$_COMMITSYNC(?, ?, ?, ?, ?, ?, ?)}";
+	private static final String LTWT_COMMIT_SYNC_ALL = "{call dbms_teqk.AQ$_COMMITSYNC_ALL(?, ?, ?, ?, ?, ?, ?)}";
+	private static final String LTWT_SEEK = "{call dbms_teqk.AQ$_SEEK(?, ?, ?, ?, ?, ?, ?)}";
+	private static final String LTWT_SEEK_TO_BEGINNING = "{call dbms_teqk.AQ$_SEEKTOBEGINNING(?, ?, ?, ?, ?)}";
+	private static final String LTWT_SEEK_TO_END = "{call dbms_teqk.AQ$_SEEKTOEND(?, ?, ?, ?, ?)}";
+	private static final String LTWT_SUB = "{call sys.dbms_aqadm.add_ltwt_subscriber(?, sys.aq$_agent(?,null,null))}";
+	
+	private final Map<Node, Map<String, CallableStatement>> callableCacheMap = new ConcurrentHashMap<>();
 
 	public AQKafkaConsumer(LogContext logContext, ConsumerConfig configs, Time time, Metadata metadata,Metrics metrics)
 
@@ -125,6 +135,36 @@ public final class AQKafkaConsumer extends AQClient{
 	{
 		assignors = _assignores;
 	}
+	
+	private CallableStatement getOrCreateCallable(Node node, String key, String sql)  {
+		Map<String, CallableStatement> nodeMap = callableCacheMap.computeIfAbsent(node, n -> new ConcurrentHashMap<>());
+		return nodeMap.computeIfAbsent(key, k -> {
+			try {
+				Connection con = getConnection(node);
+				return con.prepareCall(sql);
+			} catch (SQLException | JMSException e) {
+				throw new RuntimeException("Failed to prepare statement for " + key, e);
+			}
+		});
+	}
+
+	public void closeCallableStmt(Node node) {
+		Map<String, CallableStatement> stmts = callableCacheMap.remove(node);
+		if (stmts != null) {
+			for (CallableStatement stmt : stmts.values()) {
+				try { stmt.close(); } catch (Exception e) {}
+			}
+		}
+	}
+
+	private String getCurrentUser(Node node) throws SQLException, JMSException {
+		Connection con = ((AQjmsSession) topicConsumersMap.get(node).getSession()).getDBConnection();
+		return con.getMetaData().getUserName();
+	}
+
+	private Connection getConnection(Node node) throws SQLException, JMSException {
+		return ((AQjmsSession) topicConsumersMap.get(node).getSession()).getDBConnection();
+	}
 
 	public ClientResponse send(ClientRequest request) {
 		this.selectorMetrics.requestCompletedSend(request.destination());
@@ -134,7 +174,7 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 		return cr;
 	}
-
+	
 	/**
 	 * Determines the type of request and calls appropriate method for handling request
 	 * @param request request to be sent
@@ -280,9 +320,9 @@ public final class AQKafkaConsumer extends AQClient{
 				String topic = node.getValue().get(0).topic();
 				TopicConsumers consumers = topicConsumersMap.get(node.getKey());
 				try {
-					String ltwtSub = configs.getString(ConsumerConfig.ORACLE_CONSUMER_LIGHTWEIGHT_CONFIG);
+					Boolean ltwtSub = configs.getBoolean(ConsumerConfig.ORACLE_CONSUMER_LIGHTWEIGHT);
 
-					if(!ltwtSub.equals("true")) {
+					if(!ltwtSub.equals(true)) {
 						log.debug("Committing now for node " + node.toString());
 						TopicSession jmsSession =consumers.getSession();
 						if(jmsSession != null)
@@ -341,41 +381,12 @@ public final class AQKafkaConsumer extends AQClient{
 		commitSyncAll(node, topic, partitions, priorities, subshards, sequences);
 	}
 
-	public void createLightWeightSub(String topic, Node node) throws SQLException { 
-
-		CallableStatement cStmt = null;
-		try {		 
-			Connection con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
-			cStmt = con.prepareCall("{call sys.dbms_aqadm.add_ltwt_subscriber(?, sys.aq$_agent(?,null,null))}");
-			cStmt.setString(1, ConnectionUtils.enquote(topic));
-			cStmt.setString(2, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
-			cStmt.execute();
-			log.debug("Lightweight subscriber created for topic: " + topic + ", node: " + node);
-		} 
-
-		catch(Exception ex) { 
-			log.error("Error creating lightweight subscriber for topic: " + topic + ", node: " + node, ex);
-			throw new SQLException("Failed to create lightweight subscriber", ex);
-		}
-		finally {
-			try { 
-				if(cStmt != null)
-					cStmt.close();
-			} catch(Exception e) {
-				//do nothing
-			}
-		}
-	}
-
 	public void CommitSync(Node node, String topic, int partition_id, int priority, 
 			long subshard_id, long seq_num ) {
 
-		CallableStatement cStmt = null;
-		try {		 
-
-			Connection con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
-			String user = con.getMetaData().getUserName();
-			cStmt = con.prepareCall("{call dbms_teqk.AQ$_COMMITSYNC(?, ?, ?, ?, ?, ?, ?)}");
+		try {
+			String user = getCurrentUser(node);
+			CallableStatement cStmt = getOrCreateCallable(node, "COMMIT_SYNC", LTWT_COMMIT_SYNC);
 			cStmt.setString(1, user);
 			cStmt.setString(2, topic);
 			cStmt.setString(3, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
@@ -384,41 +395,26 @@ public final class AQKafkaConsumer extends AQClient{
 			cStmt.setLong(6, subshard_id);
 			cStmt.setLong(7, seq_num);
 			cStmt.execute();
-			log.debug("CommitSync executed successfully for topic: {}, partition: {}, subshard: {}, seq: {}",
+			log.debug("Light weight CommitSync executed successfully for topic: {}, partition: {}, subshard: {}, seq: {}",
 					topic, partition_id, subshard_id, seq_num);
-		} 
-
-		catch(Exception ex) { 
-			log.error("Error during CommitSync for node: " + node + ", topic: " + topic, ex);
+		} catch(Exception ex) {
+			log.error("Error during light weight CommitSync for node: " + node + ", topic: " + topic, ex);
 		}
-		finally {
-			try { 
-				if(cStmt != null)
-					cStmt.close();
-			} catch(Exception e) {
-				//do nothing
-			}
-		}
-
 	}
 
 	public void commitSyncAll(Node node, String topic, int[] partition_id, int[] priority, 
 			long[] subshard_id, long[] seq_num ) {
 
-		CallableStatement cStmt = null;
-		try {		 
-
-			Connection con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
-
-			OracleConnection oracleCon = (OracleConnection) con;
-			String user = con.getMetaData().getUserName();
+		try {
+			OracleConnection oracleCon = (OracleConnection) getConnection(node);
+			String user = getCurrentUser(node);
 
 			Array partitionArray = oracleCon.createOracleArray("DBMS_TEQK.INPUT_ARRAY_T", partition_id);
 			Array priorityArray = oracleCon.createOracleArray("DBMS_TEQK.INPUT_ARRAY_T", priority);
 			Array subshardArray = oracleCon.createOracleArray("DBMS_TEQK.INPUT_ARRAY_T", subshard_id);
 			Array sequenceArray = oracleCon.createOracleArray("DBMS_TEQK.INPUT_ARRAY_T", seq_num);
 
-			cStmt = con.prepareCall("{call dbms_teqk.AQ$_COMMITSYNC_ALL(?, ?, ?, ?, ?, ?, ?)}");
+			CallableStatement cStmt = getOrCreateCallable(node, "COMMIT_SYNC_ALL", LTWT_COMMIT_SYNC_ALL);
 			cStmt.setString(1, user);
 			cStmt.setString(2, topic);
 			cStmt.setString(3, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
@@ -427,32 +423,18 @@ public final class AQKafkaConsumer extends AQClient{
 			cStmt.setArray(6, subshardArray);
 			cStmt.setArray(7, sequenceArray);
 			cStmt.execute();
-			log.debug("CommitSyncAll executed for topic: {}, partitions: {}", topic, partition_id.length);
-		} 
-
-		catch(Exception ex) { 
-			log.error("Error in commitSyncAll for topic: " + topic + ", node: " + node, ex);
+			log.debug("Light weight CommitSyncAll executed for topic: {}, partitions: {}", topic, partition_id.length);
+		} catch(Exception ex) {
+			log.error("Error in light weight commitSyncAll for topic: " + topic + ", node: " + node, ex);
 		}
-		finally {
-			try { 
-				if(cStmt != null)
-					cStmt.close();
-			} catch(Exception e) {
-				//do nothing
-			}
-		}
-
 	}
 
 	public void lightWeightSeek(Node node, String topic, int partition_id, int priority, 
 			long subshard_id, long seq_num ) {
 
-		CallableStatement cStmt = null;
-		
-		try {		 
-            Connection con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
-			String user = con.getMetaData().getUserName();
-			cStmt = con.prepareCall("{call dbms_teqk.AQ$_SEEK(?, ?, ?, ?, ?, ?, ?)}");
+		try {
+			String user = getCurrentUser(node);
+			CallableStatement cStmt = getOrCreateCallable(node, "SEEK", LTWT_SEEK);
 			cStmt.setString(1, user);
 			cStmt.setString(2, topic);
 			cStmt.setString(3, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
@@ -463,33 +445,19 @@ public final class AQKafkaConsumer extends AQClient{
 			cStmt.execute();
 			log.debug("Light weight seek executed successfully for topic: {}, partition: {}, subshard: {}, seq: {}",
 					topic, partition_id, subshard_id, seq_num);
-		} 
-
-		catch(Exception ex) { 
+		} catch(Exception ex) {
 			log.error("Error in lightWeightseek for topic: " + topic + ", node: " + node, ex);
 		}
-		finally {
-			try { 
-				if(cStmt != null)
-					cStmt.close();
-			} catch(Exception e) {
-				//do nothing
-			}
-		}
-
 	}
 
 	public void lightWeightSeektoBeginning(Node node, String topic, int[] partition_id, int[] priority) {
 
-		CallableStatement cStmt = null;
-		
-		try {		 
-            Connection con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
-            OracleConnection oracleCon = (OracleConnection) con;
-			String user = con.getMetaData().getUserName();
+		try {
+			OracleConnection oracleCon = (OracleConnection) getConnection(node);
+			String user = getCurrentUser(node);
 			Array partitionArray = oracleCon.createOracleArray("DBMS_TEQK.SEEK_INPUT_ARRAY_T", partition_id);
 			Array priorityArray = oracleCon.createOracleArray("DBMS_TEQK.SEEK_INPUT_ARRAY_T", priority);
-            cStmt = con.prepareCall("{call dbms_teqk.AQ$_SEEKTOBEGINNING(?, ?, ?, ?, ?)}");
+			CallableStatement cStmt = getOrCreateCallable(node, "SEEK_TO_BEGINNING", LTWT_SEEK_TO_BEGINNING);
 			cStmt.setString(1, user);
 			cStmt.setString(2, topic);
 			cStmt.setString(3, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
@@ -497,34 +465,20 @@ public final class AQKafkaConsumer extends AQClient{
 			cStmt.setArray(5, priorityArray);
 			cStmt.execute();
 			log.debug("lightWeightSeektoBeginning executed for topic: {}, partitions: {}", topic, partition_id.length);
-		} 
-
-		catch(Exception ex) { 
+		} catch(Exception ex) {
 			log.error("Error in lightWeightSeektoBeginning for topic: " + topic + ", node: " + node, ex);
 		}
-		finally {
-			try { 
-				if(cStmt != null)
-					cStmt.close();
-			} catch(Exception e) {
-				//do nothing
-			}
-		}
-
 	}
 
 	public void lightWeightSeektoEnd(Node node, String topic, int[] partition_id, int[] priority) {
 
-		CallableStatement cStmt = null;
-		
-		try {		 
-			Connection con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
-			OracleConnection oracleCon = (OracleConnection) con;
-			String user = con.getMetaData().getUserName();
+		try {
+			OracleConnection oracleCon = (OracleConnection) getConnection(node);
+			String user = getCurrentUser(node);
 			Array partitionArray = oracleCon.createOracleArray("DBMS_TEQK.SEEK_INPUT_ARRAY_T", partition_id);
 			Array priorityArray = oracleCon.createOracleArray("DBMS_TEQK.SEEK_INPUT_ARRAY_T", priority);
 
-			cStmt = con.prepareCall("{call dbms_teqk.AQ$_SEEKTOEND(?, ?, ?, ?, ?)}");
+			CallableStatement cStmt = getOrCreateCallable(node, "SEEK_TO_END", LTWT_SEEK_TO_END);
 			cStmt.setString(1, user);
 			cStmt.setString(2, topic);
 			cStmt.setString(3, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
@@ -532,21 +486,11 @@ public final class AQKafkaConsumer extends AQClient{
 			cStmt.setArray(5, priorityArray);
 			cStmt.execute();
 			log.debug("lightWeightSeektoEnd executed for topic: {}, partitions: {}", topic, partition_id.length);
-		} 
-
-		catch(Exception ex) { 
+		} catch(Exception ex) {
 			log.error("Error in lightWeightSeektoEnd for topic: " + topic + ", node: " + node, ex);
 		}
-		finally {
-			try { 
-				if(cStmt != null)
-					cStmt.close();
-			} catch(Exception e) {
-				//do nothing
-			}
-		}
-
 	}
+
 
 	private ClientResponse createCommitResponse(ClientRequest request, Map<Node, List<TopicPartition>> nodes,
 			Map<TopicPartition, OffsetAndMetadata> offsets, Map<Node, Exception> result, boolean error) {
@@ -1690,7 +1634,13 @@ public final class AQKafkaConsumer extends AQClient{
 				topicConsumersMap.put(node, new TopicConsumers(node));
 			}
 			TopicConsumers consumers = topicConsumersMap.get(node);	
-			consumers.getTopicSubscriber(topic);
+
+			if(consumers.getlightWeightSub()) {
+				consumers.createLightWeightSub(topic, node);
+			}
+			else {
+				consumers.getTopicSubscriber(topic);
+			}
 			metadata.setDBVersion(consumers.getDBVersion());			
 		} catch(JMSException exception) { 
 			log.error("Exception during Subscribe request " + exception, exception);
@@ -1804,10 +1754,12 @@ public final class AQKafkaConsumer extends AQClient{
 		private Map<String, TopicSubscriber> topicSubscribers = null;
 		private final Node node;
 		private String dbVersion;
+		private Boolean lightWeightSub;
 		public TopicConsumers(Node node) throws JMSException {
 			this(node, TopicSession.AUTO_ACKNOWLEDGE);
 		}
 		public TopicConsumers(Node node,int mode) throws JMSException {
+			
 			this.node = node;
 			conn = createTopicConnection(node);
 
@@ -1827,9 +1779,11 @@ public final class AQKafkaConsumer extends AQClient{
 
 					try {
 						this.dbVersion = ConnectionUtils.getDBVersion(oConn);
+						this.lightWeightSub = configs.getBoolean(ConsumerConfig.ORACLE_CONSUMER_LIGHTWEIGHT);
+							
 					}catch(Exception e)
 					{
-						log.error("Exception whle fetching DB Version " + e);
+						log.error("Exception whle fetching DB Version and lightweight consumer config" + e);
 					}
 
 				}catch(Exception e)
@@ -1893,6 +1847,19 @@ public final class AQKafkaConsumer extends AQClient{
 			topicSubscribers.put(topic, subscriber);
 			return subscriber;
 		}
+		
+		private void createLightWeightSub(String topic, Node node)  { 
+			try {		 
+				CallableStatement cStmt = getOrCreateCallable(node, "CREATE_LTWT_SUB", LTWT_SUB);
+				cStmt.setString(1, ConnectionUtils.enquote(topic));
+				cStmt.setString(2, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
+				cStmt.execute();
+				log.debug("Lightweight subscriber created for topic: " + topic + ", node: " + node);
+			} 
+			catch(Exception ex) { 
+				log.error("Error creating lightweight subscriber for topic: " + topic + ", node: " + node, ex);
+			}
+		}
 
 		private void refresh(Node node) throws JMSException {
 			conn = createTopicConnection(node);
@@ -1933,6 +1900,10 @@ public final class AQKafkaConsumer extends AQClient{
 		public String getDBVersion()
 		{
 			return dbVersion;
+		}
+		
+		public boolean getlightWeightSub() {
+			return lightWeightSub;
 		}
 
 	}
