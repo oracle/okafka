@@ -37,6 +37,7 @@ import org.apache.kafka.clients.ConnectionState;
 import org.apache.kafka.common.errors.AuthenticationException;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 /**
@@ -65,7 +66,7 @@ public final class ClusterConnectionStates {
      * @return true if we can initiate a new connection
      */
     public boolean canConnect(Node node, long now) {
-        NodeConnectionState state = nodeState.get(node);
+        NodeConnectionState state = getNodeState(node);
         if (state == null)
         {
             return true;
@@ -82,7 +83,7 @@ public final class ClusterConnectionStates {
      * @param now the current time in ms
      */
     public boolean isBlackedOut(Node node, long now) {
-        NodeConnectionState state = nodeState.get(node);
+        NodeConnectionState state = getNodeState(node);
         if (state == null)
             return false;
         else
@@ -106,7 +107,7 @@ public final class ClusterConnectionStates {
      * @param now the current time in ms
      */
     public long connectionDelay(Node node, long now) {
-        NodeConnectionState state = nodeState.get(node);
+        NodeConnectionState state = getNodeState(node);
         if (state == null) return 0;
         long timeWaited = now - state.lastConnectAttemptMs;
         if (state.state.isDisconnected()) {
@@ -123,7 +124,7 @@ public final class ClusterConnectionStates {
      */
     public void connecting(Node node, long now) {
         if (nodeState.containsKey(node)) {
-            NodeConnectionState nodestate = nodeState.get(node);
+            NodeConnectionState nodestate = getNodeState(node);
             nodestate.lastConnectAttemptMs = now;
             nodestate.state = ConnectionState.CONNECTING;
         } else {
@@ -138,7 +139,7 @@ public final class ClusterConnectionStates {
      * @param now the current time
      */
     public void disconnected(Node node, long now) {
-        NodeConnectionState nodeState = nodeState(node);
+    	NodeConnectionState nodeState = getNodeState(node);
         nodeState.state = ConnectionState.DISCONNECTED;
         nodeState.lastConnectAttemptMs = now;
         updateReconnectBackoff(nodeState);
@@ -159,7 +160,7 @@ public final class ClusterConnectionStates {
      * @param node the connection identifier
      */
     public void ready(Node node) {
-        NodeConnectionState nodeState = nodeState(node);
+        NodeConnectionState nodeState = getNodeState(node);
         nodeState.state = ConnectionState.READY;
         nodeState.authenticationException = null;
         resetReconnectBackoff(nodeState);
@@ -172,7 +173,7 @@ public final class ClusterConnectionStates {
      * @param exception the authentication exception
      */
     public void authenticationFailed(Node node, long now, AuthenticationException exception) {
-        NodeConnectionState nodeState = nodeState(node);
+        NodeConnectionState nodeState = getNodeState(node);
         nodeState.authenticationException = exception;
         nodeState.state = ConnectionState.AUTHENTICATION_FAILED;
         nodeState.lastConnectAttemptMs = now;
@@ -186,7 +187,7 @@ public final class ClusterConnectionStates {
      * @param now the current time
      */
     public boolean isReady(Node node, long now) {
-        return isReady(nodeState.get(node), now);
+        return isReady(getNodeState(node), now);
     }
 
     private boolean isReady(NodeConnectionState state, long now) {
@@ -212,7 +213,7 @@ public final class ClusterConnectionStates {
      * @param id The id of the node to check
      */
     public boolean isConnected(Node node) {
-        NodeConnectionState state = nodeState.get(node);
+        NodeConnectionState state = getNodeState(node);
         return state != null && state.state.isConnected();
     }
 
@@ -221,7 +222,7 @@ public final class ClusterConnectionStates {
      * @param node the node to check
      */
     public boolean isDisconnected(Node node) {
-        NodeConnectionState state = nodeState.get(node);
+        NodeConnectionState state = getNodeState(node);
         return state != null && state.state.isDisconnected();
     }
 
@@ -230,7 +231,7 @@ public final class ClusterConnectionStates {
      * @param node the node to check
      */
     public AuthenticationException authenticationException(Node node) {
-        NodeConnectionState state = nodeState.get(node);
+        NodeConnectionState state = getNodeState(node);
         return state != null ? state.authenticationException : null;
     }
 
@@ -281,18 +282,32 @@ public final class ClusterConnectionStates {
      * @return the state of our connection
      */
     public ConnectionState connectionState(Node node) {
-        return nodeState(node).state;
+        return getNodeState(node).state;
     }
-
+ 
     /**
      * Get the state of a given node.
      * @param node the connection to fetch the state for
      */
-    private NodeConnectionState nodeState(Node node) {
-        NodeConnectionState state = this.nodeState.get(node);
-        if (state == null)
-            throw new IllegalStateException("No entry found for connection " + node);
-        return state;
+    private NodeConnectionState getNodeState(Node node) {
+    	NodeConnectionState state = this.nodeState.get(node);
+		/*
+		 * If bootstrap node got updated after connection then nodeState map have the
+		 * node with the old hashCode so there will be no entry in the Map nodeState
+		 */
+    	if(state == null) {
+    		Iterator<Map.Entry<Node, NodeConnectionState>> iterator = nodeState.entrySet().iterator();
+    		while (iterator.hasNext()) {
+    		    Map.Entry<Node, NodeConnectionState> entry = iterator.next();
+    		    if (entry.getKey().equals(node)) {
+    		    	state = entry.getValue();
+    		        iterator.remove(); 
+    		    	nodeState.put(node, state);
+    		        break; 
+    		    }
+    		}
+    	}
+    	return state;
     }
 
     /**
