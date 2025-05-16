@@ -261,7 +261,10 @@ public class ConnectionUtils {
 			return false;
 		
 		boolean msgIdExists = false;
-		OKafkaOffset okafkaOffset = MessageIdConverter.getOKafkaOffset("ID:"+msgId,true, true); 
+		if(!msgId.startsWith("ID:"))
+			msgId = "ID:" + msgId;
+			
+		OKafkaOffset okafkaOffset = MessageIdConverter.getOKafkaOffset(msgId,true, true); 
 		
 		String qry = 
 				"DECLARE " +
