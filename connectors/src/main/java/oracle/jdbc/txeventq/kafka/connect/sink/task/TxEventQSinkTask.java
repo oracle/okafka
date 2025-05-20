@@ -109,6 +109,7 @@ public class TxEventQSinkTask extends SinkTask {
             return;
         }
 
+        log.debug("Number of records sent to put call: {}", records.size());
         producer.put(records);
 
         log.trace("[{}]:[{}]  Exit {}.put", Thread.currentThread().getId(),
@@ -150,6 +151,8 @@ public class TxEventQSinkTask extends SinkTask {
         // Returning an empty set of offsets since the connector is going to handle all
         // offsets in the external system.
         currentOffsets.clear();
+        log.trace("[{}]:[{}] Exit {}.preCommit", Thread.currentThread().getId(),
+                this.producer.getDatabaseConnection(), this.getClass().getName());
         return currentOffsets;
     }
 
@@ -164,12 +167,14 @@ public class TxEventQSinkTask extends SinkTask {
      */
     @Override
     public void open(Collection<TopicPartition> partitions) {
-        log.trace("[{}]:[{}] Entry {}.open", Thread.currentThread().getId(),
+        log.info("[{}]:[{}] Entry {}.open", Thread.currentThread().getId(),
                 this.producer.getDatabaseConnection(), this.getClass().getName());
 
         HashMap<TopicPartition, Long> offsetMapNew = new HashMap<>();
         for (TopicPartition tp : partitions) // for each partition assigned
         {
+            log.info("Partition assigned to task: [{}]", tp.partition());
+
             Long offset = this.producer.getOffsetInDatabase(tp.topic(),
                     this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME),
                     this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_SCHEMA),
@@ -178,7 +183,7 @@ public class TxEventQSinkTask extends SinkTask {
         }
         this.context.offset(offsetMapNew);
 
-        log.trace("[{}]:[{}] Exit {}.open", Thread.currentThread().getId(),
+        log.info("[{}]:[{}] Exit {}.open", Thread.currentThread().getId(),
                 this.producer.getDatabaseConnection(), this.getClass().getName());
     }
 }

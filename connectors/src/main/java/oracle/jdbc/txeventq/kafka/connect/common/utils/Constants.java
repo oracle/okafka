@@ -74,4 +74,24 @@ public final class Constants {
     // Database not open
     public static final int ORA_01109 = 1109;
 
+    // Closed statement
+    public static final int ORA_17009 = 17009;
+
+    // Got minus one from a read call
+    public static final int ORA_17800 = 17800;
+
+    // Timeout occurred while waiting for lock to flush object string data object string
+    public static final int ORA_62187 = 62187;
+
+    // Invalid credential or not authorized; logon denied
+    public static final int ORA_01017 = 1017;
+
+    // Interrupted IO error.: Socket read interrupted
+    public static final int ORA_18730 = 18730;
+
+    // Database connection closed by peer
+    public static final int ORA_03113 = 3113;
+
+    // Cannot connect to database. Instance ...
+    public static final int ORA_12521 = 12521;
 }

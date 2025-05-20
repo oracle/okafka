@@ -6,7 +6,7 @@
 
     <groupId>com.oracle.database.messaging</groupId>
     <artifactId>txeventq-connector</artifactId>
-    <version>23.4.0.24.06</version>
+    <version>23.8.0.25.06</version>
 
     <packaging>jar</packaging>
 
@@ -47,11 +47,11 @@
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <java.version>11</java.version>
         <logback.version>1.4.14</logback.version>
-        <oracle-db-messaging.version>23.2.0.0</oracle-db-messaging.version>
-        <oracle-jdbc.version>23.2.0.0</oracle-jdbc.version>
-        <oracle.database.security.version>21.9.0.0</oracle.database.security.version>
+        <oracle-db-messaging.version>23.7.0.0</oracle-db-messaging.version>
+        <oracle-jdbc.version>23.8.0.25.04</oracle-jdbc.version>
+        <oracle.database.security.version>21.17.0.0</oracle.database.security.version>
         <jms.version>2.0.1</jms.version>
-        <kafka.version>3.6.1</kafka.version>
+        <kafka.version>3.9.0</kafka.version>
     </properties>
 
     <dependencies>
@@ -77,7 +77,7 @@
         <dependency>
             <groupId>com.oracle.database.security</groupId>
             <artifactId>oraclepki</artifactId>
-            <version>${oracle.database.security.version}</version>
+            <version>23.8.0.25.04</version>
         </dependency>
         <dependency>
             <groupId>com.oracle.database.security</groupId>
@@ -111,7 +111,7 @@
             <extension>
                 <groupId>kr.motd.maven</groupId>
                 <artifactId>os-maven-plugin</artifactId>
-                <version>1.6.2</version>
+                <version>1.7.1</version>
             </extension>
         </extensions>
         <pluginManagement>
@@ -119,17 +119,17 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-jar-plugin</artifactId>
-                    <version>3.2.2</version>
+                    <version>3.4.2</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-dependency-plugin</artifactId>
-                    <version>3.3.0</version>
+                    <version>3.8.1</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-assembly-plugin</artifactId>
-                    <version>3.4.2</version>
+                    <version>3.7.1</version>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -179,7 +179,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>3.3.2</version>
+                <version>3.11.2</version>
                 <configuration>
                     <bottom>
                         <![CDATA[Copyright © 2023, Oracle and/or its affiliates. All rights reserved.]]>
@@ -189,7 +189,7 @@
             </plugin>
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.22.0</version>
+                <version>3.5.2</version>
             </plugin>
         </plugins>
     </build>

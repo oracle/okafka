@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -52,20 +53,27 @@ public class TxEventQSourceTask extends SourceTask {
 
     private int tasksMax;
 
+    // The number of times a new poll was blocked because the current batch
+    // is not yet complete. (A batch is complete once all messages have
+    // been delivered to Kafka, as confirmed by callbacks to #commitRecord).
+    private int counterForBlockedPolls = 0;
+
+    // The maximum number of times the SourceTask will tolerate new polls
+    // being blocked before reporting an error to the Connect framework.
+    private final static int MAX_BLOCKED_POLLS_COUNTER = 50;
+
     // Used to indicate when a batch has completed.
     private CountDownLatch batchCompleteIndicator = null;
 
     // This will be incremented each time poll() is called
     private AtomicInteger pollRotation = new AtomicInteger(1);
 
-    // The value of the pollRotation the last time commit() was called
-    private int lastCommitPollRotation = 0;
-
     // Indicates whether stop has been requested.
     private AtomicBoolean stopNow = new AtomicBoolean();
 
     private TxEventQConnectorConfig config;
     private TxEventQConsumer consumer = null;
+    private int getSourceMaxPollBlockedTimeMs;
 
     @Override
     public String version() {
@@ -79,7 +87,7 @@ public class TxEventQSourceTask extends SourceTask {
      */
     @Override
     public void start(Map<String, String> properties) {
-        log.trace("[{}] Entry {}.start, props={}", Thread.currentThread().getId(),
+        log.trace("[{}]:[{}] Entry {}.start, props={}", Thread.currentThread().getId(), this,
                 this.getClass().getName(), properties);
 
         // Loading Task Configuration
@@ -88,11 +96,14 @@ public class TxEventQSourceTask extends SourceTask {
 
         this.connectorName = this.config.name();
 
-        this.batchSize = this.config.getInt(TxEventQConnectorConfig.TASK_BATCH_SIZE_CONFIG);
+        this.batchSize = this.config.getInt(TxEventQConnectorConfig.TXEVENTQ_BATCH_SIZE_CONFIG);
         log.debug("The batch size is: {}", this.batchSize);
 
         this.tasksMax = this.config.getInt(TxEventQConnectorConfig.TASK_MAX_CONFIG);
         log.debug("The tasks.max is: {}", this.tasksMax);
+
+        this.getSourceMaxPollBlockedTimeMs = this.config
+                .getInt(TxEventQConnectorConfig.SOURCE_MAX_POLL_BLOCKED_TIME_MS_CONFIG);
 
         this.consumer.connect();
 
@@ -101,7 +112,9 @@ public class TxEventQSourceTask extends SourceTask {
         int txEventQShardNum = this.consumer.getNumOfShardsForQueue(
                 this.config.getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME));
 
-        if (kafkaPartitionNum < txEventQShardNum) {
+        if (this.config
+                .getBoolean(TxEventQConnectorConfig.TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_CONFIG)
+                && kafkaPartitionNum < txEventQShardNum) {
             throw new ConnectException("The number of Kafka partitions " + kafkaPartitionNum
                     + " must be greater than or equal to " + txEventQShardNum);
         }
@@ -122,8 +135,8 @@ public class TxEventQSourceTask extends SourceTask {
      */
     @Override
     public List<SourceRecord> poll() throws InterruptedException {
-        log.trace("[{}]:[{}] Entry {}.poll", Thread.currentThread().getId(),
-                this.consumer.getDatabaseConnection(), this.getClass().getName());
+        log.trace("[{}]:[{}]:[{}] Entry {}.poll", Thread.currentThread().getId(),
+                this.consumer.getDatabaseConnection(), this, this.getClass().getName());
 
         List<SourceRecord> records = new ArrayList<>();
 
@@ -134,13 +147,29 @@ public class TxEventQSourceTask extends SourceTask {
          * it.
          */
         if (batchCompleteIndicator != null) {
-            log.debug("[{}][{}] Awaiting batch completion signal", Thread.currentThread().getId(),
-                    this.consumer.getDatabaseConnection());
-            batchCompleteIndicator.await();
+            if (waitForBatchCompleteInKafka()) {
+                counterForBlockedPolls = 0;
+            } else {
+                // The poll will not continue because the prior batch has not been sent to
+                // Kafka completely yet.
+                counterForBlockedPolls += 1;
 
-            log.debug("[{}]:[{}] Committing records", Thread.currentThread().getId(),
-                    this.consumer.getDatabaseConnection());
-            this.consumer.commit();
+                if (counterForBlockedPolls > MAX_BLOCKED_POLLS_COUNTER) {
+                    // The number of blocked polls waiting for the commits to Kafka has exceeded
+                    // the limit. We need to rollback and report that the task cannot proceed.
+                    // The rollback will be initiated during the {@link #stop()}.
+                    throw new ConnectException(
+                            "Kafka did not commit all the messages in the batch.");
+                } else {
+                    log.debug("Poll cycle is being skipped until previous batch completes.");
+                    log.trace(
+                            "[{}]:[{}]  Exit {}.poll Poll cycle is being skipped until previous batch completes.",
+                            Thread.currentThread().getId(), this.consumer.getDatabaseConnection(),
+                            this.getClass().getName(), recordCount(records), messageCount);
+                    return null;
+                }
+            }
+
         }
 
         /**
@@ -198,6 +227,42 @@ public class TxEventQSourceTask extends SourceTask {
     }
 
     /**
+     * Checks if the count down latch that is keeping track of the number of messages returned in
+     * the poll call has been committed by Kafka. If the count down latch has reached 0 a database
+     * commit will be called.
+     * 
+     * @return true if the count down latch reached zero and false if the waiting time elapsed
+     *         before the count down latch reached zero
+     * @throws InterruptedException
+     */
+    private boolean waitForBatchCompleteInKafka() throws InterruptedException {
+        log.trace("[{}]:[{}]:[{}] Entry {}.waitForBatchCompleteInKafka",
+                Thread.currentThread().getId(), this.consumer.getDatabaseConnection(), this,
+                this.getClass().getName());
+
+        log.debug("[{}][{}] Waiting for batch completion signal", Thread.currentThread().getId(),
+                this.consumer.getDatabaseConnection());
+
+        final boolean batchIsCompleteInKafka = batchCompleteIndicator
+                .await(this.getSourceMaxPollBlockedTimeMs, TimeUnit.MILLISECONDS);
+
+        if (batchIsCompleteInKafka) {
+            log.debug("[{}]:[{}] Committing records in database", Thread.currentThread().getId(),
+                    this.consumer.getDatabaseConnection());
+            this.consumer.commit();
+        } else {
+            log.debug("[{}]:[{}]: {} messages from previous batch still not committed",
+                    Thread.currentThread().getId(), this.consumer.getDatabaseConnection(),
+                    batchCompleteIndicator.getCount());
+        }
+
+        log.trace("[{}]:[{}]:[{}] Exit {}.waitForBatchCompleteInKafka",
+                Thread.currentThread().getId(), this.consumer.getDatabaseConnection(), this,
+                this.getClass().getName());
+        return batchIsCompleteInKafka;
+    }
+
+    /**
      * Returns the SourceRecord count in the list.
      * 
      * @param records The list of SourceRecords.
@@ -205,45 +270,6 @@ public class TxEventQSourceTask extends SourceTask {
      */
     private int recordCount(List<SourceRecord> records) {
         return (records == null) ? 0 : records.size();
-    }
-
-    @Override
-    public void commit() throws InterruptedException {
-        log.trace("[{}]:[{}] Entry {}.commit.", Thread.currentThread().getId(),
-                this.consumer.getDatabaseConnection(), this.getClass().getName());
-
-        /*
-         * Checks that the all the messages in a batch are complete and not stuck. If this method is
-         * called it means that Kafka Connect thinks that all messages have been completed. If this
-         * is the case then commitRecord has been called for all messages. In the event that not all
-         * the messages have been called by commitRecord, the connector may continue to wait for a
-         * long time. In order to ensure this does not happen if the commit callback is called twice
-         * without the poll rotation increasing then the batch complete indicator will be triggered
-         * directly.
-         */
-        final int currentPollRotation = pollRotation.get();
-        log.debug("Commit starting in poll rotation {}", currentPollRotation);
-
-        if (lastCommitPollRotation == currentPollRotation) {
-            synchronized (this) {
-                if (batchCompleteIndicator != null) {
-                    log.debug("Increase batch complete indicator by {}",
-                            batchCompleteIndicator.getCount());
-
-                    // This indicates that we are stuck because the connector is waiting for the
-                    // signal in the poll() method and it's been waiting for at least two calls
-                    // to this commit callback.
-                    while (batchCompleteIndicator.getCount() > 0) {
-                        batchCompleteIndicator.countDown();
-                    }
-                }
-            }
-        } else {
-            lastCommitPollRotation = currentPollRotation;
-        }
-
-        log.trace("[{}]:[{}]  Exit {}.commit", Thread.currentThread().getId(),
-                this.consumer.getDatabaseConnection(), this.getClass().getName());
     }
 
     /**
@@ -264,10 +290,11 @@ public class TxEventQSourceTask extends SourceTask {
     public void commitRecord(SourceRecord record, RecordMetadata metadata)
             throws InterruptedException {
 
-        log.trace("[{}]:[{}] Entry {}.commitRecord, record={}", Thread.currentThread().getId(),
-                this.consumer.getDatabaseConnection(), this.getClass().getName(), record);
+        log.trace("[{}]:[{}]:[{}] Entry {}.commitRecord, record={}", Thread.currentThread().getId(),
+                this.consumer.getDatabaseConnection(), this, this.getClass().getName(), record);
 
         batchCompleteIndicator.countDown();
+        log.debug("CountDownLatch Value in commitRecord: {}", batchCompleteIndicator);
 
         log.trace("[{}]:[{}]  Exit {}.commitRecord", Thread.currentThread().getId(),
                 this.consumer.getDatabaseConnection(), this.getClass().getName());
@@ -282,8 +309,8 @@ public class TxEventQSourceTask extends SourceTask {
      */
     @Override
     public void stop() {
-        log.trace("[{}]:[{}] Entry {}.stop", Thread.currentThread().getId(),
-                this.consumer.getDatabaseConnection(), this.getClass().getName());
+        log.trace("[{}]:[{}]:[{}] Entry {}.stop", Thread.currentThread().getId(),
+                this.consumer.getDatabaseConnection(), this, this.getClass().getName());
 
         stopNow.set(true);
 
