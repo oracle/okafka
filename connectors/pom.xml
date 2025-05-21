@@ -51,7 +51,7 @@
         <oracle-jdbc.version>23.8.0.25.04</oracle-jdbc.version>
         <oracle.database.security.version>21.17.0.0</oracle.database.security.version>
         <jms.version>2.0.1</jms.version>
-        <kafka.version>3.9.0</kafka.version>
+        <kafka.version>4.0.0</kafka.version>
     </properties>
 
     <dependencies>
