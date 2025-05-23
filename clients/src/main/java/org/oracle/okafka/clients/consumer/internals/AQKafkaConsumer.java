@@ -17,6 +17,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -136,16 +137,20 @@ public final class AQKafkaConsumer extends AQClient{
 		assignors = _assignores;
 	}
 	
-	private CallableStatement getOrCreateCallable(Node node, String key, String sql)  {
-		Map<String, CallableStatement> nodeMap = callableCacheMap.computeIfAbsent(node, n -> new ConcurrentHashMap<>());
-		return nodeMap.computeIfAbsent(key, k -> {
-			try {
-				Connection con = getConnection(node);
-				return con.prepareCall(sql);
-			} catch (SQLException | JMSException e) {
-				throw new RuntimeException("Failed to prepare statement for " + key, e);
-			}
-		});
+	private CallableStatement getOrCreateCallable(Node node, String key, String sql) {
+	    Map<String, CallableStatement> nodeMap = callableCacheMap.computeIfAbsent(node, n -> new ConcurrentHashMap<>());
+	    
+	    CallableStatement stmt = nodeMap.get(key);
+	    try {
+	        if (stmt == null || stmt.isClosed()) {
+	            Connection con = getConnection(node);
+	            stmt = con.prepareCall(sql);
+	            nodeMap.put(key, stmt);
+	        }
+	        return stmt;
+	    } catch (SQLException | JMSException e) {
+	        throw new RuntimeException("Failed to prepare statement for " + key, e);
+	    }
 	}
 
 	public void closeCallableStmt(Node node) {
@@ -158,7 +163,7 @@ public final class AQKafkaConsumer extends AQClient{
 	}
 
 	private String getCurrentUser(Node node) throws SQLException, JMSException {
-		Connection con = ((AQjmsSession) topicConsumersMap.get(node).getSession()).getDBConnection();
+		Connection con = getConnection(node);
 		return con.getMetaData().getUserName();
 	}
 
@@ -429,17 +434,16 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 	}
 
-	public void lightWeightSeek(Node node, String topic, int partition_id, int priority, 
+	public void lightWeightSeek(Node node, String topic, long partition_id, long priority, 
 			long subshard_id, long seq_num ) {
-
 		try {
 			String user = getCurrentUser(node);
 			CallableStatement cStmt = getOrCreateCallable(node, "SEEK", LTWT_SEEK);
 			cStmt.setString(1, user);
 			cStmt.setString(2, topic);
 			cStmt.setString(3, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
-			cStmt.setInt(4, partition_id);
-			cStmt.setInt(5, priority);
+			cStmt.setLong(4, partition_id);
+			cStmt.setLong(5, priority);
 			cStmt.setLong(6, subshard_id);
 			cStmt.setLong(7, seq_num);
 			cStmt.execute();
@@ -450,8 +454,7 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 	}
 
-	public void lightWeightSeektoBeginning(Node node, String topic, int[] partition_id, int[] priority) {
-
+	public void lightWeightSeektoBeginning(Node node, String topic, Long[] partition_id, Long[] priority) {
 		try {
 			OracleConnection oracleCon = (OracleConnection) getConnection(node);
 			String user = getCurrentUser(node);
@@ -463,6 +466,10 @@ public final class AQKafkaConsumer extends AQClient{
 			cStmt.setString(3, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
 			cStmt.setArray(4, partitionArray);
 			cStmt.setArray(5, priorityArray);
+			log.debug("lightWeightSeektoBeginning: User: {}, Topic: {}, GroupId: {}, Partition IDs: {}, Priority: {}",
+					user, topic, configs.getString(ConsumerConfig.GROUP_ID_CONFIG),
+					Arrays.toString(partition_id), Arrays.toString(priority));
+
 			cStmt.execute();
 			log.debug("lightWeightSeektoBeginning executed for topic: {}, partitions: {}", topic, partition_id.length);
 		} catch(Exception ex) {
@@ -470,27 +477,80 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 	}
 
-	public void lightWeightSeektoEnd(Node node, String topic, int[] partition_id, int[] priority) {
 
+	public void lightWeightSeektoEnd(Node node, String topic, Long[] partition_id, Long[] priority) {
 		try {
 			OracleConnection oracleCon = (OracleConnection) getConnection(node);
 			String user = getCurrentUser(node);
 			Array partitionArray = oracleCon.createOracleArray("DBMS_TEQK.SEEK_INPUT_ARRAY_T", partition_id);
 			Array priorityArray = oracleCon.createOracleArray("DBMS_TEQK.SEEK_INPUT_ARRAY_T", priority);
-
 			CallableStatement cStmt = getOrCreateCallable(node, "SEEK_TO_END", LTWT_SEEK_TO_END);
 			cStmt.setString(1, user);
 			cStmt.setString(2, topic);
 			cStmt.setString(3, configs.getString(ConsumerConfig.GROUP_ID_CONFIG));
 			cStmt.setArray(4, partitionArray);
 			cStmt.setArray(5, priorityArray);
+			log.debug("lightWeightSeektoEnd: User: {}, Topic: {}, GroupId: {}, Partition IDs: {}, Priority: {}",
+					user, topic, configs.getString(ConsumerConfig.GROUP_ID_CONFIG),
+					Arrays.toString(partition_id), Arrays.toString(priority));
+
 			cStmt.execute();
 			log.debug("lightWeightSeektoEnd executed for topic: {}, partitions: {}", topic, partition_id.length);
-		} catch(Exception ex) {
+		} catch (Exception ex) {
 			log.error("Error in lightWeightSeektoEnd for topic: " + topic + ", node: " + node, ex);
 		}
 	}
 
+
+	private void lightweightSubscriberSeek(Node node, String topic, Map<TopicPartition, Long> offsets, Map<TopicPartition, Exception> responses) {
+
+		List<Long> seekbeginPartitions = new ArrayList<>();
+		List<Long> seekEndPartitions = new ArrayList<>();
+		List<Long> seekbeginPriorities = new ArrayList<>();
+		List<Long> seekEndPriorities = new ArrayList<>();
+
+		for (Map.Entry<TopicPartition, Long> entry : offsets.entrySet()) {
+			TopicPartition tp = entry.getKey();
+			long offset = entry.getValue();
+			long partition = tp.partition();
+			long priority = 0;
+
+			try {
+				if (offset == -2L) {  // Seek to beginning
+					seekbeginPartitions.add(2L * partition);
+					seekbeginPriorities.add((long) priority);
+					responses.put(tp, null);
+					continue;
+				}
+				else if (offset == -1L) {  // Seek to end
+					seekEndPartitions.add(2L * partition);
+					seekEndPriorities.add((long) priority);
+					responses.put(tp, null);
+					continue;
+				}
+				else {
+					long subshard = offset / 20000;
+					long sequence = offset % 20000;
+					lightWeightSeek(node, topic, partition, priority, subshard, sequence);
+					responses.put(tp, null);
+				}
+			} catch (Exception ex) {
+				responses.put(tp, ex);
+			}
+		}
+
+		if (!seekbeginPartitions.isEmpty()) {
+			lightWeightSeektoBeginning(node, topic,
+					seekbeginPartitions.toArray(new Long[0]),
+					seekbeginPriorities.toArray(new Long[0]));
+		}
+
+		if (!seekEndPartitions.isEmpty()) {
+			lightWeightSeektoEnd(node, topic,
+					seekEndPartitions.toArray(new Long[0]),
+					seekEndPriorities.toArray(new Long[0]));
+		}
+	}
 
 	private ClientResponse createCommitResponse(ClientRequest request, Map<Node, List<TopicPartition>> nodes,
 			Map<TopicPartition, OffsetAndMetadata> offsets, Map<Node, Exception> result, boolean error) {
@@ -541,7 +601,6 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 	}
 
-
 	private static void validateMsgId(String msgId) throws IllegalArgumentException {
 
 		if(msgId == null || msgId.length() !=32)
@@ -574,7 +633,7 @@ public final class AQKafkaConsumer extends AQClient{
 			OffsetResetRequest offsetResetRequest = builder.build();
 			Node node = metadata.getNodeById(Integer.parseInt(request.destination()));
 			log.debug("Destination Node: " + node);
-			
+
 			Map<TopicPartition, Long> offsetResetTimestamps = offsetResetRequest.offsetResetTimestamps();
 			Map<String, Map<TopicPartition, Long>> offsetResetTimeStampByTopic = new HashMap<String, Map<TopicPartition, Long>>() ;
 			for(Map.Entry<TopicPartition, Long> offsetResetTimestamp : offsetResetTimestamps.entrySet()) {
@@ -586,22 +645,29 @@ public final class AQKafkaConsumer extends AQClient{
 			}
 			TopicConsumers consumers = topicConsumersMap.get(node);
 			Connection con = ((AQjmsSession)consumers.getSession()).getDBConnection();
-			
+
 			SeekInput[] seekInputs = null;
 			String[] inArgs = new String[5];
 			int indx =0;
 			for(Map.Entry<String, Map<TopicPartition, Long>> offsetResetTimestampOfTopic : offsetResetTimeStampByTopic.entrySet()) {
 				String topic =  offsetResetTimestampOfTopic.getKey();
 				inArgs[0] = "Topic: " + topic + " ";
+				Map<TopicPartition,Long> partitionOffsets = offsetResetTimestampOfTopic.getValue();
+
+				if(consumers.lightWeightSub) {
+					lightweightSubscriberSeek(node, topic, partitionOffsets, responses);
+					continue;
+				}
+
 				try {
 					if(msgIdFormat.equals("00") ) {
 						msgIdFormat = getMsgIdFormat(con, topic);
 					}
 
-					int inputSize = offsetResetTimestampOfTopic.getValue().entrySet().size(); 
+					int inputSize = partitionOffsets.entrySet().size(); 
 					seekInputs = new SeekInput[inputSize];
 
-					for(Map.Entry<TopicPartition, Long> offsets : offsetResetTimestampOfTopic.getValue().entrySet()) {
+					for(Map.Entry<TopicPartition, Long> offsets : partitionOffsets.entrySet()) {
 						seekInputs[indx] = new SeekInput(); 
 						try {
 							TopicPartition tp = offsets.getKey();
@@ -704,7 +770,8 @@ public final class AQKafkaConsumer extends AQClient{
 				request.createdTimeMs(), time.milliseconds(), false, null,null, new OffsetResetResponse(responses, null));
 	}
 
-	private ClientResponse unsubscribe(ClientRequest request) {
+	
+    private ClientResponse unsubscribe(ClientRequest request) {
 		HashMap<String, Exception> response = new HashMap<>();
 		for(Map.Entry<Node, TopicConsumers> topicConsumersByNode: topicConsumersMap.entrySet())
 		{
