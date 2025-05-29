@@ -449,8 +449,6 @@ public class TxEventQProducer implements Closeable {
                 this.getClass().getName());
         int errorCode = -1;
 
-        log.debug("Exception in getErrorCode is: {}", exc);
-
         if (exc instanceof SQLException) {
             log.debug("In instanceof SQLException");
             final SQLException sqlExcep = (SQLException) exc;
@@ -966,7 +964,6 @@ public class TxEventQProducer implements Closeable {
 
         for (Node n : nodes) {
             if (!this.messageProducerForInstanceMaps.containsKey(n.getId())) {
-                log.debug("Attempting to create messageProducers map for node: [{}]", n);
                 this.messageProducerForInstanceMaps.put(n.getId(), new MessageProducerForInstance(n,
                         this.conn.getUserName().toUpperCase(), this.config));
             }
