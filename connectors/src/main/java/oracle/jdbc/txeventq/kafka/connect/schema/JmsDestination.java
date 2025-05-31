@@ -44,17 +44,13 @@ public class JmsDestination {
             .name("JMSDestination").version(1).field("type", Schema.STRING_SCHEMA)
             .field("name", Schema.STRING_SCHEMA).field("owner", Schema.OPTIONAL_STRING_SCHEMA)
             .field("completeName", Schema.OPTIONAL_STRING_SCHEMA)
-            .field("completeTableName", Schema.OPTIONAL_STRING_SCHEMA)
-            .field("address", Schema.OPTIONAL_STRING_SCHEMA)
-            .field("protocol", Schema.OPTIONAL_INT32_SCHEMA).optional().build();
+            .field("completeTableName", Schema.OPTIONAL_STRING_SCHEMA).optional().build();
 
     private final String type;
     private final String name;
     private final String owner;
     private final String completeName;
     private final String completeTableName;
-    private final String address;
-    private final int protocol;
 
     /**
      * Constructs a JmsDestination object.
@@ -64,17 +60,13 @@ public class JmsDestination {
      * @throws SQLException
      */
     public JmsDestination(Destination destination) throws JMSException, SQLException {
-        log.trace("[{}] Entry {}.JmsDestination", Thread.currentThread().getId(),
-                this.getClass().getName());
+        log.trace("Entry {}.JmsDestination", this.getClass().getName());
         this.type = JmsUtils.destinationType(destination);
         this.name = JmsUtils.destinationName(destination);
         this.owner = JmsUtils.destinationOwner(destination);
         this.completeName = JmsUtils.destinationCompleteName(destination);
         this.completeTableName = JmsUtils.destinationCompleteTableName(destination);
-        this.address = JmsUtils.destinationAgentAddress(destination);
-        this.protocol = JmsUtils.destinationAgentProtocol(destination);
-        log.trace("[{}] Exit {}.JmsDestination", Thread.currentThread().getId(),
-                this.getClass().getName());
+        log.trace("Exit {}.JmsDestination", this.getClass().getName());
     }
 
     /**
@@ -84,14 +76,11 @@ public class JmsDestination {
      *         independent Schema.
      */
     public Struct toJmsDestinationStructV1() {
-        log.trace("[{}] Entry {}.toJmsDestinationStructV1", Thread.currentThread().getId(),
-                this.getClass().getName());
-        log.trace("[{}] Exit {}.toJmsDestinationStructV1", Thread.currentThread().getId(),
-                this.getClass().getName());
+        log.trace("Entry {}.toJmsDestinationStructV1", this.getClass().getName());
+        log.trace("Exit {}.toJmsDestinationStructV1", this.getClass().getName());
         return new Struct(SCHEMA_JMSDESTINATION_V1).put("type", this.type).put("name", this.name)
                 .put("owner", this.owner).put("completeName", this.completeName)
-                .put("completeTableName", this.completeTableName).put("address", this.address)
-                .put("protocol", this.protocol);
+                .put("completeTableName", this.completeTableName);
     }
 
 }

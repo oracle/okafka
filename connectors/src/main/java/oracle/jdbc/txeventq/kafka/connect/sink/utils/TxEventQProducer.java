@@ -167,8 +167,7 @@ public class TxEventQProducer implements Closeable {
      * Uses the Oracle wallet to connect to the database.
      */
     public void connect() {
-        log.trace("[{}] Entry {}.connect", Thread.currentThread().getId(),
-                this.getClass().getName());
+        log.trace("Entry {}.connect", this.getClass().getName());
 
         try {
             System.setProperty("oracle.net.wallet_location",
@@ -208,8 +207,7 @@ public class TxEventQProducer implements Closeable {
                     Thread.currentThread().getId());
             throw handleException(ex);
         }
-        log.trace("[{}]:[{}]  Exit {}.connect", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}]  Exit {}.connect", this.conn, this.getClass().getName());
     }
 
     /**
@@ -222,8 +220,7 @@ public class TxEventQProducer implements Closeable {
      * @throws SQLException
      */
     private List<Node> getNodes() throws SQLException {
-        log.trace("[{}]:[{}]  Entry {}.getNodes", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}]  Entry {}.getNodes", this.conn, this.getClass().getName());
         List<Node> nodes = new ArrayList<>();
         String getInstanceQry = "SELECT INST_ID, INSTANCE_NAME FROM GV$INSTANCE";
 
@@ -235,8 +232,7 @@ public class TxEventQProducer implements Closeable {
             }
         }
 
-        log.trace("[{}]:[{}]  Exit {}.getNodes", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}]  Exit {}.getNodes", this.conn, this.getClass().getName());
         return nodes;
 
     }
@@ -251,8 +247,8 @@ public class TxEventQProducer implements Closeable {
      */
     private void getPartitionInstanceOwnershipInfo(List<Node> nodes, String topic)
             throws SQLException {
-        log.trace("[{}]:[{}]  Entry {}.getPartitionInstanceOwnershipInfo",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName());
+        log.trace("[{}]  Entry {}.getPartitionInstanceOwnershipInfo", this.conn,
+                this.getClass().getName());
 
         if (nodes.isEmpty() || topic == null) {
             return;
@@ -280,8 +276,8 @@ public class TxEventQProducer implements Closeable {
             }
         }
 
-        log.trace("[{}]:[{}]  Exit {}.getPartitionInstanceOwnershipInfo",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName());
+        log.trace("[{}]  Exit {}.getPartitionInstanceOwnershipInfo", this.conn,
+                this.getClass().getName());
     }
 
     /**
@@ -306,8 +302,7 @@ public class TxEventQProducer implements Closeable {
      * Internal method to connect to TxEventQ.
      */
     private void connectConnectionInternal() {
-        log.trace("[{}] Entry {}.connectConnectionInternal", Thread.currentThread().getId(),
-                this.getClass().getName());
+        log.trace("Entry {}.connectConnectionInternal", this.getClass().getName());
 
         if (this.connected) {
             return;
@@ -361,13 +356,11 @@ public class TxEventQProducer implements Closeable {
                 this.reconnectDelayMillis = this.reconnectDelayMillis * 2;
             }
 
-            log.trace("[{}]  Exit {}.connectConnectionInternal", Thread.currentThread().getId(),
-                    this.getClass().getName());
+            log.trace("Exit {}.connectConnectionInternal", this.getClass().getName());
             throw handleException(ex);
         }
 
-        log.trace("[{}] Exit {}.connectConnectionInternal", Thread.currentThread().getId(),
-                this.getClass().getName());
+        log.trace("Exit {}.connectConnectionInternal", this.getClass().getName());
     }
 
     /**
@@ -375,8 +368,7 @@ public class TxEventQProducer implements Closeable {
      * connector can keep running and just trying again is likely to fix things.
      */
     private ConnectException handleException(final Throwable exc) {
-        log.trace("[{}]:[{}]  Entry {}.handleException", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}]  Entry {}.handleException", this.conn, this.getClass().getName());
         boolean isRetriable = false;
         boolean mustClose = true;
 
@@ -428,13 +420,11 @@ public class TxEventQProducer implements Closeable {
         }
 
         if (isRetriable) {
-            log.trace("[{}]:[{}]  Exit {}.handleException", Thread.currentThread().getId(),
-                    this.conn, this.getClass().getName());
+            log.trace("[{}]  Exit {}.handleException", this.conn, this.getClass().getName());
             return new RetriableException(exc);
         }
 
-        log.trace("[{}]:[{}]  Exit {}.handleException", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}]  Exit {}.handleException", this.conn, this.getClass().getName());
         return new ConnectException(exc);
     }
 
@@ -445,8 +435,7 @@ public class TxEventQProducer implements Closeable {
      * @return The error code from the exception.
      */
     private int getErrorCode(final Throwable exc) {
-        log.trace("[{}]:[{}]  Entry {}.getErrorCode", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}]  Entry {}.getErrorCode", this.conn, this.getClass().getName());
         int errorCode = -1;
 
         if (exc instanceof SQLException) {
@@ -508,8 +497,7 @@ public class TxEventQProducer implements Closeable {
                 }
             }
         }
-        log.trace("[{}]:[{}]  Exit {}.getErrorCode", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}]  Exit {}.getErrorCode", this.conn, this.getClass().getName());
         return errorCode;
     }
 
@@ -543,8 +531,7 @@ public class TxEventQProducer implements Closeable {
      * @return The current database connection that is being used.
      */
     public OracleConnection getDatabaseConnection() {
-        log.trace("[{}]:[{}]: Entry {}.getDatabaseConnection", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}]: Entry {}.getDatabaseConnection", this.conn, this.getClass().getName());
 
         return this.conn;
     }
@@ -556,8 +543,8 @@ public class TxEventQProducer implements Closeable {
      * @return The size of the partition for the specified topic.
      */
     public int getKafkaTopicPartitionSize(String topic) {
-        log.trace("[{}]:[{}] Entry {}.getKafkaTopicPartitionSize,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.getKafkaTopicPartitionSize,", this.conn,
+                this.getClass().getName());
 
         Properties properties = new Properties();
         properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -578,8 +565,7 @@ public class TxEventQProducer implements Closeable {
             throw new ConnectException("Unable to get Kafka partition size: " + e.getMessage());
         }
 
-        log.trace("[{}]:[{}] Exit {}.getKafkaTopicPartitionSize,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Exit {}.getKafkaTopicPartitionSize,", this.conn, this.getClass().getName());
         return partitionSize;
     }
 
@@ -590,8 +576,7 @@ public class TxEventQProducer implements Closeable {
      * @return True if the Kafka topic exists false otherwise.
      */
     public boolean kafkaTopicExists(String topic) {
-        log.trace("[{}]:[{}] Entry {}.kafkaTopicExists,", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}] Entry {}.kafkaTopicExists,", this.conn, this.getClass().getName());
 
         Properties properties = new Properties();
         properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -616,8 +601,7 @@ public class TxEventQProducer implements Closeable {
                     topic, e);
         }
 
-        log.trace("[{}]:[{}] Exit {}.kafkaTopicExists,", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}] Exit {}.kafkaTopicExists,", this.conn, this.getClass().getName());
         return currentTopicList != null && currentTopicList.contains(topic);
     }
 
@@ -629,14 +613,12 @@ public class TxEventQProducer implements Closeable {
      * @throws SQLException
      */
     public boolean txEventQueueExists(String queueName) throws SQLException {
-        log.trace("[{}]:[{}] Entry {}.txEventQueueExists,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.txEventQueueExists,", this.conn, this.getClass().getName());
 
         DatabaseMetaData meta = this.conn.getMetaData();
         try (ResultSet resultSet = meta.getTables(null, null, queueName,
                 new String[] { "TABLE" })) {
-            log.trace("[{}] Exit {}.txEventQueueExists,", Thread.currentThread().getId(),
-                    this.getClass().getName());
+            log.trace("[{}] Exit {}.txEventQueueExists,", this.conn, this.getClass().getName());
             return resultSet.next();
         }
     }
@@ -647,8 +629,7 @@ public class TxEventQProducer implements Closeable {
      * @return True if cluster database, false otherwise.
      */
     private boolean isClusterDatabase() {
-        log.trace("[{}]:[{}] Entry {}.isClusterDatabase,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.isClusterDatabase,", this.conn, this.getClass().getName());
 
         String getIsClusterDatabaseVal = "SELECT VALUE FROM V$PARAMETER WHERE UPPER(NAME) = 'CLUSTER_DATABASE'";
         boolean isRac;
@@ -661,8 +642,8 @@ public class TxEventQProducer implements Closeable {
             throw handleException(e);
         }
 
-        log.trace("[{}]:[{}] Exit {}.isClusterDatabase, isRac=[{}]", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName(), isRac);
+        log.trace("[{}] Exit {}.isClusterDatabase, isRac=[{}]", this.conn,
+                this.getClass().getName(), isRac);
 
         return isRac;
     }
@@ -673,8 +654,7 @@ public class TxEventQProducer implements Closeable {
      * @return True if the table exist or false if it does not exist.
      */
     public boolean createOffsetInfoTable() {
-        log.trace("[{}]:[{}] Entry {}.createOffsetInfoTable,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.createOffsetInfoTable,", this.conn, this.getClass().getName());
         boolean offsetTableExist = false;
 
         String createTableQuery = "CREATE TABLE IF NOT EXISTS " + TXEVENTQ$_TRACK_OFFSETS
@@ -694,8 +674,7 @@ public class TxEventQProducer implements Closeable {
             throw handleException(e);
         }
 
-        log.trace("[{}]:[{}] Exit {}.createOffsetInfoTable,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Exit {}.createOffsetInfoTable,", this.conn, this.getClass().getName());
         return offsetTableExist;
     }
 
@@ -707,8 +686,7 @@ public class TxEventQProducer implements Closeable {
      * @throws SQLException
      */
     public int getNumOfShardsForQueue(String queue) {
-        log.trace("[{}]:[{}] Entry {}.getNumOfShardsForQueue,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.getNumOfShardsForQueue,", this.conn, this.getClass().getName());
 
         int numShard;
         try (CallableStatement getnumshrdStmt = this.conn
@@ -722,8 +700,7 @@ public class TxEventQProducer implements Closeable {
             throw handleException(e);
         }
 
-        log.trace("[{}]:[{}] Exit {}.getNumOfShardsForQueue,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Exit {}.getNumOfShardsForQueue,", this.conn, this.getClass().getName());
         return numShard;
     }
 
@@ -736,8 +713,7 @@ public class TxEventQProducer implements Closeable {
      */
     public void enqueueMessage(String queueName, SinkRecord sinkRecord) throws SQLException {
 
-        log.trace("[{}]:[{}] Entry {}.enqueueMessage,", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}] Entry {}.enqueueMessage,", this.conn, this.getClass().getName());
 
         if (sinkRecord.kafkaPartition() != null) {
             String id = "" + 2 * sinkRecord.kafkaPartition();
@@ -771,8 +747,7 @@ public class TxEventQProducer implements Closeable {
         ((oracle.jdbc.internal.OracleConnection) this.conn).jmsEnqueue(queueName, opt, mesg,
                 aqProp);
 
-        log.trace("[{}]:[{}] Exit {}.enqueueMessage,", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}] Exit {}.enqueueMessage,", this.conn, this.getClass().getName());
     }
 
     /**
@@ -786,8 +761,7 @@ public class TxEventQProducer implements Closeable {
      */
     public void enqueueBulkMessage(String queueName, Collection<SinkRecord> records,
             MessageProducer msgProducer) throws JMSException {
-        log.trace("[{}]:[{}] Entry {}.enqueueBulkMessage,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.enqueueBulkMessage,", this.conn, this.getClass().getName());
 
         final List<AQjmsBytesMessage> messages = new ArrayList<>();
         AQjmsBytesMessage[] msgs = null;
@@ -817,8 +791,8 @@ public class TxEventQProducer implements Closeable {
         msgs = messages.toArray(new AQjmsBytesMessage[0]);
         ((AQjmsProducer) msgProducer).bulkSend(msgs, deliveryMode, priorities, null);
 
-        log.trace("[{}]:[{}] Exit {}.enqueueBulkMessage, numMsgEnqueued = {}",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName(), msgs.length);
+        log.trace("[{}] Exit {}.enqueueBulkMessage, numMsgEnqueued = {}", this.conn,
+                this.getClass().getName(), msgs.length);
     }
 
     /**
@@ -829,8 +803,7 @@ public class TxEventQProducer implements Closeable {
      */
     private AQjmsBytesMessage createBytesMessage(TopicSession session, SinkRecord sinkRec)
             throws JMSException {
-        log.trace("[{}]:[{}] Entry {}.createBytesMessage,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.createBytesMessage,", this.conn, this.getClass().getName());
 
         AQjmsBytesMessage msg = null;
         msg = (AQjmsBytesMessage) (session.createBytesMessage());
@@ -847,8 +820,7 @@ public class TxEventQProducer implements Closeable {
         }
         msg.setIntProperty("AQINTERNAL_PARTITION", sinkRec.kafkaPartition() * 2);
 
-        log.trace("[{}]:[{}] Exit {}.createBytesMessage,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Exit {}.createBytesMessage,", this.conn, this.getClass().getName());
         return msg;
     }
 
@@ -859,8 +831,7 @@ public class TxEventQProducer implements Closeable {
      * @param records The records to enqueue into the TxEventQ.
      */
     public void put(Collection<SinkRecord> records) {
-        log.trace("[{}]:[{}] Entry {}.put,", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}] Entry {}.put,", this.conn, this.getClass().getName());
 
         connectConnectionInternal();
         try {
@@ -886,7 +857,7 @@ public class TxEventQProducer implements Closeable {
         } catch (SQLException | JMSException e) {
             throw handleException(e);
         }
-
+        log.trace("[{}] Exit {}.put,", this.conn, this.getClass().getName());
     }
 
     /**
@@ -902,8 +873,8 @@ public class TxEventQProducer implements Closeable {
      */
     private Map<Integer, Collection<SinkRecord>> sortSinkRecordsByInstances(
             Collection<SinkRecord> records) {
-        log.trace("[{}]:[{}] Entry {}.sortSinkRecordsByInstances,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.sortSinkRecordsByInstances,", this.conn,
+                this.getClass().getName());
 
         Map<Integer, Collection<SinkRecord>> recordsBelongingToInstance = new HashMap<>();
         HashMap<Integer, Long> trackOffset = new HashMap<>();
@@ -942,8 +913,7 @@ public class TxEventQProducer implements Closeable {
                 throw handleException(e);
             }
         }
-        log.trace("[{}]:[{}] Exit {}.sortSinkRecordsByInstances,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Exit {}.sortSinkRecordsByInstances,", this.conn, this.getClass().getName());
         return recordsBelongingToInstance;
     }
 
@@ -955,8 +925,8 @@ public class TxEventQProducer implements Closeable {
      * @throws JMSException
      */
     private void genMessageProducerAndPartitionInfoForNodes() throws SQLException, JMSException {
-        log.trace("[{}]:[{}] Entry {}.genMessageProducerAndPartitionInfoForNodes,",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.genMessageProducerAndPartitionInfoForNodes,", this.conn,
+                this.getClass().getName());
 
         List<Node> nodes = getNodes();
 
@@ -974,8 +944,8 @@ public class TxEventQProducer implements Closeable {
         getPartitionInstanceOwnershipInfo(nodes,
                 this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME).toUpperCase());
 
-        log.trace("[{}]:[{}] Exit {}.genMessageProducerAndPartitionInfoForNodes,",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName());
+        log.trace("[{}] Exit {}.genMessageProducerAndPartitionInfoForNodes,", this.conn,
+                this.getClass().getName());
     }
 
     /**
@@ -987,8 +957,8 @@ public class TxEventQProducer implements Closeable {
      */
     private void enqueueOnNonClusterDatabase(Collection<SinkRecord> records)
             throws JMSException, SQLException {
-        log.trace("[{}]:[{}] Entry {}.enqueueOnNonClusterDatabase,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.enqueueOnNonClusterDatabase,", this.conn,
+                this.getClass().getName());
 
         enqueueBulkMessage(this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME), records,
                 tProducer);
@@ -999,8 +969,8 @@ public class TxEventQProducer implements Closeable {
 
         this.conn.commit();
 
-        log.trace("[{}]:[{}] Exit {}.enqueueOnNonClusterDatabase,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Exit {}.enqueueOnNonClusterDatabase,", this.conn,
+                this.getClass().getName());
     }
 
     /**
@@ -1013,8 +983,8 @@ public class TxEventQProducer implements Closeable {
      */
     private Map<String, Map<Integer, Long>> getTopicPartitionOffsetMapInfo(
             Collection<SinkRecord> records) {
-        log.trace("[{}]:[{}] Entry {}.getTopicPartitionOffsetMapInfo,",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.getTopicPartitionOffsetMapInfo,", this.conn,
+                this.getClass().getName());
         Map<String, Map<Integer, Long>> topicInfoMap = new HashMap<>();
         for (SinkRecord sinkRecord : records) {
 
@@ -1026,8 +996,8 @@ public class TxEventQProducer implements Closeable {
             topicInfoMap.computeIfAbsent(sinkRecord.topic(), k -> (new HashMap<>()))
                     .put(sinkRecord.kafkaPartition(), sinkRecord.kafkaOffset());
         }
-        log.trace("[{}]:[{}] Exit {}.getTopicPartitionOffsetMapInfo,",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName());
+        log.trace("[{}] Exit {}.getTopicPartitionOffsetMapInfo,", this.conn,
+                this.getClass().getName());
         return topicInfoMap;
     }
 
@@ -1043,8 +1013,8 @@ public class TxEventQProducer implements Closeable {
     private void processTopicPartitionOffsetMapInfoInDatabase(
             Map<String, Map<Integer, Long>> topicInfoMap, PreparedStatement mergePrepareStatement)
             throws SQLException {
-        log.trace("[{}]:[{}] Entry {}.processTopicPartitionOffsetMapInfoInDatabase,",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.processTopicPartitionOffsetMapInfoInDatabase,", this.conn,
+                this.getClass().getName());
 
         for (Map.Entry<String, Map<Integer, Long>> topicEntry : topicInfoMap.entrySet()) {
             String topicKey = topicEntry.getKey();
@@ -1057,8 +1027,8 @@ public class TxEventQProducer implements Closeable {
             }
         }
 
-        log.trace("[{}]:[{}] Exit {}.processTopicPartitionOffsetMapInfoInDatabase,",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName());
+        log.trace("[{}] Exit {}.processTopicPartitionOffsetMapInfoInDatabase,", this.conn,
+                this.getClass().getName());
     }
 
     /**
@@ -1074,8 +1044,7 @@ public class TxEventQProducer implements Closeable {
     private void enqueueOnClusterDatabase(
             Map<Integer, Collection<SinkRecord>> recordsBelongingToInstance)
             throws SQLException, JMSException {
-        log.trace("[{}]:[{}] Entry {}.enqueueOnClusterDatabase,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.enqueueOnClusterDatabase,", this.conn, this.getClass().getName());
 
         boolean useDiffInstanceConn = useDifferentInstanceConnection(recordsBelongingToInstance);
 
@@ -1126,8 +1095,7 @@ public class TxEventQProducer implements Closeable {
             throw e;
         }
 
-        log.trace("[{}]:[{}] Exit {}.enqueueOnClusterDatabase,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Exit {}.enqueueOnClusterDatabase,", this.conn, this.getClass().getName());
     }
 
     /**
@@ -1142,8 +1110,8 @@ public class TxEventQProducer implements Closeable {
      */
     private MessageProducerForInstance getMessageProducerForInstance(boolean useDiffInstanceConn,
             Map.Entry<java.lang.Integer, java.util.Collection<SinkRecord>> instanceSinkRecordMap) {
-        log.trace("[{}]:[{}] Entry {}.getMessageProducerForInstance,",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.getMessageProducerForInstance,", this.conn,
+                this.getClass().getName());
         MessageProducerForInstance msgProducerForInstance = null;
 
         if (!this.messageProducerForInstanceMaps.isEmpty() && useDiffInstanceConn) {
@@ -1154,8 +1122,8 @@ public class TxEventQProducer implements Closeable {
                     .get(instanceSinkRecordMap.getKey());
         }
 
-        log.trace("[{}]:[{}] Exit {}.getMessageProducerForInstance,",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName());
+        log.trace("[{}] Exit {}.getMessageProducerForInstance,", this.conn,
+                this.getClass().getName());
         return msgProducerForInstance;
     }
 
@@ -1168,8 +1136,8 @@ public class TxEventQProducer implements Closeable {
      */
     private boolean useDifferentInstanceConnection(
             Map<Integer, Collection<SinkRecord>> recordsBelongingToInstance) {
-        log.trace("[{}]:[{}] Entry {}.useDifferentInstanceConnection,",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.useDifferentInstanceConnection,", this.conn,
+                this.getClass().getName());
         boolean useDiffInstanceConn = true;
 
         /*
@@ -1197,9 +1165,8 @@ public class TxEventQProducer implements Closeable {
             }
         }
 
-        log.trace("[{}]:[{}] Exit {}.useDifferentInstanceConnection, retval={},",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName(),
-                useDiffInstanceConn);
+        log.trace("[{}] Exit {}.useDifferentInstanceConnection, retval={},", this.conn,
+                this.getClass().getName(), useDiffInstanceConn);
         return useDiffInstanceConn;
     }
 
@@ -1218,8 +1185,8 @@ public class TxEventQProducer implements Closeable {
      */
     private void setOffsetInfoInDatabase(PreparedStatement mergePrepareStatement, String topic,
             String queueName, String queueSchema, int partition, long offset) throws SQLException {
-        log.trace("[{}]:[{}] Entry {}.setOffsetInfoInDatabase,", Thread.currentThread().getId(),
-                mergePrepareStatement.getConnection(), this.getClass().getName());
+        log.trace("[{}] Entry {}.setOffsetInfoInDatabase,", mergePrepareStatement.getConnection(),
+                this.getClass().getName());
 
         mergePrepareStatement.setString(1, topic);
         mergePrepareStatement.setString(2, queueName);
@@ -1233,8 +1200,8 @@ public class TxEventQProducer implements Closeable {
         mergePrepareStatement.setLong(10, offset + 1);
         mergePrepareStatement.executeUpdate();
 
-        log.trace("[{}]:[{}] Exit {}.setOffsetInfoInDatabase,", Thread.currentThread().getId(),
-                mergePrepareStatement.getConnection(), this.getClass().getName());
+        log.trace("[{}] Exit {}.setOffsetInfoInDatabase,", mergePrepareStatement.getConnection(),
+                this.getClass().getName());
 
     }
 
@@ -1250,8 +1217,7 @@ public class TxEventQProducer implements Closeable {
      */
     public long getOffsetInDatabase(String topic, String queueName, String queueSchema,
             int partition) {
-        log.trace("[{}]:[{}] Entry {}.getOffsetInDatabase,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.getOffsetInDatabase,", this.conn, this.getClass().getName());
         long offsetVal = 0;
         try {
             this.preparedSelectOffsetStatement.setString(1, topic);
@@ -1268,16 +1234,14 @@ public class TxEventQProducer implements Closeable {
             throw handleException(e);
         }
 
-        log.trace("[{}]:[{}] Exit {}.getOffsetInDatabase,", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Exit {}.getOffsetInDatabase,", this.conn, this.getClass().getName());
         return offsetVal;
 
     }
 
     @Override
     public void close() throws IOException {
-        log.trace("[{}] Entry {}.close,", Thread.currentThread().getId(),
-                this.getClass().getName());
+        log.trace("Entry {}.close,", this.getClass().getName());
 
         if (tSess != null) {
             log.debug("Session rollback attempted.");
@@ -1348,7 +1312,7 @@ public class TxEventQProducer implements Closeable {
             log.debug("Connection to TxEventQ closed.");
         }
 
-        log.trace("[{}] Exit {}.close,", Thread.currentThread().getId(), this.getClass().getName());
+        log.trace("Exit {}.close,", this.getClass().getName());
     }
 
     private final class MessageProducerForInstance {
@@ -1392,8 +1356,7 @@ public class TxEventQProducer implements Closeable {
          * @throws JMSException
          */
         public TopicConnection createTopicConnection(Node node) throws SQLException, JMSException {
-            log.trace("[{}] Entry {}.createTopicConnection,", Thread.currentThread().getId(),
-                    this.getClass().getName());
+            log.trace("Entry {}.createTopicConnection,", this.getClass().getName());
             Properties props = new Properties();
             String urlBuilder = "jdbc:oracle:thin:@"
                     + this.config.getString(TxEventQSinkConfig.DATABASE_TNS_ALIAS_CONFIG);
@@ -1408,8 +1371,7 @@ public class TxEventQProducer implements Closeable {
             log.debug("Get datasource connection: {}", dataSource.getConnection());
 
             TopicConnectionFactory connFactory = AQjmsFactory.getTopicConnectionFactory(dataSource);
-            log.trace("[{}] Exit {}.createTopicConnection,", Thread.currentThread().getId(),
-                    this.getClass().getName());
+            log.trace("Exit {}.createTopicConnection,", this.getClass().getName());
             return connFactory.createTopicConnection();
         }
 
@@ -1422,8 +1384,7 @@ public class TxEventQProducer implements Closeable {
          * @throws SQLException
          */
         public TopicSession createTopicSession(int mode) throws JMSException, SQLException {
-            log.trace("[{}] Entry {}.createTopicSession,", Thread.currentThread().getId(),
-                    this.getClass().getName());
+            log.trace("Entry {}.createTopicSession,", this.getClass().getName());
             if (this.sess != null)
                 return this.sess;
 
@@ -1431,8 +1392,7 @@ public class TxEventQProducer implements Closeable {
             this.oracleConn = (OracleConnection) ((AQjmsSession) (this.sess)).getDBConnection();
             this.preparedMergeStatement = this.oracleConn.prepareStatement(this.mergeSqlStatement);
             this.topicConn.start();
-            log.trace("[{}] Exit {}.createTopicSession,", Thread.currentThread().getId(),
-                    this.getClass().getName());
+            log.trace("Exit {}.createTopicSession,", this.getClass().getName());
             return this.sess;
         }
 
@@ -1443,11 +1403,9 @@ public class TxEventQProducer implements Closeable {
          * @return The PreparedStatement
          */
         public PreparedStatement getPreparedMergeStatement() {
-            log.trace("[{}] Entry {}.getPreparedMergeStatement,", Thread.currentThread().getId(),
-                    this.getClass().getName());
+            log.trace("Entry {}.getPreparedMergeStatement,", this.getClass().getName());
 
-            log.trace("[{}] Exit {}.getPreparedMergeStatement,", Thread.currentThread().getId(),
-                    this.getClass().getName());
+            log.trace("Exit {}.getPreparedMergeStatement,", this.getClass().getName());
             return this.preparedMergeStatement;
         }
 
@@ -1458,12 +1416,10 @@ public class TxEventQProducer implements Closeable {
          * @throws JMSException
          */
         private MessageProducer createMessageProducer() throws JMSException {
-            log.trace("[{}] Entry {}.createMessageProducer,", Thread.currentThread().getId(),
-                    this.getClass().getName());
+            log.trace("Entry {}.createMessageProducer,", this.getClass().getName());
             Topic dest = ((AQjmsSession) (this.sess)).getTopic(this.userName,
                     this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME).toUpperCase());
-            log.trace("[{}] Exit {}.createMessageProducer,", Thread.currentThread().getId(),
-                    this.getClass().getName());
+            log.trace("Exit {}.createMessageProducer,", this.getClass().getName());
             return this.sess.createProducer(dest);
         }
 
@@ -1484,8 +1440,7 @@ public class TxEventQProducer implements Closeable {
         }
 
         public void close() {
-            log.trace("[{}] Entry {}.close,", Thread.currentThread().getId(),
-                    this.getClass().getName());
+            log.trace("Entry {}.close,", this.getClass().getName());
 
             try {
                 if (this.preparedMergeStatement != null) {
@@ -1531,8 +1486,7 @@ public class TxEventQProducer implements Closeable {
                 log.debug("Connection to TxEventQ closed.");
             }
 
-            log.trace("[{}] Exit {}.close,", Thread.currentThread().getId(),
-                    this.getClass().getName());
+            log.trace("Exit {}.close,", this.getClass().getName());
         }
 
         @Override

@@ -161,38 +161,6 @@ public class ConsumerOfJmsSchema {
 				}
 				
 				System.out.println("");
-				
-				/*********************************************************/
-				/* Gets the different values from the replyTo schema. */
-				/*********************************************************/
-				
-				if (!jsonObject.get("replyTo").equals(null))
-				{
-					JSONObject replyToJsonObject  =  jsonObject.getJSONObject("replyTo");
-					System.out.println("********Gets the different values from the replyTo schema.********");
-					String replyToType = replyToJsonObject.getString("type");
-					System.out.println("type= " + replyToType);
-				
-					String replyToName = replyToJsonObject.getString("name");
-					System.out.println("name= " + destinationName);
-				
-					if (replyToType.equals("agent")) {
-						if (!replyToJsonObject.get("address").equals(null)) {
-							String replyToAddress = replyToJsonObject.getString("address");
-							System.out.println("address= " + replyToAddress);
-						}else {
-							System.out.println("address= ");
-						}
-						
-						if (!replyToJsonObject.get("protocol").equals(null)) {
-							int replyToProtocol = replyToJsonObject.getInt("protocol");
-							System.out.println("protocol= " + replyToProtocol);
-						}
-					}
-				
-					System.out.println("");
-				}
-				
 			}
 		}
 	}

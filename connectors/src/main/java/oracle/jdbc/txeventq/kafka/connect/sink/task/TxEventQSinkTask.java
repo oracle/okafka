@@ -54,8 +54,7 @@ public class TxEventQSinkTask extends SinkTask {
 
     @Override
     public void start(Map<String, String> properties) {
-        log.trace("[{}] Entry {}.start, props={}", Thread.currentThread().getId(),
-                this.getClass().getName(), properties);
+        log.trace("Entry {}.start, props={}", this.getClass().getName(), properties);
 
         // Loading Task Configuration
 
@@ -96,14 +95,14 @@ public class TxEventQSinkTask extends SinkTask {
                     "TXEVENTQ_TRACK_OFFSETS table couldn't be created or accessed to setup offset information.");
         }
 
-        log.trace("[{}]:[{}] Exit {}.start", Thread.currentThread().getId(),
-                this.producer.getDatabaseConnection(), this.getClass().getName());
+        log.trace("[{}] Exit {}.start", this.producer.getDatabaseConnection(),
+                this.getClass().getName());
     }
 
     @Override
     public void put(Collection<SinkRecord> records) {
-        log.trace("[{}]:[{}] Entry {}.put", Thread.currentThread().getId(),
-                this.producer.getDatabaseConnection(), this.getClass().getName());
+        log.trace("[{}] Entry {}.put", this.producer.getDatabaseConnection(),
+                this.getClass().getName());
 
         if (records.isEmpty()) {
             return;
@@ -112,47 +111,48 @@ public class TxEventQSinkTask extends SinkTask {
         log.debug("Number of records sent to put call: {}", records.size());
         producer.put(records);
 
-        log.trace("[{}]:[{}]  Exit {}.put", Thread.currentThread().getId(),
-                this.producer.getDatabaseConnection(), this.getClass().getName());
+        log.trace("[{}]  Exit {}.put", this.producer.getDatabaseConnection(),
+                this.getClass().getName());
     }
 
     @Override
     public void stop() {
-        log.trace("[{}]:[{}] Entry {}.stop", Thread.currentThread().getId(),
-                this.producer.getDatabaseConnection(), this.getClass().getName());
+        log.trace("[{}] Entry {}.stop", this.producer.getDatabaseConnection(),
+                this.getClass().getName());
 
         closeDatabaseConnection();
 
-        log.trace("[{}] Exit {}.stop", Thread.currentThread().getId(), this.getClass().getName());
+        log.trace("[{}] Exit {}.stop", this.producer.getDatabaseConnection(),
+                this.getClass().getName());
     }
 
     /**
      * Calls the producer's close method to close the database connection.
      */
     private void closeDatabaseConnection() {
-        log.trace("[{}]:[{}] Entry {}.closeDatabaseConnection", Thread.currentThread().getId(),
-                this.producer.getDatabaseConnection(), this.getClass().getName());
+        log.trace("[{}] Entry {}.closeDatabaseConnection", this.producer.getDatabaseConnection(),
+                this.getClass().getName());
         try {
             this.producer.close();
         } catch (IOException e) {
             log.error("Exception occurred while closing database connection.");
         }
 
-        log.trace("[{}]:[{}] Exit {}.closeDatabaseConnection", Thread.currentThread().getId(),
-                this.producer.getDatabaseConnection(), this.getClass().getName());
+        log.trace("[{}] Exit {}.closeDatabaseConnection", this.producer.getDatabaseConnection(),
+                this.getClass().getName());
     }
 
     @Override
     public Map<TopicPartition, OffsetAndMetadata> preCommit(
             Map<TopicPartition, OffsetAndMetadata> currentOffsets) {
-        log.trace("[{}]:[{}] Entry {}.preCommit", Thread.currentThread().getId(),
-                this.producer.getDatabaseConnection(), this.getClass().getName());
+        log.trace("[{}] Entry {}.preCommit", this.producer.getDatabaseConnection(),
+                this.getClass().getName());
 
         // Returning an empty set of offsets since the connector is going to handle all
         // offsets in the external system.
         currentOffsets.clear();
-        log.trace("[{}]:[{}] Exit {}.preCommit", Thread.currentThread().getId(),
-                this.producer.getDatabaseConnection(), this.getClass().getName());
+        log.trace("[{}] Exit {}.preCommit", this.producer.getDatabaseConnection(),
+                this.getClass().getName());
         return currentOffsets;
     }
 
@@ -167,8 +167,8 @@ public class TxEventQSinkTask extends SinkTask {
      */
     @Override
     public void open(Collection<TopicPartition> partitions) {
-        log.info("[{}]:[{}] Entry {}.open", Thread.currentThread().getId(),
-                this.producer.getDatabaseConnection(), this.getClass().getName());
+        log.info("[{}] Entry {}.open", this.producer.getDatabaseConnection(),
+                this.getClass().getName());
 
         HashMap<TopicPartition, Long> offsetMapNew = new HashMap<>();
         for (TopicPartition tp : partitions) // for each partition assigned
@@ -183,7 +183,7 @@ public class TxEventQSinkTask extends SinkTask {
         }
         this.context.offset(offsetMapNew);
 
-        log.info("[{}]:[{}] Exit {}.open", Thread.currentThread().getId(),
-                this.producer.getDatabaseConnection(), this.getClass().getName());
+        log.info("[{}] Exit {}.open", this.producer.getDatabaseConnection(),
+                this.getClass().getName());
     }
 }

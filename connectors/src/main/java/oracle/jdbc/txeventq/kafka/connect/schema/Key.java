@@ -50,9 +50,9 @@ public class Key {
      *                 the JMSMessage.
      */
     public Key(String keyValue) {
-        log.trace("[{}] Entry {}.Key", Thread.currentThread().getId(), this.getClass().getName());
+        log.trace("Entry {}.Key", this.getClass().getName());
         this.correlation = keyValue;
-        log.trace("[{}] Exit {}.Key", Thread.currentThread().getId(), this.getClass().getName());
+        log.trace("Exit {}.Key", this.getClass().getName());
     }
 
     /**
@@ -62,10 +62,8 @@ public class Key {
      *         independent Schema.
      */
     public Struct toKeyStructV1() {
-        log.trace("[{}] Entry {}.toKeyStructV1", Thread.currentThread().getId(),
-                this.getClass().getName());
-        log.trace("[{}] Exit {}.toKeyStructV1", Thread.currentThread().getId(),
-                this.getClass().getName());
+        log.trace("Entry {}.toKeyStructV1", this.getClass().getName());
+        log.trace("Exit {}.toKeyStructV1", this.getClass().getName());
         return new Struct(SCHEMA_KEY_V1).put("correlation", this.correlation);
     }
 }

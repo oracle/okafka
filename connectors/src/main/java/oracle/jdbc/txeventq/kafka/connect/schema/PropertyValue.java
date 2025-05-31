@@ -52,8 +52,7 @@ public class PropertyValue {
      * 
      */
     public PropertyValue(Object value) {
-        log.trace("[{}] Entry {}.PropertyValue", Thread.currentThread().getId(),
-                this.getClass().getName());
+        log.trace("Entry {}.PropertyValue", this.getClass().getName());
         this.value = value;
         if (value instanceof Boolean) {
             propertyType = "boolean";
@@ -76,8 +75,7 @@ public class PropertyValue {
                     "Unsupported value propertyType: " + value.getClass().getName() + ".");
         }
 
-        log.trace("[{}] Exit {}.PropertyValue", Thread.currentThread().getId(),
-                this.getClass().getName());
+        log.trace("Exit {}.PropertyValue", this.getClass().getName());
     }
 
     /**

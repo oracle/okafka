@@ -41,6 +41,8 @@ import org.apache.kafka.connect.data.Struct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import oracle.jms.AQjmsMessage;
+
 public class JmsMessage {
     protected static final Logger log = LoggerFactory.getLogger(JmsMessage.class);
     public static final Schema SCHEMA_JMSMESSAGE_V1 = SchemaBuilder.struct().name("JMSMessage")
@@ -53,7 +55,7 @@ public class JmsMessage {
             .field("redelivered", Schema.BOOLEAN_SCHEMA)
             .field("priority", Schema.OPTIONAL_INT32_SCHEMA)
             .field("expiration", Schema.OPTIONAL_INT64_SCHEMA)
-            .field("type", Schema.OPTIONAL_STRING_SCHEMA)
+            .field("type", Schema.OPTIONAL_STRING_SCHEMA).field("retry_count", Schema.INT32_SCHEMA)
             .field("properties",
                     SchemaBuilder.map(Schema.STRING_SCHEMA, PropertyValue.SCHEMA_PROPERTYVALUE_V1))
             .required().field("payloadText", Schema.OPTIONAL_STRING_SCHEMA)
@@ -75,6 +77,7 @@ public class JmsMessage {
     private final long timestamp;
     private final int deliveryMode;
     private final boolean redelivered;
+    private final int retryCount;
     private final Map<String, Struct> properties;
     private final byte[] payloadBytes;
     private final String payloadText;
@@ -88,8 +91,7 @@ public class JmsMessage {
      * @throws SQLException
      */
     public JmsMessage(Message jms) throws JMSException, SQLException {
-        log.trace("[{}] Entry {}.JmsMessage", Thread.currentThread().getId(),
-                this.getClass().getName());
+        log.trace("Entry {}.JmsMessage", this.getClass().getName());
 
         this.messageId = jms.getJMSMessageID();
         this.correlationId = jms.getJMSCorrelationID();
@@ -106,6 +108,7 @@ public class JmsMessage {
         this.properties = propertiesMap(jms);
         this.deliveryMode = jms.getJMSDeliveryMode();
         this.type = jms.getJMSType();
+        this.retryCount = ((AQjmsMessage) jms).getAttempts();
 
         if (jms instanceof BytesMessage) {
             this.messageType = "bytes";
@@ -142,8 +145,7 @@ public class JmsMessage {
             throw new UnsupportedOperationException(
                     "JMS message type '" + jms.getClass() + "' is not supported.");
         }
-        log.trace("[{}] Exit {}.JmsMessage", Thread.currentThread().getId(),
-                this.getClass().getName());
+        log.trace("Exit {}.JmsMessage", this.getClass().getName());
     }
 
     /**
@@ -154,8 +156,7 @@ public class JmsMessage {
      * @throws JMSException
      */
     private static Map<String, Struct> propertiesMap(Message jms) throws JMSException {
-        log.trace("[{}] Entry {}.propertiesMap", Thread.currentThread().getId(),
-                JmsMessage.class.getName());
+        log.trace("Entry {}.propertiesMap", JmsMessage.class.getName());
         final Map<String, Struct> result = new HashMap<>();
         final Enumeration<?> names = jms.getPropertyNames();
         while (names.hasMoreElements()) {
@@ -167,8 +168,7 @@ public class JmsMessage {
             }
         }
 
-        log.trace("[{}] Exit {}.propertiesMap", Thread.currentThread().getId(),
-                JmsMessage.class.getName());
+        log.trace("Exit {}.propertiesMap", JmsMessage.class.getName());
         return result;
     }
 
@@ -179,14 +179,13 @@ public class JmsMessage {
      *         independent Schema.
      */
     public Struct toJmsMessageStructV1() {
-        log.trace("[{}] Entry {}.toJmsMessageStructV1", Thread.currentThread().getId(),
-                this.getClass().getName());
+        log.trace("Entry {}.toJmsMessageStructV1", this.getClass().getName());
         final Struct result = new Struct(SCHEMA_JMSMESSAGE_V1).put("messageType", this.messageType)
                 .put("messageId", this.messageId).put("correlationId", this.correlationId)
                 .put("priority", this.priority).put("expiration", this.expiration)
                 .put("timestamp", this.timestamp).put("redelivered", this.redelivered)
                 .put("properties", this.properties).put("deliveryMode", this.deliveryMode)
-                .put("type", this.type);
+                .put("type", this.type).put("retry_count", this.retryCount);
         if (payloadText != null) {
             result.put("payloadText", payloadText);
         }

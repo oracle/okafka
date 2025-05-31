@@ -32,7 +32,6 @@ import javax.jms.JMSException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import oracle.jms.AQjmsAgent;
 import oracle.jms.AQjmsDestination;
 
 public abstract class JmsUtils {
@@ -40,13 +39,12 @@ public abstract class JmsUtils {
     protected static final Logger log = LoggerFactory.getLogger(JmsUtils.class);
 
     /**
-     * Determines if the Destination is an instance of AQjmsDestination or AQjmsAgent. If an
-     * instance of AQjmsDestination gets either the queue name or the topic name. If an instance of
-     * AQjmsAgent then gets the name of the agent.
+     * Determines if the Destination is an instance of AQjmsDestination. If an instance of
+     * AQjmsDestination gets either the queue name or the topic name.
      * 
      * @param destination The Destination object
      *
-     * @return The queue name, topic name or agent name depending on the instance type.
+     * @return The queue name or topic name depending on the instance type.
      * @throws JMSException
      * @throws SQLException
      */
@@ -57,9 +55,6 @@ public abstract class JmsUtils {
             return ((AQjmsDestination) destination).getQueueName() != null
                     ? ((AQjmsDestination) destination).getQueueName()
                     : ((AQjmsDestination) destination).getTopicName();
-        } else if (destination instanceof AQjmsAgent) {
-            log.debug("Processing Destination of type AQjmsAgent");
-            return ((AQjmsAgent) destination).getName();
         }
         return null;
     }
@@ -110,46 +105,16 @@ public abstract class JmsUtils {
     }
 
     /**
-     * If the Destination is an instance of AQjmsAgent gets the address of the agent.
+     * Determines if the destination object is a queue or topic.
      * 
      * @param destination The Destination object.
-     * @return The address of agent. Null if not an instance of AQjmsAgent.
-     * @throws SQLException
-     */
-    public static String destinationAgentAddress(Destination destination) throws SQLException {
-        if (destination instanceof AQjmsAgent) {
-            return ((AQjmsAgent) destination).getAddress();
-        }
-        return null;
-    }
-
-    /**
-     * If the Destination is an instance of AQjmsAgent gets the protocol of the agent.
-     * 
-     * @param destination The Destination object.
-     * @return The protocol of the agent.
-     * @throws SQLException
-     */
-    public static int destinationAgentProtocol(Destination destination) throws SQLException {
-        if (destination instanceof AQjmsAgent) {
-            return ((AQjmsAgent) destination).getProtocol();
-        }
-        return 0;
-    }
-
-    /**
-     * Determines if the destination object is a queue, topic, or agent.
-     * 
-     * @param destination The Destination object.
-     * @return A string of "queue" if the object is a queue, string of "topic" if the object is a
-     *         topic, and string of "agent" if object is an agent. Null if none of the above apply.
+     * @return A string of "queue" if the object is a queue and string of "topic" if the object is a
+     *         topic. Null if none of the above apply.
      * @throws JMSException
      */
     public static String destinationType(Destination destination) throws JMSException {
         if (destination instanceof AQjmsDestination) {
             return ((AQjmsDestination) destination).getQueueName() != null ? "queue" : "topic";
-        } else if (destination instanceof AQjmsAgent) {
-            return "agent";
         }
         return null;
     }

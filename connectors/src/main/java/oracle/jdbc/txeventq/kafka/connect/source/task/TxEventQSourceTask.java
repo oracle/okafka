@@ -87,8 +87,7 @@ public class TxEventQSourceTask extends SourceTask {
      */
     @Override
     public void start(Map<String, String> properties) {
-        log.trace("[{}]:[{}] Entry {}.start, props={}", Thread.currentThread().getId(), this,
-                this.getClass().getName(), properties);
+        log.trace("[{}] Entry {}.start, props={}", this, this.getClass().getName(), properties);
 
         // Loading Task Configuration
         this.config = new TxEventQConnectorConfig(properties);
@@ -119,8 +118,8 @@ public class TxEventQSourceTask extends SourceTask {
                     + " must be greater than or equal to " + txEventQShardNum);
         }
 
-        log.trace("[{}]:[{}] Exit {}.start", Thread.currentThread().getId(),
-                this.consumer.getDatabaseConnection(), this.getClass().getName());
+        log.trace("[{}] Exit {}.start", this.consumer.getDatabaseConnection(),
+                this.getClass().getName());
     }
 
     /**
@@ -135,8 +134,8 @@ public class TxEventQSourceTask extends SourceTask {
      */
     @Override
     public List<SourceRecord> poll() throws InterruptedException {
-        log.trace("[{}]:[{}]:[{}] Entry {}.poll", Thread.currentThread().getId(),
-                this.consumer.getDatabaseConnection(), this, this.getClass().getName());
+        log.trace("[{}]:[{}] Entry {}.poll", this.consumer.getDatabaseConnection(), this,
+                this.getClass().getName());
 
         List<SourceRecord> records = new ArrayList<>();
 
@@ -163,9 +162,8 @@ public class TxEventQSourceTask extends SourceTask {
                 } else {
                     log.debug("Poll cycle is being skipped until previous batch completes.");
                     log.trace(
-                            "[{}]:[{}]  Exit {}.poll Poll cycle is being skipped until previous batch completes.",
-                            Thread.currentThread().getId(), this.consumer.getDatabaseConnection(),
-                            this.getClass().getName(), recordCount(records), messageCount);
+                            "[{}]  Exit {}.poll Poll cycle is being skipped until previous batch completes.",
+                            this.consumer.getDatabaseConnection(), this.getClass().getName());
                     return null;
                 }
             }
@@ -179,13 +177,12 @@ public class TxEventQSourceTask extends SourceTask {
          */
 
         final int currentPollRotation = pollRotation.incrementAndGet();
-        log.debug("[{}]:[{}] Starting poll rotation {}", Thread.currentThread().getId(),
-                this.consumer.getDatabaseConnection(), currentPollRotation);
+        log.debug("[{}] Starting poll rotation {}", this.consumer.getDatabaseConnection(),
+                currentPollRotation);
 
         try {
             if (!stopNow.get()) {
-                log.debug("[{}]:[{}]:[{}] Polling for TxEventQ messages.",
-                        Thread.currentThread().getId(), this,
+                log.debug("[{}]:[{}] Polling for TxEventQ messages.", this,
                         this.consumer.getDatabaseConnection());
 
                 records = this.consumer.receive(this.batchSize);
@@ -195,7 +192,7 @@ public class TxEventQSourceTask extends SourceTask {
                 }
 
             } else {
-                log.debug("[{}]:[{}] Stopping polling for records", Thread.currentThread().getId(),
+                log.debug("[{}] Stopping polling for records",
                         this.consumer.getDatabaseConnection());
             }
         } catch (final ConnectException exc) {
@@ -219,9 +216,9 @@ public class TxEventQSourceTask extends SourceTask {
             }
         }
 
-        log.trace("[{}]:[{}]  Exit {}.poll retvalSize={} messageCount={}",
-                Thread.currentThread().getId(), this.consumer.getDatabaseConnection(),
-                this.getClass().getName(), recordCount(records), messageCount);
+        log.trace("[{}]  Exit {}.poll retvalSize={} messageCount={}",
+                this.consumer.getDatabaseConnection(), this.getClass().getName(),
+                recordCount(records), messageCount);
 
         return records;
     }
@@ -236,28 +233,24 @@ public class TxEventQSourceTask extends SourceTask {
      * @throws InterruptedException
      */
     private boolean waitForBatchCompleteInKafka() throws InterruptedException {
-        log.trace("[{}]:[{}]:[{}] Entry {}.waitForBatchCompleteInKafka",
-                Thread.currentThread().getId(), this.consumer.getDatabaseConnection(), this,
-                this.getClass().getName());
+        log.trace("[{}] Entry {}.waitForBatchCompleteInKafka",
+                this.consumer.getDatabaseConnection(), this.getClass().getName());
 
-        log.debug("[{}][{}] Waiting for batch completion signal", Thread.currentThread().getId(),
+        log.debug("[{}] Waiting for batch completion signal",
                 this.consumer.getDatabaseConnection());
 
         final boolean batchIsCompleteInKafka = batchCompleteIndicator
                 .await(this.getSourceMaxPollBlockedTimeMs, TimeUnit.MILLISECONDS);
 
         if (batchIsCompleteInKafka) {
-            log.debug("[{}]:[{}] Committing records in database", Thread.currentThread().getId(),
-                    this.consumer.getDatabaseConnection());
+            log.debug("[{}] Committing records in database", this.consumer.getDatabaseConnection());
             this.consumer.commit();
         } else {
-            log.debug("[{}]:[{}]: {} messages from previous batch still not committed",
-                    Thread.currentThread().getId(), this.consumer.getDatabaseConnection(),
-                    batchCompleteIndicator.getCount());
+            log.debug("[{}]: {} messages from previous batch still not committed",
+                    this.consumer.getDatabaseConnection(), batchCompleteIndicator.getCount());
         }
 
-        log.trace("[{}]:[{}]:[{}] Exit {}.waitForBatchCompleteInKafka",
-                Thread.currentThread().getId(), this.consumer.getDatabaseConnection(), this,
+        log.trace("[{}] Exit {}.waitForBatchCompleteInKafka", this.consumer.getDatabaseConnection(),
                 this.getClass().getName());
         return batchIsCompleteInKafka;
     }
@@ -290,14 +283,14 @@ public class TxEventQSourceTask extends SourceTask {
     public void commitRecord(SourceRecord record, RecordMetadata metadata)
             throws InterruptedException {
 
-        log.trace("[{}]:[{}]:[{}] Entry {}.commitRecord, record={}", Thread.currentThread().getId(),
-                this.consumer.getDatabaseConnection(), this, this.getClass().getName(), record);
+        log.trace("[{}] Entry {}.commitRecord, record={}", this.consumer.getDatabaseConnection(),
+                this.getClass().getName(), record);
 
         batchCompleteIndicator.countDown();
         log.debug("CountDownLatch Value in commitRecord: {}", batchCompleteIndicator);
 
-        log.trace("[{}]:[{}]  Exit {}.commitRecord", Thread.currentThread().getId(),
-                this.consumer.getDatabaseConnection(), this.getClass().getName());
+        log.trace("[{}]  Exit {}.commitRecord", this.consumer.getDatabaseConnection(),
+                this.getClass().getName());
     }
 
     /**
@@ -309,8 +302,8 @@ public class TxEventQSourceTask extends SourceTask {
      */
     @Override
     public void stop() {
-        log.trace("[{}]:[{}]:[{}] Entry {}.stop", Thread.currentThread().getId(),
-                this.consumer.getDatabaseConnection(), this, this.getClass().getName());
+        log.trace("[{}] Entry {}.stop", this.consumer.getDatabaseConnection(),
+                this.getClass().getName());
 
         stopNow.set(true);
 
@@ -324,7 +317,7 @@ public class TxEventQSourceTask extends SourceTask {
             }
         }
 
-        log.trace("[{}] Exit {}.stop", Thread.currentThread().getId(), this.getClass().getName());
+        log.trace("Exit {}.stop", this.getClass().getName());
 
     }
 }

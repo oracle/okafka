@@ -46,9 +46,9 @@ grant select_catalog_role to user
 
 Once user is created and above privileges are granted, connect to Oracle Database as this user and create a Transactional Event Queue using below PL/SQL script.
 In the below script `SHARD_NUM` parameter for TxEventQ is set to 1, but this value should be modified to be less than or equal to the number of Kafka partitions
-assigned to the Kafka topic that the Sink Connector will be consuming from. The Sink Connector perform `Key_BASED_ENQUEUE`, which means that messages from a Kafka
-partition will be moved into the corresponding Transactional Event Queue shard. For instance, a message from Kafka partition 1 will be put into TxEventQ shard 2. This
-is being done so that ordering is preserved. The Sink Connector supports a JMS type Transactional Event Queue.
+assigned to the Kafka topic that the Sink Connector will be consuming from. The Sink Connector perform `KEY_BASED_ENQUEUE`, which means that messages from a Kafka
+partition will be moved into the corresponding Transactional Event Queue shard. **The Sink Connector supports a JMS type Transactional Event Queue and will store the 
+payload as a JMS_BYTES message.**
 
 ```roomsql
 exec sys.dbms_aqadm.create_transactional_event_queue(queue_name=>"TxEventQ", multiple_consumers => TRUE); 
@@ -58,11 +58,19 @@ exec sys.dbms_aqadm.start_queue('TxEventQ');
 exec sys.dbms_aqadm.add_subscriber('TxEventQ', SYS.AQ$_AGENT('SUB1', NULL, 0));
 ```
 
-**If using the Source Connector and ordering of the events are important then the Transactional Event Queue that the Kafka Source connector will be pulling from should have the `STICKY_DEQUEUE` parameter set to 1 and the configuration property `txeventq.map.shard.to.kafka_partition` needs to be set to true. The `SHARD_NUM` assigned to the queue**
-**should be less than or equal to the number of Kafka partitions assigned to the Kafka topic. The messages from the Transactional Event Queue will be placed into the specified Kafka topic partition based on the TxEventQ shard the message was dequeued**
-**from. For instance if the message came from TXEventQ shard 2 it will be placed into Kafka topic partition 1.**
+**If using the Source Connector and ordering of the events are important then the Transactional Event Queue that the Kafka Source connector will be pulling from needs to have been created with the `STICKY_DEQUEUE` parameter set to 1**
+**and the source connector configuration file needs to have the property `txeventq.map.shard.to.kafka_partition` set to true.**
+**The `SHARD_NUM` assigned to the queue should be less than or equal to the number of Kafka partitions assigned to the Kafka topic.**
+**The messages from the Transactional Event Queue will be placed into the specified Kafka topic partition based on the TxEventQ shard the message was dequeued from.**
 
-**Note: If running on a database version less than 23.4 with `STICKY_DEQUEUE` the `tasks.max` value must be equal to the `SHARD_NUM` specified. If the `tasks.max` is not equal to the `SHARD_NUM` dequeue from all event streams will not be performed.**
+**Note: If running on a database version less than 23.4 with `STICKY_DEQUEUE` set to 1 the source connector configuration file property `tasks.max` value must be equal to the `SHARD_NUM` specified. If the `tasks.max` is not equal to the `SHARD_NUM` dequeue from all event streams will not be performed.**
+
+Here is the source connector configuration property that needs to be set in the configuration properties file that is discussed in more details below.
+
+```roomsql
+txeventq.map.shard.to.kafka_partition=true
+```
+Here is the PL/SQL script to create the Transactional Event Queue that will be used by the Source Connector if ordering of the events is required.
 
 ```roomsql
 exec sys.dbms_aqadm.create_transactional_event_queue(queue_name=>"TxEventQ", multiple_consumers => TRUE); 
@@ -337,9 +345,7 @@ bootstrap.servers=<broker i.e localhost:9092>
 # since this is the time used by Kafka to determine the amount of time to wait for the tasks to shutdown gracefully. 
 source.max.poll.blocked.time.ms=<time in milliseconds, default is 2000>
 
-# This property will specify whether the messages from a TxEventQ shard will be placed into the respective Kafka partition.
-# If this property is set to true all the messages from shard 2 will be sent to Kafka partition 1, messages from shard 4 will be
-# sent to Kafka partition 2, etc. 
+# This property will specify whether the messages from a TxEventQ shard will be placed into the respective Kafka partitions.
 # If ordering within the shards need to be maintained when sent to the Kafka topic this property will
 # need to be set to true and the TxEventQ will need to be created with 'STICKY_DEQUEUE' queue parameter set to 1. 
 # If this property is set to true the number of Kafka partitions for the topic will need to be equal or greater 
@@ -370,49 +376,48 @@ be used as the key for the message that will be placed into a Kafka topic. The s
 
 | Field Name    | Schema                      							| Required | Default Value | Description                                                  |
 |---------------|-------------------------------------------------------|----------|---------------|--------------------------------------------------------------|
-| correlation   | String                                                | Yes      |               |This field stores the value of [Message.getJMSCorrelationID()](https://docs.oracle.com/javaee/6/api/javax/jms/Message.html#getJMSCorrelationID()).|
+| correlation   | String                                                | Yes      |               |This field stores the value of [Message.getJMSCorrelationID()](https://docs.oracle.com/javaee/7/api/javax/jms/Message.html#getJMSCorrelationID()).|
 
 #### JMS Message Schema
 This schema is used to store the value of the JMS message. The schema defines the following fields:
 
 | Field Name    | Schema                      							| Required | Default Value | Description                                                  |
 |---------------|-------------------------------------------------------|----------|---------------|--------------------------------------------------------------|
-| messageId     | String                      							| Yes      | 			   | This field stores the value of [Message.getJMSMessageID()](https://docs.oracle.com/javaee/6/api/javax/jms/Message.html#getJMSMessageID()).|
+| messageId     | String                      							| Yes      | 			   | This field stores the value of [Message.getJMSMessageID()](https://docs.oracle.com/javaee/7/api/javax/jms/Message.html#getJMSMessageID()).|
 | messageType   | String                      							| Yes      | 			   | `text`, `map` or `bytes` depending on received message type. |
-| correlationId | String                      							| No       | 			   | This field stores the value of [Message.getJMSCorrelationID()](https://docs.oracle.com/javaee/6/api/javax/jms/Message.html#getJMSCorrelationID()).|
-| destination   | [JMS Destination](#jms-destination-schema)			| No       | 			   | This schema is used to represent a JMS Destination, and is either [queue](https://docs.oracle.com/javaee/6/api/javax/jms/Queue.html) or [topic](https://docs.oracle.com/javaee/6/api/javax/jms/Topic.html).|
-| replyTo       | [JMS Destination](#jms-destination-schema)			| No       | 			   | This schema is used to represent a JMS Destination, and is either [queue](https://docs.oracle.com/javaee/6/api/javax/jms/Queue.html), [topic](https://docs.oracle.com/javaee/6/api/javax/jms/Topic.html), or [agent](https://docs.oracle.com/en/database/oracle/oracle-database/23/arpls/advanced-queuing-AQ-types.html#GUID-2F1133F1-6F59-4379-8493-923C042E7042).|
-| priority      | Int32                       							| No       | 	    	   | This field stores the value of [Message.getJMSPriority()](https://docs.oracle.com/javaee/6/api/javax/jms/Message.html#getJMSPriority()).|
-| expiration    | Int64                       							| No       | 			   | This field stores the value of [Message.getJMSExpiration()](https://docs.oracle.com/javaee/6/api/javax/jms/Message.html#getJMSExpiration()).|
+| correlationId | String                      							| No       | 			   | This field stores the value of [Message.getJMSCorrelationID()](https://docs.oracle.com/javaee/7/api/javax/jms/Message.html#getJMSCorrelationID()).|
+| destination   | [JMS Destination](#jms-destination-schema)			| No       | 			   | This schema is used to represent a JMS Destination, and is either [queue](https://docs.oracle.com/javaee/7/api/javax/jms/Queue.html) or [topic](https://docs.oracle.com/javaee/7/api/javax/jms/Topic.html).|
+| replyTo       | [JMS Destination](#jms-destination-schema)			| No       | 			   | This schema is used to represent a JMS Destination, and is either [queue](https://docs.oracle.com/javaee/7/api/javax/jms/Queue.html) or [topic](https://docs.oracle.com/javaee/7/api/javax/jms/Topic.html).|
+| priority      | Int32                       							| No       | 	    	   | This field stores the value of [Message.getJMSPriority()](https://docs.oracle.com/javaee/7/api/javax/jms/Message.html#getJMSPriority()).|
+| expiration    | Int64                       							| No       | 			   | This field stores the value of [Message.getJMSExpiration()](https://docs.oracle.com/javaee/7/api/javax/jms/Message.html#getJMSExpiration()).|
 | type          | String                      							| No       | 			   | This field stores the value of [Message.getJMSType()](https://docs.oracle.com/javaee/6/api/javax/jms/Message.html#getJMSType()).|   
-| timestamp     | Int64                       							| Yes      | 			   | Data from the [getJMSTimestamp()](https://docs.oracle.com/javaee/6/api/javax/jms/Message.html#getJMSTimestamp()) method.|
-| deliveryMode  | Int32                                                 | Yes      |               | This field stores the value of [Message.getJMSDeliveryMode()](https://docs.oracle.com/javaee/6/api/javax/jms/Message.html#getJMSDeliveryMode()).|
-| redelivered   | Boolean                     							| Yes      | 			   | This field stores the value of [Message.getJMSRedelivered()](https://docs.oracle.com/javaee/6/api/javax/jms/Message.html#getJMSRedelivered()).|
+| timestamp     | Int64                       							| Yes      | 			   | Data from the [getJMSTimestamp()](https://docs.oracle.com/javaee/7/api/javax/jms/Message.html#getJMSTimestamp()) method.|
+| deliveryMode  | Int32                                                 | Yes      |               | This field stores the value of [Message.getJMSDeliveryMode()](https://docs.oracle.com/javaee/7/api/javax/jms/Message.html#getJMSDeliveryMode()).|
+| retry_count   | Int32                                                 | Yes      |               | This field stores the number of attempts for a retry on the message.|
+| redelivered   | Boolean                     							| Yes      | 			   | This field stores the value of [Message.getJMSRedelivered()](https://docs.oracle.com/javaee/7/api/javax/jms/Message.html#getJMSRedelivered()).|
 | properties    | Map<String, [Property Value](#property-value-schema)> | Yes      | 			   | This field stores the data from all of the properties for the Message indexed by their propertyName.|
-| payloadBytes  | Bytes                       							| No       | 			   | This field stores the value from [BytesMessage.readBytes(byte[])](https://docs.oracle.com/javaee/6/api/javax/jms/BytesMessage.html#readBytes(byte[])). Empty for other types.| 
-| payloadText   | String                      							| No       | 			   | This field stores the value from [TextMessage.getText()](https://docs.oracle.com/javaee/6/api/javax/jms/TextMessage.html#getText()). Empty for other types.|
-| payloadMap    | Map<String, [Property Value](#property-value-schema)> | No       | 			   | This field stores the data from all of the map entries returned from [MapMessage.getMapNames()](https://docs.oracle.com/javaee/6/api/javax/jms/MapMessage.html#getMapNames()) for the Message indexed by their key. Empty for other types.|
+| payloadBytes  | Bytes                       							| No       | 			   | This field stores the value from [BytesMessage.readBytes(byte[])](https://docs.oracle.com/javaee/7/api/javax/jms/BytesMessage.html#readBytes(byte[])). Empty for other types.| 
+| payloadText   | String                      							| No       | 			   | This field stores the value from [TextMessage.getText()](https://docs.oracle.com/javaee/7/api/javax/jms/TextMessage.html#getText()). Empty for other types.|
+| payloadMap    | Map<String, [Property Value](#property-value-schema)> | No       | 			   | This field stores the data from all of the map entries returned from [MapMessage.getMapNames()](https://docs.oracle.com/javaee/7/api/javax/jms/MapMessage.html#getMapNames()) for the Message indexed by their key. Empty for other types.|
 
 
 #### JMS Destination Schema
-This schema is used to depict a JMS Destination, and is either a [queue](https://docs.oracle.com/javaee/7/api/javax/jms/Queue.html), [topic](https://docs.oracle.com/javaee/7/api/javax/jms/Topic.html), or [agent](https://docs.oracle.com/en/database/oracle/oracle-database/23/arpls/advanced-queuing-AQ-types.html#GUID-2F1133F1-6F59-4379-8493-923C042E7042).
+This schema is used to depict a JMS Destination, and is either a [queue](https://docs.oracle.com/javaee/7/api/javax/jms/Queue.html) or [topic](https://docs.oracle.com/javaee/7/api/javax/jms/Topic.html).
 The schema defines the following fields:
 
 | Field Name 	   | Schema | Required | Default Value | Description                 |
 |------------------|--------|----------|---------------|-----------------------------|
-| type             | String | Yes      | 			   | JMS destination type (`queue`, `topic`, or `agent`).|
-| name             | String | Yes      | 			   | JMS destination name. If the JMS destination type is a `queue` this will be the value of [AQjmsDestination.getQueueName()](https://docs.oracle.com/en/database/oracle/oracle-database/23/jajms/oracle/jms/AQjmsDestination.html#getQueueName__). If the JMS destination type is a `topic` this will be the value of [AQjmsDestination.getTopicName()](https://docs.oracle.com/en/database/oracle/oracle-database/23/jajms/oracle/jms/AQjmsDestination.html#getTopicName__). If the JMS destination type is an `agent` this will be the value of [AQjmsAgent.getName()](https://docs.oracle.com/cd/A84870_01/doc/server.816/a76935/oracle_j.htm#392318)|
+| type             | String | Yes      | 			   | JMS destination type (`queue` or `topic`).|
+| name             | String | Yes      | 			   | JMS destination name. If the JMS destination type is a `queue` this will be the value of [AQjmsDestination.getQueueName()](https://docs.oracle.com/en/database/oracle/oracle-database/23/jajms/oracle/jms/AQjmsDestination.html#getQueueName__). If the JMS destination type is a `topic` this will be the value of [AQjmsDestination.getTopicName()](https://docs.oracle.com/en/database/oracle/oracle-database/23/jajms/oracle/jms/AQjmsDestination.html#getTopicName__).|
 | owner            | String | No       |               | If JMS destination type is a `queue` this will be the value of [AQjmsDestination.getQueueOwner()](https://docs.oracle.com/en/database/oracle/oracle-database/23/jajms/oracle/jms/AQjmsDestination.html#getQueueOwner__). If JMS destination type is a `topic` this will be the value of [AQjmsDestination.getTopicOwner()](https://docs.oracle.com/en/database/oracle/oracle-database/23/jajms/oracle/jms/AQjmsDestination.html#getTopicOwner__)|
 | completeName     | String | No       |               | If the JMS destination type is either a `queue` or `topic` this will be the value of [AQjmsDestination.getCompleteName()](https://docs.oracle.com/en/database/oracle/oracle-database/23/jajms/oracle/jms/AQjmsDestination.html#getCompleteName__).|
 | completeTableName| String | No       |               | If the JMS destination type is either a `queue` or `topic` this will be the value of [AQjmsDestination.getCompleteTableName()](https://docs.oracle.com/en/database/oracle/oracle-database/23/jajms/oracle/jms/AQjmsDestination.html#getCompleteTableName__).|
-| address          | String | No       |               | If the JMS destination type is an `agent` this will be the value of [AQjmsAgent.getAddress()](https://docs.oracle.com/cd/A84870_01/doc/server.816/a76935/oracle_j.htm#392292)|
-| protocol         | Int32  | No       |               | If the JMS destination type is an `agent` this will be the value of [AQjmsAgent.getProtocol()](https://docs.oracle.com/cd/A84870_01/doc/server.816/a76935/oracle_j.htm#392336)|
 
 #### Property Value Schema
 This schema is used to store the data stored in the properties of the message. In order to
 make sure the proper type mappings are preserved the field `propertyType` will store value
 type of the field. The corresponding field in the schema will contain the data for the property.
-This ensures that the data is retrievable as the type returned by [Message.getObjectProperty()](https://docs.oracle.com/javaee/6/api/javax/jms/Message.html#getObjectProperty(java.lang.String)).
+This ensures that the data is retrievable as the type returned by [Message.getObjectProperty()](https://docs.oracle.com/javaee/7/api/javax/jms/Message.html#getObjectProperty(java.lang.String)).
 The schema defines the following fields: 
 
 | Field Name  | Schema  | Required | Default Value | Description                                                                             |
