@@ -50,8 +50,9 @@ public class TxEventQSinkConnector extends SinkConnector {
 
     @Override
     public void start(Map<String, String> originalProps) {
-        log.debug("[{}] Starting Oracle TxEventQ Sink Connector", Thread.currentThread().getId());
+        log.trace("Entry {}.start", this.getClass().getName());
         this.configProperties = originalProps;
+        log.trace("Exit {}.start", this.getClass().getName());
     }
 
     @Override

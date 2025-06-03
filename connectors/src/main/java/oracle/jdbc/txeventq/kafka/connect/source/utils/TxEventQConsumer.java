@@ -59,14 +59,19 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import oracle.AQ.AQOracleSQLException;
 import oracle.jdbc.OracleConnection;
 import oracle.jdbc.aq.AQDequeueOptions;
 import oracle.jdbc.aq.AQMessage;
 import oracle.jdbc.txeventq.kafka.connect.common.utils.Constants;
+import oracle.jdbc.txeventq.kafka.connect.schema.JmsMessage;
+import oracle.jdbc.txeventq.kafka.connect.schema.Key;
 import oracle.jms.AQjmsBytesMessage;
 import oracle.jms.AQjmsConsumer;
 import oracle.jms.AQjmsFactory;
+import oracle.jms.AQjmsMapMessage;
 import oracle.jms.AQjmsSession;
+import oracle.jms.AQjmsTextMessage;
 import oracle.sql.RAW;
 import oracle.sql.json.OracleJsonDatum;
 
@@ -96,6 +101,8 @@ public class TxEventQConsumer implements Closeable {
     private Topic topic;
     private TopicSubscriber topicDurSubscr1;
     private String getQueueType;
+    private boolean useSchemaForJmsMsg;
+    private boolean mapShardToKafkaPartition;
 
     private static final int MINIMUM_VERSION = 21;
     private int databaseMajorVersion = 0;
@@ -116,6 +123,7 @@ public class TxEventQConsumer implements Closeable {
                     this.config.getString(TxEventQConnectorConfig.DATABASE_WALLET_CONFIG));
             System.setProperty("oracle.net.tns_admin",
                     this.config.getString(TxEventQConnectorConfig.DATABASE_TNSNAMES_CONFIG));
+
             DriverManager.registerDriver(new oracle.jdbc.OracleDriver());
             String url = "jdbc:oracle:thin:@"
                     + this.config.getString(TxEventQConnectorConfig.DATABASE_TNS_ALIAS_CONFIG);
@@ -136,6 +144,12 @@ public class TxEventQConsumer implements Closeable {
             this.conn.setAutoCommit(false);
             this.getQueueType = getQueueTableType(this.config
                     .getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME).toUpperCase());
+
+            this.useSchemaForJmsMsg = this.config
+                    .getBoolean(TxEventQConnectorConfig.USE_SCHEMA_FOR_JMS_MESSAGES_CONFIG);
+
+            this.mapShardToKafkaPartition = this.config.getBoolean(
+                    TxEventQConnectorConfig.TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_CONFIG);
 
             this.connected = true;
             log.debug("[{}] Oracle TxEventQ connection [{}] opened.",
@@ -216,8 +230,9 @@ public class TxEventQConsumer implements Closeable {
 
             if (tSess != null) {
                 this.tSess.rollback();
-                log.debug("Session will be closed.");
+                log.debug("Session rollback occurred.");
                 this.tSess.close();
+                log.debug("Session closed.");
             }
 
             if (this.conn != null) {
@@ -289,6 +304,12 @@ public class TxEventQConsumer implements Closeable {
             this.getQueueType = getQueueTableType(this.config
                     .getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME).toUpperCase());
 
+            this.useSchemaForJmsMsg = this.config
+                    .getBoolean(TxEventQConnectorConfig.USE_SCHEMA_FOR_JMS_MESSAGES_CONFIG);
+
+            this.mapShardToKafkaPartition = this.config.getBoolean(
+                    TxEventQConnectorConfig.TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_CONFIG);
+
             log.debug("[{}] Oracle TxEventQ connection [{}] opened.",
                     Thread.currentThread().getId(), this.conn);
             this.connected = true;
@@ -328,8 +349,7 @@ public class TxEventQConsumer implements Closeable {
      */
     private TxEventQSourceRecord processRawPayload(byte[] msgId, AQMessage msg)
             throws SQLException {
-        log.trace("[{}]:[{}] Entry {}.processRawPayload", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}] Entry {}.processRawPayload", this.conn, this.getClass().getName());
         if (msgId == null) {
             throw new SQLException("Message Id for RAW message is null.");
         }
@@ -337,13 +357,15 @@ public class TxEventQConsumer implements Closeable {
         RAW rawPayload = msg.getRAWPayload();
         String kafkaTopic = this.config.getString(TxEventQConnectorConfig.KAFKA_TOPIC);
         String msgIdStr = byteArrayToHex(msgId);
+        String correlationId = msg.getMessageProperties().getCorrelation();
         int shardNum = getShardId(msgIdStr);
-        log.debug("[{}]:[{}] Processing RAW Type message:[msgId: {}, shardNum: {}]",
-                Thread.currentThread().getId(), this.conn, msgIdStr, shardNum);
 
-        log.trace("[{}]:[{}] Exit {}.processRawPayload", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
-        return new TxEventQSourceRecord(null, null, kafkaTopic, shardNum / 2, null,
+        log.debug("[{}] Processing RAW Type message:[msgId: {}, shardNum: {}]", this.conn, msgIdStr,
+                shardNum);
+
+        log.trace("[{}] Exit {}.processRawPayload", this.conn, this.getClass().getName());
+        return new TxEventQSourceRecord(null, null, kafkaTopic,
+                this.mapShardToKafkaPartition ? shardNum / 2 : null, null, correlationId, null,
                 rawPayload.getBytes(), TxEventQSourceRecord.PayloadType.RAW, msgId);
     }
 
@@ -358,23 +380,23 @@ public class TxEventQConsumer implements Closeable {
      */
     private TxEventQSourceRecord processJsonPayload(byte[] msgId, AQMessage msg)
             throws SQLException {
-        log.trace("[{}]:[{}] Entry {}.processJsonPayload", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.processJsonPayload", this.conn, this.getClass().getName());
         if (msgId == null) {
             throw new SQLException("Message Id for JSON message is null.");
         }
 
         OracleJsonDatum jsonPayload = msg.getJSONPayload();
         String msgIdStr = byteArrayToHex(msgId);
+        String correlationId = msg.getMessageProperties().getCorrelation();
         int shardNum = getShardId(msgIdStr);
-        String kafaTopic = this.config.getString(TxEventQConnectorConfig.KAFKA_TOPIC);
+        String kafkaTopic = this.config.getString(TxEventQConnectorConfig.KAFKA_TOPIC);
 
-        log.debug("[{}]:[{}] Processing JSON Type message:[msgId: {}, shardNum: {}]",
-                Thread.currentThread().getId(), this.conn, msgIdStr, shardNum);
+        log.debug("[{}] Processing JSON Type message:[msgId: {}, shardNum: {}]", this.conn,
+                msgIdStr, shardNum);
 
-        log.trace("[{}]:[{}] Exit {}.processJsonPayload", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
-        return new TxEventQSourceRecord(null, null, kafaTopic, shardNum / 2, null,
+        log.trace("[{}] Exit {}.processJsonPayload", this.conn, this.getClass().getName());
+        return new TxEventQSourceRecord(null, null, kafkaTopic,
+                this.mapShardToKafkaPartition ? shardNum / 2 : null, null, correlationId, null,
                 jsonPayload.getBytes(), TxEventQSourceRecord.PayloadType.JSON, msgId);
     }
 
@@ -388,34 +410,28 @@ public class TxEventQConsumer implements Closeable {
      */
     public List<SourceRecord> receive(int batchSize) {
         if (!connectConnectionInternal()) {
-            log.trace("[{}]:[{}]  Exit {}.receive, retval=null", Thread.currentThread().getId(),
-                    this.conn, this.getClass().getName());
+            log.trace("[{}]  Exit {}.receive, retval=null", this.conn, this.getClass().getName());
             return Collections.emptyList();
         }
 
-        log.trace("[{}]:[{}]  Entry {}.receive", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}]  Entry {}.receive", this.conn, this.getClass().getName());
 
-        log.debug("[{}]:[{}] Queue table {} is a {} type table.", Thread.currentThread().getId(),
-                this.conn, this.config.getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME),
-                getQueueType);
+        log.debug("[{}] Queue table {} is a {} type table.", this.conn,
+                this.config.getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME),
+                this.getQueueType);
 
         if (this.getQueueType != null && this.getQueueType.equalsIgnoreCase("JMS_BYTES")) {
-            log.trace("[{}]:[{}]  Exit {}.receive", Thread.currentThread().getId(), this.conn,
-                    this.getClass().getName());
+            log.trace("[{}]  Exit {}.receive", this.conn, this.getClass().getName());
             return receiveJmsMessages(batchSize);
         } else if (this.getQueueType != null && this.getQueueType.equalsIgnoreCase("RAW")) {
-            log.trace("[{}]:[{}]  Exit {}.receive", Thread.currentThread().getId(), this.conn,
-                    this.getClass().getName());
+            log.trace("[{}]  Exit {}.receive", this.conn, this.getClass().getName());
             return receiveRawAQMessages(this.getQueueType, batchSize);
         } else if (this.getQueueType != null && this.getQueueType.equalsIgnoreCase("JSON")) {
-            log.trace("[{}]:[{}]  Exit {}.receive", Thread.currentThread().getId(), this.conn,
-                    this.getClass().getName());
+            log.trace("[{}]  Exit {}.receive", this.conn, this.getClass().getName());
             return receiveJsonAQMessages(this.getQueueType, batchSize);
         } else {
             log.error("Supported queue types are: JMS_BYTES, RAW, and JSON");
-            log.trace("[{}]:[{}]  Exit {}.receive, retval=null", Thread.currentThread().getId(),
-                    this.conn, this.getClass().getName());
+            log.trace("[{}]  Exit {}.receive", this.conn, this.getClass().getName());
             return Collections.emptyList();
         }
     }
@@ -429,8 +445,7 @@ public class TxEventQConsumer implements Closeable {
      * @return A list of SourceRecords containing the messages that has been dequeued.
      */
     public List<SourceRecord> receiveRawAQMessages(String queueType, int batchSize) {
-        log.trace("[{}]:[{}]  Entry {}.receiveRawAQMessage", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}]  Entry {}.receiveRawAQMessage", this.conn, this.getClass().getName());
         AQDequeueOptions deqopt = new AQDequeueOptions();
 
         deqopt.setRetrieveMessageId(true);
@@ -477,9 +492,8 @@ public class TxEventQConsumer implements Closeable {
             throw exc;
         }
 
-        log.trace("[{}]:[{}]  Exit {}.receiveRawAQMessage, retvalArrSize={}",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName(),
-                records.size());
+        log.trace("[{}]  Exit {}.receiveRawAQMessage, retvalArrSize={}", this.conn,
+                this.getClass().getName(), records.size());
 
         return records;
     }
@@ -493,8 +507,7 @@ public class TxEventQConsumer implements Closeable {
      * @return A list of SourceRecords containing the messages that has been dequeued.
      */
     public List<SourceRecord> receiveJsonAQMessages(String queueType, int batchSize) {
-        log.trace("[{}]:[{}]  Entry {}.receiveJsonAQMessage", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}]  Entry {}.receiveJsonAQMessage", this.conn, this.getClass().getName());
         AQDequeueOptions deqopt = new AQDequeueOptions();
         int msgCount = 0;
 
@@ -544,43 +557,97 @@ public class TxEventQConsumer implements Closeable {
             throw exc;
         }
 
-        log.trace("[{}]:[{}]  Exit {}.receiveJsonAQMessage, retvalArrSize={}",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName(),
-                records.size());
+        log.trace("[{}]  Exit {}.receiveJsonAQMessage, retvalArrSize={}", this.conn,
+                this.getClass().getName(), records.size());
 
         return records;
     }
 
     /**
-     * Processes the JMS bytes message that was dequeued and creates a new TxEventQSourceRecord.
+     * Processes the JMS messages that was dequeued and creates a new TxEventQSourceRecord. The
+     * method determines whether the message is a JMS bytes, JMS text, or JMS map message and
+     * processes accordingly.
      * 
      * @param msgId The message Id of the message that was dequeued.
      * @param msg   The message that was dequeued.
      * @return A TxEventQSourceRecord containing the message information, Kafka topic, and
      *         partitions location for Kafka to store the message at.
      * @throws JMSException
+     * @throws SQLException
      */
-    private TxEventQSourceRecord processJmsBytes(String msgId, Message msg) throws JMSException {
-        log.trace("[{}]:[{}] Entry {}.processJmsBytes", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+    private TxEventQSourceRecord processJmsMessage(String msgId, Message msg)
+            throws JMSException, SQLException {
+        log.trace("[{}] Entry {}.processJmsMessage", this.conn, this.getClass().getName());
         if (msgId == null) {
-            throw new JMSException("Message Id for JMS bytes message is null.");
+            throw new JMSException("Message Id for JMS message is null.");
         }
 
-        AQjmsBytesMessage byteMessage;
-        if (msg instanceof AQjmsBytesMessage) {
-            String kafkaTopic = this.config.getString(TxEventQConnectorConfig.KAFKA_TOPIC);
-            byteMessage = (AQjmsBytesMessage) msg;
-            String msgIdStr = byteArrayToHex(byteMessage.getJMSMessageIDAsBytes());
-            int shardNum = getShardId(msgIdStr);
-            byte[] bytePayload = byteMessage.getBytesData();
-            log.debug("[{}]:[{}] Processing JMS_BYTES message:[msgIdStr: {}, shardNum: {}]",
-                    Thread.currentThread().getId(), this.conn, msgIdStr, shardNum);
+        String kafkaTopic = this.config.getString(TxEventQConnectorConfig.KAFKA_TOPIC);
+        String msgIdStr = msg.getJMSMessageID();
+        String correlationId = msg.getJMSCorrelationID();
+        Key correlationKey = new Key(correlationId);
+        int shardNum = getShardId(msgIdStr);
 
-            log.trace("[{}]:[{}] Exit {}.processJmsBytes", Thread.currentThread().getId(),
-                    this.conn, this.getClass().getName());
-            return new TxEventQSourceRecord(null, null, kafkaTopic, shardNum / 2, null, bytePayload,
-                    TxEventQSourceRecord.PayloadType.JMS, byteMessage.getJMSMessageIDAsBytes());
+        if (msg instanceof AQjmsBytesMessage) {
+
+            AQjmsBytesMessage byteMessage = (AQjmsBytesMessage) msg;
+
+            JmsMessage jmsMsg = new JmsMessage(byteMessage);
+
+            log.debug(
+                    "[{}] Processing JMS Bytes message:[msgIdStr: {}, shardNum: {}, correlationId: {}]",
+                    this.conn, msgIdStr, shardNum, correlationId);
+
+            log.trace("[{}] Exit {}.processJmsMessage", this.conn, this.getClass().getName());
+            return new TxEventQSourceRecord(null, null, kafkaTopic,
+                    this.mapShardToKafkaPartition ? shardNum / 2 : null,
+                    this.useSchemaForJmsMsg && correlationId != null ? Key.SCHEMA_KEY_V1 : null,
+                    this.useSchemaForJmsMsg && correlationId != null
+                            ? correlationKey.toKeyStructV1()
+                            : correlationId,
+                    this.useSchemaForJmsMsg ? JmsMessage.SCHEMA_JMSMESSAGE_V1 : null,
+                    this.useSchemaForJmsMsg ? jmsMsg.toJmsMessageStructV1()
+                            : byteMessage.getBytesData(),
+                    TxEventQSourceRecord.PayloadType.JMS_BYTES,
+                    byteMessage.getJMSMessageIDAsBytes());
+        } else if (msg instanceof AQjmsTextMessage) {
+            AQjmsTextMessage textMsg = (AQjmsTextMessage) msg;
+            JmsMessage jmsMsg = new JmsMessage(textMsg);
+
+            log.debug(
+                    "[{}] Processing JMS Text message:[msgIdStr: {}, shardNum: {}, correlationId: {}]",
+                    this.conn, msgIdStr, shardNum, correlationId);
+
+            log.trace("[{}] Exit {}.processJmsMessage", this.conn, this.getClass().getName());
+
+            return new TxEventQSourceRecord(null, null, kafkaTopic,
+                    this.mapShardToKafkaPartition ? shardNum / 2 : null,
+                    this.useSchemaForJmsMsg && correlationId != null ? Key.SCHEMA_KEY_V1 : null,
+                    this.useSchemaForJmsMsg && correlationId != null
+                            ? correlationKey.toKeyStructV1()
+                            : correlationId,
+                    this.useSchemaForJmsMsg ? JmsMessage.SCHEMA_JMSMESSAGE_V1 : null,
+                    this.useSchemaForJmsMsg ? jmsMsg.toJmsMessageStructV1() : textMsg.getText(),
+                    TxEventQSourceRecord.PayloadType.JMS_TEXT, textMsg.getJMSMessageIDAsBytes());
+        } else if (msg instanceof AQjmsMapMessage) {
+            AQjmsMapMessage mapMsg = (AQjmsMapMessage) msg;
+            JmsMessage jmsMsg = new JmsMessage(mapMsg);
+
+            log.debug(
+                    "[{}] Processing JMS Map message:[msgIdStr: {}, shardNum: {}, correlationId: {}]",
+                    this.conn, msgIdStr, shardNum, correlationId);
+
+            log.trace("[{}] Exit {}.processJmsMessage", this.conn, this.getClass().getName());
+
+            return new TxEventQSourceRecord(null, null, kafkaTopic,
+                    this.mapShardToKafkaPartition ? shardNum / 2 : null,
+                    this.useSchemaForJmsMsg && correlationId != null ? Key.SCHEMA_KEY_V1 : null,
+                    this.useSchemaForJmsMsg && correlationId != null
+                            ? correlationKey.toKeyStructV1()
+                            : correlationId,
+                    this.useSchemaForJmsMsg ? JmsMessage.SCHEMA_JMSMESSAGE_V1 : null,
+                    this.useSchemaForJmsMsg ? jmsMsg.toJmsMessageStructV1() : mapMsg.getMapNames(),
+                    TxEventQSourceRecord.PayloadType.JMS_MAP, mapMsg.getJMSMessageIDAsBytes());
         }
 
         return null;
@@ -620,8 +687,7 @@ public class TxEventQConsumer implements Closeable {
      * @return The number of shards.
      */
     public int getNumOfShardsForQueue(String queue) {
-        log.trace("[{}]:[{}] Entry {}.getNumOfShardsForQueue", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.getNumOfShardsForQueue", this.conn, this.getClass().getName());
 
         int numShard;
         try (CallableStatement getnumshrdStmt = this.conn
@@ -638,8 +704,7 @@ public class TxEventQConsumer implements Closeable {
         }
 
         log.debug("Number of shards for {}: {}", queue, numShard);
-        log.trace("[{}]:[{}] Exit {}.getNumOfShardsForQueue", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Exit {}.getNumOfShardsForQueue", this.conn, this.getClass().getName());
         return numShard;
     }
 
@@ -650,8 +715,7 @@ public class TxEventQConsumer implements Closeable {
      * @return True if the queue is using sticky dequeue, otherwise false.
      */
     public boolean isStickyDequeue(String queue) {
-        log.trace("[{}]:[{}] Entry {}.isStickyDequeue", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}] Entry {}.isStickyDequeue", this.conn, this.getClass().getName());
 
         int stickyDequeue;
         try (CallableStatement getnumshrdStmt = this.conn
@@ -668,8 +732,7 @@ public class TxEventQConsumer implements Closeable {
         }
 
         log.debug("Sticky dequeue for {}: {}", queue, stickyDequeue);
-        log.trace("[{}]:[{}] Exit {}.isStickyDequeue", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}] Exit {}.isStickyDequeue", this.conn, this.getClass().getName());
 
         return stickyDequeue == 1;
     }
@@ -681,8 +744,7 @@ public class TxEventQConsumer implements Closeable {
      * @return The size of the partition for the specified topic.
      */
     public int getKafkaTopicPartitionSize(String topic) {
-        log.trace("[{}]:[{}] Entry {}.getKafkaTopicPartitionSize", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}] Entry {}.getKafkaTopicPartitionSize", this.conn, this.getClass().getName());
         Properties properties = new Properties();
         properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
                 this.config.getList(TxEventQConnectorConfig.BOOTSTRAP_SERVERS_CONFIG));
@@ -701,9 +763,8 @@ public class TxEventQConsumer implements Closeable {
         } catch (Exception e) {
             throw new ConnectException("Unable to get Kafka partition size: " + e.getMessage());
         }
-        log.trace("[{}]:[{}] Exit {}.getKafkaTopicPartitionSize, retval={}",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName(),
-                partitionSize);
+        log.trace("[{}] Exit {}.getKafkaTopicPartitionSize, retval={}", this.conn,
+                this.getClass().getName(), partitionSize);
         return partitionSize;
     }
 
@@ -715,8 +776,7 @@ public class TxEventQConsumer implements Closeable {
      * @return A list of SourceRecords to be used by Kafka.
      */
     public List<SourceRecord> receiveJmsMessages(int batchSize) {
-        log.trace("[{}]:[{}]  Entry {}.receiveJmsMessages", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName());
+        log.trace("[{}]  Entry {}.receiveJmsMessages", this.conn, this.getClass().getName());
         Message[] jmsMesg = null;
         List<SourceRecord> records = new ArrayList<>();
         SourceRecord sr = null;
@@ -730,14 +790,14 @@ public class TxEventQConsumer implements Closeable {
                 if (jmsMesg != null && jmsMesg.length != 0) {
                     this.inflight = true;
                     for (int i = 0; i < jmsMesg.length; i++) {
-
                         String msgId = jmsMesg[i].getJMSMessageID();
-                        sr = processJmsBytes(msgId, jmsMesg[i]);
+                        sr = processJmsMessage(msgId, jmsMesg[i]);
+                        log.debug("The returned record is: {}", sr);
                         records.add(sr);
                     }
                 }
             }
-        } catch (JMSException e) {
+        } catch (JMSException | SQLException e) {
             handleException(e);
             records.clear();
         } catch (final ConnectException exc) {
@@ -745,9 +805,8 @@ public class TxEventQConsumer implements Closeable {
             throw exc;
         }
 
-        log.trace("[{}]:[{}]  Exit {}.receiveJmsMessages, retvalArrSize={}",
-                Thread.currentThread().getId(), this.conn, this.getClass().getName(),
-                records.size());
+        log.trace("[{}]  Exit {}.receiveJmsMessages, retvalArrSize={}", this.conn,
+                this.getClass().getName(), records.size());
 
         return records;
     }
@@ -757,8 +816,7 @@ public class TxEventQConsumer implements Closeable {
      * connector can keep running and just trying again is likely to fix things.
      */
     private ConnectException handleException(final Throwable exc) {
-        log.trace("[{}]:[{}]  Entry {}.handleException", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}]  Entry {}.handleException", this.conn, this.getClass().getName());
         boolean isRetriable = false;
         boolean mustClose = true;
 
@@ -780,6 +838,12 @@ public class TxEventQConsumer implements Closeable {
         case Constants.ORA_25348:
         case Constants.ORA_01109:
         case Constants.JMS_131:
+        case Constants.ORA_17009:
+        case Constants.ORA_17800:
+        case Constants.ORA_01017:
+        case Constants.ORA_18730:
+        case Constants.ORA_03113:
+        case Constants.ORA_12521:
             isRetriable = true;
             break;
         case Constants.ORA_25228:
@@ -812,8 +876,7 @@ public class TxEventQConsumer implements Closeable {
             return new RetriableException(exc);
         }
 
-        log.trace("[{}]:[{}]  Exit {}.handleException", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}]  Exit {}.handleException", this.conn, this.getClass().getName());
         return new ConnectException(exc);
     }
 
@@ -824,36 +887,67 @@ public class TxEventQConsumer implements Closeable {
      * @return The error code from the exception.
      */
     private int getErrorCode(final Throwable exc) {
+        log.trace("[{}]  Entry {}.getErrorCode", this.conn, this.getClass().getName());
         int errorCode = -1;
 
         if (exc instanceof SQLException) {
+            log.debug("In instanceof SQLException");
             final SQLException sqlExcep = (SQLException) exc;
             log.error("{}:[{}] {}", sqlExcep.getClass().getName(), sqlExcep.getErrorCode(),
                     sqlExcep.getMessage());
             errorCode = sqlExcep.getErrorCode();
 
         } else if (exc instanceof JMSException) {
+            log.debug("In instanceof JMSException");
             final JMSException jmse = (JMSException) exc;
             Throwable e = jmse.getCause();
             if (e != null) {
                 if (e instanceof SQLRecoverableException) {
+                    log.debug("In instanceof SQLRecoverableException");
                     final SQLRecoverableException sqlre = (SQLRecoverableException) e;
                     log.error("{} caused by {}: [{}] {}", jmse.getClass().getName(),
                             sqlre.getClass().getName(), sqlre.getErrorCode(), sqlre.getMessage());
                     errorCode = sqlre.getErrorCode();
                 } else if (e instanceof SQLException) {
+                    log.debug("In instanceof SQLException");
                     final SQLException sqlExcep = (SQLException) e;
                     log.error("{} caused by {}: [{}] {}", jmse.getClass().getName(),
                             sqlExcep.getClass().getName(), sqlExcep.getErrorCode(),
                             sqlExcep.getMessage());
                     errorCode = sqlExcep.getErrorCode();
+                } else if (e instanceof AQOracleSQLException) {
+                    log.debug("In instanceof AQOracleSQLException");
+                    final AQOracleSQLException aqOracleSqlExcep = (AQOracleSQLException) e;
+                    log.error("{} caused by {}: [{}] {}", jmse.getClass().getName(),
+                            aqOracleSqlExcep.getClass().getName(), aqOracleSqlExcep.getErrorCode(),
+                            aqOracleSqlExcep.getMessage());
+                    errorCode = aqOracleSqlExcep.getErrorCode();
                 }
             } else {
                 log.error("{}:[{}] {}", jmse.getClass().getName(), jmse.getErrorCode(),
                         jmse.getMessage());
-                errorCode = Integer.parseInt(jmse.getErrorCode());
+
+                if (jmse.getErrorCode() != null) {
+                    errorCode = Integer.parseInt(jmse.getErrorCode());
+                } else {
+                    if (jmse.getMessage().contains("ORA-")) {
+                        int indexOfOraPhrase = jmse.getMessage().indexOf("ORA-");
+                        String errorNum = jmse.getMessage().substring(indexOfOraPhrase,
+                                indexOfOraPhrase + 9);
+                        String[] splitOraPhrase = errorNum.split("-");
+                        log.debug("Ora error from error message: [{}]", errorNum);
+                        if (splitOraPhrase[1].startsWith("0")) {
+                            String errorNumOnly = splitOraPhrase[1].substring(1,
+                                    splitOraPhrase[1].length());
+                            errorCode = Integer.parseInt(errorNumOnly);
+                        } else {
+                            errorCode = Integer.parseInt(splitOraPhrase[1]);
+                        }
+                    }
+                }
             }
         }
+        log.trace("[{}]  Exit {}.getErrorCode", this.conn, this.getClass().getName());
         return errorCode;
     }
 
@@ -866,8 +960,7 @@ public class TxEventQConsumer implements Closeable {
     private String getQueueTableType(String queueName) {
         String queueTableType = null;
 
-        log.trace("[{}]:[{}] Entry {}.getQueueTableType", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}] Entry {}.getQueueTableType", this.conn, this.getClass().getName());
         try (PreparedStatement statement = this.conn.prepareStatement(
                 "SELECT type, queue_table from user_queue_tables where queue_table = ?")) {
             statement.setString(1, queueName);
@@ -880,8 +973,8 @@ public class TxEventQConsumer implements Closeable {
             handleException(e);
         }
 
-        log.trace("[{}]:[{}]  Exit {}.getQueueTableType, retval={}", Thread.currentThread().getId(),
-                this.conn, this.getClass().getName(), queueTableType);
+        log.trace("[{}]  Exit {}.getQueueTableType, retval={}", this.conn,
+                this.getClass().getName(), queueTableType);
         return queueTableType;
     }
 
@@ -898,21 +991,18 @@ public class TxEventQConsumer implements Closeable {
      */
     @Override
     public void close() throws IOException {
-        log.trace("[{}]:[{}] Entry {}.close", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}] Entry {}.close", this.conn, this.getClass().getName());
         closeNow.set(true);
         closeConnectionInternal();
-        log.trace("[{}]:[{}]  Exit {}.close", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}]  Exit {}.close", this.conn, this.getClass().getName());
     }
 
     /**
      * Returns messages received from TxEventQ. Called process failed to transform the messages and
      * return them to Connector for producing to Kafka.
      */
-    private void attemptRollback() {
-        log.trace("[{}]:[{}] Entry {}.attemptRollback", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+    public void attemptRollback() {
+        log.trace("[{}] Entry {}.attemptRollback", this.conn, this.getClass().getName());
         try {
             if (this.tSess != null) {
                 this.tSess.rollback();
@@ -920,16 +1010,14 @@ public class TxEventQConsumer implements Closeable {
         } catch (final JMSException ex) {
             log.error("Rollback failed.", ex);
         }
-        log.trace("[{}]:[{}]  Exit {}.attemptRollback", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}]  Exit {}.attemptRollback", this.conn, this.getClass().getName());
     }
 
     /**
      * Commits the current transaction.
      */
     public void commit() {
-        log.trace("[{}]:[{}] Entry {}.commit", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}] Entry {}.commit", this.conn, this.getClass().getName());
 
         if (!connectConnectionInternal()) {
             return;
@@ -938,8 +1026,7 @@ public class TxEventQConsumer implements Closeable {
             if (this.inflight) {
                 this.inflight = false;
 
-                log.debug("[{}]:[{}] Attempting to Commit session transaction.",
-                        Thread.currentThread().getId(), this.conn);
+                log.debug("[{}] Attempting to Commit session transaction.", this.conn);
 
                 if (this.tSess != null) {
                     this.tSess.commit();
@@ -952,8 +1039,7 @@ public class TxEventQConsumer implements Closeable {
             throw exc;
         }
 
-        log.trace("[{}]:[{}] Exit {}.commit", Thread.currentThread().getId(), this.conn,
-                this.getClass().getName());
+        log.trace("[{}] Exit {}.commit", this.conn, this.getClass().getName());
     }
 
     /**
