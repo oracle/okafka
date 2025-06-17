@@ -82,6 +82,10 @@ public class Node  extends org.apache.kafka.common.Node{
         return id;
     }
     
+    public void setHost(String host) {
+    	this.host = host.toUpperCase();
+    }
+    
     public void setId(int newId)
     {
     	if(id <=0)
@@ -98,8 +102,7 @@ public class Node  extends org.apache.kafka.common.Node{
     
     public void setInstanceName(String _instanceName)
     {
-    	if(instanceName == null || instanceName.length()==0)
-    		instanceName = _instanceName.toUpperCase();
+    	instanceName = _instanceName.toUpperCase();
     }
     
     public void setUser(String _user) {

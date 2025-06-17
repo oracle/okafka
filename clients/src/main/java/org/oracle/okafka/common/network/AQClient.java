@@ -474,8 +474,11 @@ public abstract class AQClient {
 							String protocolNow = getProperty(str,"PROTOCOL");
 							log.debug("Protocol used by this local listener " + protocolNow);
 
-							if( (plainText && protocolNow.equalsIgnoreCase("TCP")) || 
-									(!plainText && protocolNow.equalsIgnoreCase("TCPS")))
+							/*
+							 * if( (plainText && protocolNow.equalsIgnoreCase("TCP")) || (!plainText &&
+							 * protocolNow.equalsIgnoreCase("TCPS")))
+							 */
+							if(protocolNow.equalsIgnoreCase("TCP"))
 							{
 								String host = getProperty(str, "HOST");;
 								Integer port = Integer.parseInt(getProperty(str, "PORT"));
