@@ -1156,7 +1156,7 @@ public final class AQKafkaProducer extends AQClient {
 				isAlive = true;*/
 			}catch(Exception e)
 			{
-				log.error("Exception while getting instance id from conneciton " + e, e);
+				log.error("Exception while setting up Publisher Session for node: " + node, e);
 				throw e;
 			}
 
@@ -1189,26 +1189,14 @@ public final class AQKafkaProducer extends AQClient {
 				conn = createTopicConnection();
 				sess = createTopicSession(sessionAckMode);
 				Connection oConn = ((AQjmsSession)sess).getDBConnection();
-				String dbHost = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SC_SERVER_HOST");
 				String instanceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("INSTANCE_NAME");
-				
-				if(!metadata.isBootstrap()) {
-					if( !configs.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG).equalsIgnoreCase("PLAINTEXT")) {
-							if(!node.host().contains(dbHost.toUpperCase()) || !node.instanceName().equalsIgnoreCase(instanceName)) {
-								try {
-									sess.close();
-									conn.close();
-								} catch(JMSException e) {
-									// do nothing
-								}
-								throw new ConnectionException("Failed to connect to node: "+ node);
-							}
-						}
-				} else {
+
+				if(metadata.isBootstrap()) {
+					String dbHost = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SC_SERVER_HOST");
 					int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
 					String serviceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("SERVICE_NAME");
 					String user = oConn.getMetaData().getUserName();
-					
+
 					String oldHost = node.host();
 					node.setHost(dbHost + oldHost.substring(oldHost.indexOf('.')));
 					node.setId(instId);
@@ -1217,13 +1205,13 @@ public final class AQKafkaProducer extends AQClient {
 					node.setUser(user);
 					node.updateHashCode();
 				}
-				
+
 				String sessionId = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SESSION_ID");
 				String serialNum = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SERIAL_NUM");
 				String serverPid = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SERVER_PID");
 				connInfo = "Session_Info:"+ sessionId +","+serialNum+". Process Id:" + serverPid +". Instance Name:"+instanceName;
 				log.info("Database Producer "+connInfo);
-				
+
 				pingStmt = oConn.prepareStatement(PING_QUERY);
 				pingStmt.setQueryTimeout(1);
 				isAlive = true;
@@ -1233,8 +1221,6 @@ public final class AQKafkaProducer extends AQClient {
 			}
 			catch(Exception setupException)
 			{	
-				if(setupException instanceof ConnectionException)
-					throw (ConnectionException)setupException;
 				String errorCode = null;
 				if(setupException instanceof SQLException)
 					errorCode = String.valueOf(((SQLException)setupException).getErrorCode());

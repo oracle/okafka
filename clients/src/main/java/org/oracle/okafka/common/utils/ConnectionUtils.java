@@ -68,7 +68,7 @@ public class ConnectionUtils {
 		s.setConnectionProperty(CommonClientConfigs.ORACLE_NET_TNS_ADMIN, configs.getString(CommonClientConfigs.ORACLE_NET_TNS_ADMIN));
 		if( !configs.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG).equalsIgnoreCase("PLAINTEXT")) {
 			s.setConnectionProperty("oracle.net.wallet_location", "file:" + configs.getString(CommonClientConfigs.ORACLE_NET_TNS_ADMIN));
-			if(node.instanceName()!=null)
+			if(!node.isBootstrap())
 				s.setConnectionProperty("oracle.jdbc.targetInstanceName", node.instanceName());
 		}
 		try {
@@ -110,7 +110,7 @@ public class ConnectionUtils {
 			dataSource.setConnectionProperty(CommonClientConfigs.ORACLE_NET_TNS_ADMIN, configs.getString(CommonClientConfigs.ORACLE_NET_TNS_ADMIN));
 			if( !configs.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG).equalsIgnoreCase("PLAINTEXT")) {
 				dataSource.setConnectionProperty("oracle.net.wallet_location", "file:" + configs.getString(CommonClientConfigs.ORACLE_NET_TNS_ADMIN));
-				if(node.instanceName()!=null)
+				if(!node.isBootstrap())
 					dataSource.setConnectionProperty("oracle.jdbc.targetInstanceName", node.instanceName());
 			}
 				
@@ -340,13 +340,13 @@ public class ConnectionUtils {
 		String hostnPort = null;
 		try {
 			String url = conn.getMetaData().getURL().toUpperCase();
-			String host = TNSParser.getProperties(url, "HOST").iterator().next();
+			String host = TNSParser.getProperty(url, "HOST");
 			if(host == null)
 			{
 				return null;
 			}
 			
-			String portStr = TNSParser.getProperties(url, "PORT").iterator().next();
+			String portStr = TNSParser.getProperty(url, "PORT");
 			if(portStr== null)
 				return null;
 			

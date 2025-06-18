@@ -28,21 +28,18 @@ public class TNSParser {
 		this.configs = configs;
 	}
 
-	public static List<String> getProperties(String connStr, String property) {
-	    List<String> values = new ArrayList<>();
-	    int index = 0;
-	    while ((index = connStr.indexOf(property, index)) != -1) {
-	        int index1 = connStr.indexOf("=", index);
-	        if (index1 == -1) break;
-	        int index2 = connStr.indexOf(")", index1);
-	        if (index2 == -1) break;
-
-	        String value = connStr.substring(index1 + 1, index2).trim();
-	        values.add(value);
-	        index = index2 + 1;
-	    }
-	    return values;
-	}
+	public static String getProperty(String connStr, String property) {
+		int index = connStr.indexOf(property);
+		if(index == -1)
+			return null;
+        int index1 = connStr.indexOf("=", index);
+        if(index1 == -1)
+        	return null;
+        int index2 = connStr.indexOf(")", index1);
+        if(index2 == -1)
+        	return null;
+        return connStr.substring(index1 + 1, index2).trim();
+    }
 	
     public String getConnectionString(String alias) {
         String aliasTmp = alias.trim().toUpperCase();

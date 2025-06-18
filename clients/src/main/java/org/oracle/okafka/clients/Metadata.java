@@ -320,10 +320,10 @@ public final class Metadata implements Closeable {
 		
 		boolean oldNodesAdded = false;
 		for(org.apache.kafka.common.Node oldNode : cluster.nodes())
-		{
+		{	
 			org.apache.kafka.common.Node nodeById = newCluster.nodeById(oldNode.id());
 			if(nodeById == null)
-			{
+			{	
 				newClusterNodes.add(oldNode);
 				//newCluster.nodes().add(oldNode);
 				oldNodesAdded = true;
@@ -331,7 +331,8 @@ public final class Metadata implements Closeable {
 				
 				log.debug("Added Down Node  " + oldNode );
 				
-			}		
+			}
+			((org.oracle.okafka.common.Node)nodeById).setBootstrapFlag(false);
 		}
 		if(oldNodesAdded)
 		{

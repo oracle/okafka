@@ -35,6 +35,7 @@ public class Node  extends org.apache.kafka.common.Node{
     private String serviceName;
     private String user;
     private String protocol;
+    private boolean isBootstrap = false;
     
     // Cache hashCode as it is called in performance sensitive parts of the code (e.g. RecordAccumulator.ready)
     private Integer hash;
@@ -115,7 +116,14 @@ public class Node  extends org.apache.kafka.common.Node{
     	if(protocol == null)
     		protocol = _protocol.toUpperCase();
     }
-
+    
+    public void setBootstrapFlag(boolean flag) {
+    	this.isBootstrap = flag;
+    }
+    
+    public boolean isBootstrap() {
+    	return this.isBootstrap;
+    }
     /**
      * The host name for this Node
      */
@@ -159,7 +167,6 @@ public class Node  extends org.apache.kafka.common.Node{
     	return protocol;
     }
     
-
     @Override
     public int hashCode() {
     	if (this.hash == null) {

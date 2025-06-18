@@ -66,7 +66,6 @@ public class AQKafkaAdmin extends AQClient{
 	private final Map<Node, Connection> connections;
 	private final AdminMetadataManager metadataManager;
 	private boolean forceMetadata = false;
-	private boolean isMetadataBootstrap = true;
 	
 	public AQKafkaAdmin(LogContext logContext, AdminClientConfig configs, AdminMetadataManager _metadataManager, Time time) {
 		super(logContext.logger(AQKafkaAdmin.class), configs);
@@ -561,22 +560,11 @@ public class AQKafkaAdmin extends AQClient{
 			Connection newConn = ConnectionUtils.createJDBCConnection(node, configs, this.log);
 			String dbHost = ((oracle.jdbc.internal.OracleConnection)newConn).getServerSessionInfo().getProperty("AUTH_SC_SERVER_HOST");
 			String instanceName = ((oracle.jdbc.internal.OracleConnection)newConn).getServerSessionInfo().getProperty("INSTANCE_NAME");
-			if(!isMetadataBootstrap) {
-				if( !configs.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG).equalsIgnoreCase("PLAINTEXT")) {
-					if(!node.host().contains(dbHost.toUpperCase()) || !node.instanceName().equalsIgnoreCase(instanceName)) {
-						try {
-							newConn.close();
-						} catch(SQLException sql) {
-							// do nothing
-						}
-						throw new ConnectionException("Failed to connect to node: "+ node);
-					}
-				}
-			} else {
+			if(node.isBootstrap()){
 				int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection)newConn).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
 				String serviceName = ((oracle.jdbc.internal.OracleConnection)newConn).getServerSessionInfo().getProperty("SERVICE_NAME");
 				String user = newConn.getMetaData().getUserName();
-				
+
 				String oldHost = node.host();
 				node.setHost(dbHost + oldHost.substring(oldHost.indexOf('.')));
 				node.setId(instId);
@@ -584,7 +572,7 @@ public class AQKafkaAdmin extends AQClient{
 				node.setInstanceName(instanceName);
 				node.setUser(user);
 				node.updateHashCode();
-				
+
 				/*
 				 * Fetching the nodes and updating the metadataManager to ensure that Cluster
 				 * have the correct mapping in the nodesById Map even when the bootstrap node
@@ -597,9 +585,10 @@ public class AQKafkaAdmin extends AQClient{
 				Cluster newCluster = new Cluster(clusterId, NetworkClient.convertToKafkaNodes(nodes),
 						Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
 						nodes.size() > 0 ? nodes.get(0) : null);// , configs);
+				for(Node n: nodes) {
+					n.setBootstrapFlag(false);
+				}
 				this.metadataManager.update(newCluster, System.currentTimeMillis());
-				isMetadataBootstrap = false;
-				
 			}
 			connections.put(node, newConn);
 			

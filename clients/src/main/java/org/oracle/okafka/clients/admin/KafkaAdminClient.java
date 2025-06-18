@@ -523,27 +523,20 @@ public class KafkaAdminClient extends AdminClient {
 			String connStr = parser.getConnectionString(config.getString(SslConfigs.TNS_ALIAS).toUpperCase());
 			if (connStr == null)
 				throw new InvalidLoginCredentialsException("Please provide valid connection string");
-
-			List<String> hosts = parser.getProperties(connStr, "HOST");
-			List<String> portsStr = parser.getProperties(connStr, "PORT");
-			List<String> serviceNames = parser.getProperties(connStr, "SERVICE_NAME");
-			if (hosts.size() != portsStr.size() || hosts.size() == 0 || serviceNames.size() == 0)
+			String host = parser.getProperty(connStr, "HOST");
+			String portStr = parser.getProperty(connStr, "PORT");
+			serviceName = parser.getProperty(connStr, "SERVICE_NAME");
+			int port;
+			if (host == null || portStr == null || serviceName == null)
 				throw new InvalidLoginCredentialsException("Please provide valid connection string");
-			serviceName = serviceNames.iterator().next();
-			List<String> instanceNames = parser.getProperties(connStr, "INSTANCE_NAME");
-			if(instanceNames.size()!=0)
-				instanceName = instanceNames.iterator().next();
-			
-			for (int i = 0; i < hosts.size(); i++) {
-				int port;
-				try {
-					port = Integer.parseInt(portsStr.get(i));
-				} catch (NumberFormatException nfe) {
-					throw new InvalidLoginCredentialsException("Please provide valid connection string");
-				}
-				addresses = new ArrayList<>();
-				addresses.add(new InetSocketAddress(hosts.get(i), port));
+			try {
+				port = Integer.parseInt(portStr);
+			} catch (NumberFormatException nfe) {
+				throw new InvalidLoginCredentialsException("Please provide valid connection string");
 			}
+			instanceName = parser.getProperty(connStr, "INSTANCE_NAME");
+			addresses = new ArrayList<>();
+			addresses.add(new InetSocketAddress(host, port));
 		}
 
 		{ // Changes for 2.8.1 :: Create Bootstrap Cluster and pass it to metadata.update
@@ -557,6 +550,7 @@ public class KafkaAdminClient extends AdminClient {
 			for (InetSocketAddress inetAddr : addresses) {
 				org.oracle.okafka.common.Node bootStrapNode = new org.oracle.okafka.common.Node(id--,
 						inetAddr.getHostName(), inetAddr.getPort(), serviceName, instanceName);
+				bootStrapNode.setBootstrapFlag(true);
 				bootStrapNodeList.add((Node) bootStrapNode);
 			}
 			Cluster bootStrapCluster = new Cluster(null, bootStrapNodeList, new ArrayList<>(0), Collections.emptySet(),
