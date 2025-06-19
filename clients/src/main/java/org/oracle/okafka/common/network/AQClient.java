@@ -340,7 +340,8 @@ public abstract class AQClient {
 		try {
 			user = con.getMetaData().getUserName();
 			stmt = con.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-			String query = "select inst_id, instance_name, startup_time  from gv$instance";
+			String query = "SELECT i.inst_id, i.instance_name, i.startup_time FROM gv$instance i "
+					+ "JOIN gv$pdbs p ON i.inst_id = p.inst_id WHERE p.open_mode = 'READ WRITE' AND p.restricted = 'NO'";
 			result = stmt.executeQuery(query);
 			Map<Integer, String> instance_names = new HashMap<>();
 			Map<Integer, Timestamp> instance_startTimes = new HashMap<>();
@@ -386,7 +387,8 @@ public abstract class AQClient {
 			}
 	
 			if (furtherMetadata || metadataRequested) {
-				query = "select inst_id, TYPE, value from gv$listener_network order by inst_id";
+				query = "select l.inst_id, l.TYPE, l.value from gv$listener_network l "
+						+ "JOIN gv$pdbs p ON l.inst_id = p.inst_id WHERE p.open_mode = 'READ WRITE' AND p.restricted = 'NO' order by l.inst_id";
 				result = stmt.executeQuery(query);
 				Map<Integer, ArrayList<String>> services = new HashMap<>();
 				Map<Integer,ArrayList<String>> localListenersMap = new HashMap<>();
@@ -794,6 +796,8 @@ public abstract class AQClient {
 		}
 
 		try {
+			if(rs != null)
+				rs.close();
 			if (cStmt != null)
 				cStmt.close();
 		} catch (Exception ex) {
@@ -874,36 +878,6 @@ public abstract class AQClient {
 
 		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
 				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null, listOffsetResponse);
-	}
-	
-	public Map<TopicPartition, PartitionOffsetData> fetchCommittedOffsets(String groupId,
-			List<TopicPartition> topicPartitions, AtomicBoolean disconnected, Connection jdbcConn) throws SQLException {
-		Map<TopicPartition, PartitionOffsetData> committedOffsetsMap = new HashMap<>();
-		for (TopicPartition tp : topicPartitions) {
-			try {
-				
-				long offset = FetchOffsets.fetchCommittedOffset(tp.topic(), tp.partition(), groupId, jdbcConn);
-				if (offset != -1)
-					committedOffsetsMap.put(tp, new PartitionOffsetData(offset, null));
-				else
-					committedOffsetsMap.put(tp, null);
-			} catch (SQLException sqlE) {
-				if (sqlE.getErrorCode() == 24010) {
-					log.warn("Topic '{}' doesn't exist", tp.topic());
-					committedOffsetsMap.put(tp, null);
-				} else {
-					int errorCode = sqlE.getErrorCode();
-					log.error("SQL Error:ORA-" + errorCode);
-					if (errorCode == 28 || errorCode == 17410) {
-						disconnected.set(true);
-						throw sqlE;
-					} else
-						committedOffsetsMap.put(tp, new PartitionOffsetData(-1L, sqlE));
-				}
-
-			}
-		}
-		return committedOffsetsMap;
 	}
 
 	public static String getProperty(String str, String property) {

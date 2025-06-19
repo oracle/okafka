@@ -75,19 +75,19 @@ public class TNSParser {
 	        	   sb.append(fileStr.charAt(ind));
 	        }
 	        String strtmp = new String (sb.toString());
-	        String filestr = "";
+	        StringBuilder filestr = new StringBuilder();
 	        String tokenstr = new String ();
 	        StringTokenizer st = new StringTokenizer(strtmp, eol);
 	        while(st.hasMoreTokens()) {
 	          tokenstr = st.nextToken().trim();
 	          if (!tokenstr.contains(hashChar))
-	             filestr = filestr + tokenstr + eol;
+	             filestr.append(tokenstr);
 	          else {
 	        	  if(tokenstr.indexOf(hashChar) != 0)
-	        		  filestr = filestr + tokenstr.substring(0, tokenstr.indexOf(hashChar)) + eol;
+	        		  filestr.append(tokenstr, 0, tokenstr.indexOf(hashChar));
               }
 	        }
-            return filestr;	        
+            return filestr.toString();	        
 	        
 	    }
 		public void readFile() throws FileNotFoundException, IOException {

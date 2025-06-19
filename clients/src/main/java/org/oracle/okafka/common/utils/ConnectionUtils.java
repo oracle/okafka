@@ -132,13 +132,21 @@ public class ConnectionUtils {
 	public static boolean isSessionClosed(AQjmsSession sess) {
 		Connection con;
 		try {
-			con = ((oracle.jms.AQjmsSession)sess).getDBConnection();
-			if(con == null || con.isClosed())
+			con = sess.getDBConnection();
+			if (con == null || isConnectionClosed(con))
 				return true;
-		} catch (JMSException | SQLException e) {
+		} catch (JMSException e) {
 			return true;
 		}
 		return false;
+	}
+	
+	public static boolean isConnectionClosed(Connection con) {
+		try {
+			return con.isClosed() || !(con.isValid(5));
+		} catch (SQLException e) {
+			return true;
+		}
 	}
 
 	public static String getUsername(AbstractConfig configs) {

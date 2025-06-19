@@ -124,8 +124,7 @@ public class ConsumerNetworkClient {
 	private final long defaultApiTimeoutMs;
 	private final SubscriptionState subscriptions;
 	private Set<String> subscriptionSnapshot;
-	private boolean rejoin = false;
-	private boolean needsJoinPrepare = true;
+//	private boolean needsJoinPrepare = true;
 	private SessionData sessionData = null;
 	private final List<ConsumerPartitionAssignor> assignors;
 	private final List<AQjmsBytesMessage> messages = new ArrayList<>();
@@ -282,7 +281,7 @@ public class ConsumerNetworkClient {
 				}
 			}
 			timeSpent = System.currentTimeMillis() - pollStartTime;
-		}while(retry &&  timeSpent < timeoutMs );
+		}while(retry &&  timeSpent < timeoutMs);
 		
 		return this.messages;
 	}
@@ -386,7 +385,6 @@ public class ConsumerNetworkClient {
 		messages.addAll(fetchResponse.getMessages());
 		if(response.wasDisconnected()) {
 			client.disconnected(metadata.getNodeById(Integer.parseInt(response.destination())), time.milliseconds()); 
-			rejoin = true;
 			currentSession = null;
 			if(sessionData != null)
 			{
@@ -405,19 +403,21 @@ public class ConsumerNetworkClient {
 			long elapsed = response.requestLatencyMs();
 			long prevTime = time.milliseconds();
 			long current;
-			while(elapsed < timeoutMs && rejoinNeeded(exception)) {
+			if(elapsed < timeoutMs && rejoinNeeded(exception)) {
 				log.debug("JoinGroup Is Needed");
-				if (needsJoinPrepare) {
-					log.debug("Revoking");
-					onJoinPrepare();
-					needsJoinPrepare = false;
-				}
+//				if (needsJoinPrepare) {
+//					log.debug("Revoking");
+//					onJoinPrepare();
+//					needsJoinPrepare = false;
+//				}
+				log.debug("Revoking");
+				onJoinPrepare();
 				if (lastRebalanceStartMs == -1L)
 					lastRebalanceStartMs = time.milliseconds();
 				log.debug("Sending Join Group Request to database via node " + response.destination());
 				sendJoinGroupRequest(metadata.getNodeById(Integer.parseInt(response.destination())));
 				log.debug("Join Group Response received");
-				exception = null;
+//				exception = null;
 				current = time.milliseconds();
 				elapsed = elapsed + (current - prevTime);
 				prevTime = current;
@@ -439,7 +439,7 @@ public class ConsumerNetworkClient {
 				return true;
 			}
 		}
-		return rejoin;
+		return false;
 	}
 
 	private void onJoinPrepare() {
@@ -484,7 +484,6 @@ public class ConsumerNetworkClient {
 		if(response.wasDisconnected()) {
 			log.info("Join Group failed as connection to database was severed.");
 			client.disconnected(metadata.getNodeById(Integer.parseInt(response.destination())), time.milliseconds()); 
-			rejoin = true;
 			currentSession = null;
 			if(sessionData != null)
 			{
@@ -568,7 +567,6 @@ public class ConsumerNetworkClient {
 		if(response.wasDisconnected()) {
 			log.info("Sync Group failed as connection to database was severed.");
 			client.disconnected(metadata.getNodeById(Integer.parseInt(response.destination())), time.milliseconds()); 
-			rejoin = true;
 			currentSession = null;
 			if(sessionData != null)
 			{
@@ -582,8 +580,7 @@ public class ConsumerNetworkClient {
 		if(exception == null) {
 			sensors.syncSensor.record(response.requestLatencyMs());
 			onJoinComplete(syncResponse.getSessionData());
-			rejoin = false;
-			needsJoinPrepare = true;
+//			needsJoinPrepare = true;
 			this.sessionData = syncResponse.getSessionData();    	  
 		}
 
@@ -740,8 +737,15 @@ public class ConsumerNetworkClient {
 			}
 			catch(Exception e){
 				log.error("Exception while subscribing to the topic" + e.getMessage(),e);
+				if(e instanceof SQLException) {
+					int errorCode = ((SQLException) e).getErrorCode();
+					if(errorCode == 28 || errorCode == 17410) {
+						this.aqConsumer.close(node);
+						this.client.disconnected(node, now);;
+						return false;
+					}
+				}
 			}
-		
 		}
 		return true;
 
@@ -750,11 +754,10 @@ public class ConsumerNetworkClient {
 	public void maybeUpdateMetadata(long timeout) {
 		Cluster cluster = metadata.fetch();
 		long curr = time.milliseconds();
-		if(cluster.isBootstrapConfigured() || metadata.timeToNextUpdate(curr) == 0 ? true : false) {
+		if(metadata.isBootstrap() || metadata.timeToNextUpdate(curr) == 0 ? true : false) {
 			int lastVersion = metadata.version();
 			long elapsed = 0;
 			long prev;
-			
 			while ((elapsed <= timeout) && (metadata.version() <= lastVersion) && !metadata.isClosed()) {
 				prev = time.milliseconds();
 				client.maybeUpdateMetadata(curr);
@@ -1056,7 +1059,6 @@ public class ConsumerNetworkClient {
 		if(response.wasDisconnected()) {
 			log.debug("handleUnsubscribeResponse : node in disconnected state\n");
 			client.disconnected(metadata.getNodeById(Integer.parseInt(response.destination())), time.milliseconds()); 
-			rejoin = true;
 			currentSession = null;
 			if(sessionData != null)
 			{

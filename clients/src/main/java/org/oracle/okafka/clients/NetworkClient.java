@@ -544,6 +544,7 @@ public class NetworkClient implements KafkaClient {
 
 	//  @Override
 	public void disconnected(Node node, long now) {
+		this.aqClient.close(node);
 		this.connectionStates.disconnected(node, now);
 	}
 

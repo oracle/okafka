@@ -941,7 +941,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 				if (includeMetadataInTimeout) {
 					final long metadataStart = time.milliseconds();
 					if (!updateMetadataAndSubscribeIfNeeded(timer.remainingMs())) {
-						return ConsumerRecords.empty();
+						continue;
 					}
 
 					timer.update(time.milliseconds());
@@ -991,7 +991,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 		long subscriptionStart = time.milliseconds();
 		client.maybeUpdateMetadata(timeout);
 		elapsed += time.milliseconds() - subscriptionStart;
-		if (!client.mayBeTriggerSubcription(timeout - elapsed)) {
+		if ((timeout - elapsed) < 0 || !client.mayBeTriggerSubcription(timeout - elapsed)) {
 			return false;
 		}
 		elapsed += time.milliseconds() - subscriptionStart;

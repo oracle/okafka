@@ -128,13 +128,6 @@ public class AQKafkaAdmin extends AQClient{
 			 exception = sql;
 			 log.trace("Unexcepted error occured with connection to node {}, closing the connection", request.destination());
 			 log.trace("Failed to create topics {}", topics.keySet());
-			 try {
-				 jdbcConn.close(); 
-				 connections.remove(node);				 
-				 log.trace("Connection with node {} is closed", request.destination());
-			 } catch(SQLException sqlException) {
-				 log.trace("Failed to close connection with node {}", request.destination());
-			 }
 		 } 
 		 return createTopicsResponse(result, exception, exception != null, request, topicIdMap);	 
 	}
@@ -199,13 +192,7 @@ public class AQKafkaAdmin extends AQClient{
 		 } catch(SQLException sql) {
 			 log.trace("Unexcepted error occured with connection to node {}, closing the connection", node);
 			 log.trace("Failed to delete topics : {}", topicSet);
-			 try {
-				 connections.remove(node);
-				 jdbcConn.close(); 
-				 log.trace("Connection with node {} is closed", request.destination());
-			 } catch(SQLException sqlException) {
-				 log.trace("Failed to close connection with node {}", node);
-			 }
+
 			 return deleteTopicsResponse(result,Collections.emptyMap(), sql,true, request);
 		 }
 		 try {
@@ -259,13 +246,7 @@ public class AQKafkaAdmin extends AQClient{
 		 } catch(SQLException sql) {
 			 log.trace("Unexcepted error occured with connection to node {}, closing the connection", node);
 			 log.trace("Failed to delete topics with Ids : {}", topicIdSet);
-			 try {
-				 connections.remove(node);
-				 jdbcConn.close(); 
-				 log.trace("Connection with node {} is closed", request.destination());
-			 } catch(SQLException sqlException) {
-				 log.trace("Failed to close connection with node {}", node);
-			 }
+
 			 return deleteTopicsResponse(Collections.emptyMap(), result, sql,true, request);
 		 }
 		 try {
@@ -294,22 +275,14 @@ public class AQKafkaAdmin extends AQClient{
 		Node node =(org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
 		ClientResponse response = getMetadataNow(request, connections.get(node), node, forceMetadata);
 		if(response.wasDisconnected()) { 
-
-			connections.remove(node);
 			forceMetadata = true;
 		}
-		
 		return response;
 	}
 	
 	private ClientResponse listOffsets(ClientRequest request) {
 		Node node =(org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
-		ClientResponse response = getOffsetsResponse(request,connections.get(node));
-		if(response.wasDisconnected()) { 
-			connections.remove(node);
-			forceMetadata = true;
-		}
-		
+		ClientResponse response = getOffsetsResponse(request,connections.get(node));		
 		return response;
 	}
 	
@@ -342,7 +315,7 @@ public class AQKafkaAdmin extends AQClient{
 			
 			int errorCode = sqlE.getErrorCode();
 			log.error("ListGroup: SQL Error:ORA-" + errorCode,sqlE);
-			if (errorCode == 28 || errorCode == 17410) {
+			if (ConnectionUtils.isConnectionClosed(jdbcConn)) {
 				disconnected = true;
 				exception = new DisconnectException(sqlE.getMessage(),sqlE);
 			} 
@@ -430,7 +403,7 @@ public class AQKafkaAdmin extends AQClient{
 					} catch (SQLException sqlE) {
 						int errorCode = sqlE.getErrorCode();
 						log.error("ListConsumerGroupOffset: SQL Error:ORA-" + errorCode, sqlE);
-						if (errorCode == 28 || errorCode == 17410) {
+						if (ConnectionUtils.isConnectionClosed(jdbcConn)) {
 							disconnected = true;
 							throw new DisconnectException(sqlE.getMessage(),sqlE);
 						} else
@@ -446,7 +419,7 @@ public class AQKafkaAdmin extends AQClient{
 				if(e instanceof SQLException) {
 					int errorCode = ((SQLException)e).getErrorCode();
 					log.error("SQL Error:ORA-" + errorCode);
-					if (errorCode == 28 || errorCode == 17410) {
+					if (ConnectionUtils.isConnectionClosed(jdbcConn)) {
 						disconnected = true;
 						exception = new DisconnectException(e.getMessage(), e);
 					} 
@@ -455,16 +428,12 @@ public class AQKafkaAdmin extends AQClient{
 						request.destination());
 				if (jdbcConn != null)
 					jdbcConn.close();
+				connections.remove(node);
 
 				log.trace("Connection with node {} is closed", request.destination());
 			} catch (SQLException sqlEx) {
 				log.trace("Failed to close connection with node {}", request.destination());
 			}
-		}
-
-		if (disconnected) {
-			connections.remove(node);
-			forceMetadata = true;
 		}
 
 		OffsetFetchResponse offsetResponse = new OffsetFetchResponse(responseMap);
@@ -526,7 +495,7 @@ public class AQKafkaAdmin extends AQClient{
 
 			int errorCode = sqlE.getErrorCode();
 			log.error("DeleteConsumerGroups: SQL Error:ORA-" + errorCode, sqlE);
-			if (errorCode == 28 || errorCode == 17410) {
+			if (ConnectionUtils.isConnectionClosed(jdbcConn)) {
 				disconnected = true;
 				exception = new DisconnectException(sqlE.getMessage(), sqlE);
 			}
@@ -535,6 +504,7 @@ public class AQKafkaAdmin extends AQClient{
 						request.destination());
 				if (jdbcConn != null)
 					jdbcConn.close();
+				connections.remove(node);
 
 				log.trace("Connection with node {} is closed", request.destination());
 			} catch (SQLException sqlEx) {
@@ -570,7 +540,7 @@ public class AQKafkaAdmin extends AQClient{
 				List<Node> nodes = new ArrayList<>();
 				String clusterId = ((oracle.jdbc.internal.OracleConnection) newConn).getServerSessionInfo()
 						.getProperty("DATABASE_NAME");
-				this.getNodes(nodes, newConn, node, forceMetadata);
+				this.getNodes(nodes, newConn, node, true);
 				Cluster newCluster = new Cluster(clusterId, NetworkClient.convertToKafkaNodes(nodes),
 						Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
 						nodes.size() > 0 ? nodes.get(0) : null);// , configs);
@@ -616,7 +586,7 @@ public class AQKafkaAdmin extends AQClient{
 				connections.remove(node);
 				log.trace("Connection to node {} closed", node);
 			} catch(SQLException sql) {
-				
+				log.trace("Failed to close connection with node {}", node);
 			}
 			
 		}
