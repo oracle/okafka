@@ -582,12 +582,12 @@ public class AQKafkaAdmin extends AQClient{
 				String clusterId = ((oracle.jdbc.internal.OracleConnection) newConn).getServerSessionInfo()
 						.getProperty("DATABASE_NAME");
 				this.getNodes(nodes, newConn, node, forceMetadata);
-				Cluster newCluster = new Cluster(clusterId, NetworkClient.convertToKafkaNodes(nodes),
-						Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-						nodes.size() > 0 ? nodes.get(0) : null);// , configs);
 				for(Node n: nodes) {
 					n.setBootstrapFlag(false);
 				}
+				Cluster newCluster = new Cluster(clusterId, NetworkClient.convertToKafkaNodes(nodes),
+						Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
+						nodes.size() > 0 ? nodes.get(0) : null);// , configs);
 				this.metadataManager.update(newCluster, System.currentTimeMillis());
 			}
 			connections.put(node, newConn);

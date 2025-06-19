@@ -281,6 +281,9 @@ public final class Metadata implements Closeable {
 		this.lastRefreshMs = now;
 		this.lastSuccessfulRefreshMs = now;
 		this.version += 1;
+		if(this.isBootStrap)
+			for(org.apache.kafka.common.Node n : this.cluster.nodes())
+				((Node)n).setBootstrapFlag(false);
 		this.isBootStrap = bootstrap;
 		
 		/* if (topicExpiryEnabled) {
@@ -332,7 +335,6 @@ public final class Metadata implements Closeable {
 				log.debug("Added Down Node  " + oldNode );
 				
 			}
-			((org.oracle.okafka.common.Node)nodeById).setBootstrapFlag(false);
 		}
 		if(oldNodesAdded)
 		{
