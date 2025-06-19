@@ -76,8 +76,7 @@ public class TxEventQSourceConnector extends SourceConnector {
      */
     @Override
     public List<Map<String, String>> taskConfigs(int maxTasks) {
-        log.debug("[{}] Setting task configurations for {} workers.",
-                Thread.currentThread().getId(), maxTasks);
+        log.debug("Setting task configurations for {} workers.", maxTasks);
         final List<Map<String, String>> configs = new ArrayList<>(maxTasks);
         for (int i = 0; i < maxTasks; ++i) {
             configs.add(configProperties);
@@ -87,13 +86,15 @@ public class TxEventQSourceConnector extends SourceConnector {
 
     @Override
     public void start(Map<String, String> originalProps) {
-        log.debug("[{}] Starting Oracle TxEventQ Source Connector", Thread.currentThread().getId());
+        log.trace("Entry {}.start,", this.getClass().getName());
         this.configProperties = originalProps;
+        log.trace("Exit {}.start,", this.getClass().getName());
     }
 
     @Override
     public void stop() {
-        log.debug("[{}] Stopping Oracle TEQ Source Connector", Thread.currentThread().getId());
+        log.trace("Entry {}.stop,", this.getClass().getName());
+        log.trace("Exit {}.stop,", this.getClass().getName());
     }
 
     /**

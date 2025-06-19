@@ -1,0 +1,8 @@
+sdb =
+(DESCRIPTION =
+    (ADDRESS = (PROTOCOL = TCP)(HOST = phoenix307317.dev3sub2phx.databasede3phx.oraclevcn.com)(PORT = 1521))
+    (CONNECT_DATA =
+      (SERVICE_NAME = cdb1_pdb1.regress.rdbms.dev.us.oracle.com)
+    )
+  )
+

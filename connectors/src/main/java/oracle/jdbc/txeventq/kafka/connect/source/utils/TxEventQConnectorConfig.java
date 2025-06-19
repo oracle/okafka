@@ -56,6 +56,17 @@ public class TxEventQConnectorConfig extends AbstractConfig {
     private static final String TXEVENTQ_SUBSCRIBER_DOC = "txeventq.subscriber";
     private static final String TXEVENTQ_SUBSCRIBER_DISPLAY = "txeventq.subscriber";
 
+    public static final String TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_CONFIG = "txeventq.map.shard.to.kafka_partition";
+    private static final String TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_DOC = "Indicates that all the messages from a TxEventQ shard will be put into a respective Kafka partition.";
+    private static final String TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_DISPLAY = "txeventq.map.shard.to.kafka_partition";
+    public static final boolean TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_DEFAULT = false;
+
+    public static final String TXEVENTQ_BATCH_SIZE_CONFIG = "txeventq.batch.size";
+    private static final String TXEVENTQ_BATCH_SIZE_DISPLAY = "Transactional Event Queue Batch Size";
+    private static final String TXEVENTQ_BATCH_SIZE_DOC = "The maximum number of records to read from the Oracle Transactional Event Queue before writing to Kafka.";
+    public static final int TXEVENTQ_BATCH_SIZE_DEFAULT = 250;
+    public static final int TXEVENTQ_BATCH_SIZE_MINIMUM = 1;
+
     // Kafka Configuration
     public static final String KAFKA_TOPIC = "kafka.topic";
     public static final String KAFKA_TOPIC_DOC = "The name of the Kafka topic where the connector writes all records that were read from the JMS broker.";
@@ -74,15 +85,21 @@ public class TxEventQConnectorConfig extends AbstractConfig {
     private static final String KAFKA_CONNECT_TASK_ID_DOC = "";
     private static final String KAFKA_CONNECT_TASK_ID_DISPLAY = "";
 
-    public static final String TASK_BATCH_SIZE_CONFIG = "batch.size";
-    private static final String TASK_BATCH_SIZE_DISPLAY = "Batch Size";
-    private static final String TASK_BATCH_SIZE_DOC = "The maximum number of records that a connector task may read from the Oracle TxEventQ broker before writing to Kafka. The task holds these records until they are acknowledged in Kafka, so this may affect memory usage.";
-    public static final int TASK_BATCH_SIZE_DEFAULT = 1024;
-
     public static final String TASK_MAX_CONFIG = "tasks.max";
     private static final String TASK_MAX_DISPLAY = "Tasks Max";
     private static final String TASK_MAX_DOC = "Maximum number of tasks to use for this connector.";
     public static final int TASK_MAX_DEFAULT = 1;
+
+    public static final String SOURCE_MAX_POLL_BLOCKED_TIME_MS_CONFIG = "source.max.poll.blocked.time.ms";
+    private static final String SOURCE_MAX_POLL_BLOCKED_TIME_MS_DISPLAY = "Source connector max poll time in ms.";
+    private static final String SOURCE_MAX_POLL_BLOCKED_TIME_MS_DOC = "The maximum length of time the SourceTask will wait for a "
+            + "prior batch of messages to be delivered to Kafka before starting a new poll.";
+    public static final int SOURCE_MAX_POLL_BLOCKED_TIME_MS_DEFAULT = 2000;
+
+    public static final String USE_SCHEMA_FOR_JMS_MESSAGES_CONFIG = "use.schema.for.jms.msgs";
+    private static final String USE_SCHEMA_FOR_JMS_MESSAGES_DISPLAY = "Use built in schema for JMS messages";
+    private static final String USE_SCHEMA_FOR_JMS_MESSAGES_DOC = "Indicates whether to use the built in schema for JMS type messages.";
+    public static final boolean USE_SCHEMA_FOR_JMS_MESSAGES_DEFAULT = false;
 
     public final String topic;
 
@@ -134,6 +151,16 @@ public class TxEventQConnectorConfig extends AbstractConfig {
                 ConfigDef.Importance.HIGH, TXEVENTQ_SUBSCRIBER_DOC, groupName, ++orderInGroup,
                 ConfigDef.Width.MEDIUM, TXEVENTQ_SUBSCRIBER_DISPLAY);
 
+        configDef.define(TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_CONFIG, ConfigDef.Type.BOOLEAN,
+                TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_DEFAULT, ConfigDef.Importance.MEDIUM,
+                TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_DOC, groupName, ++orderInGroup,
+                ConfigDef.Width.MEDIUM, TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_DISPLAY);
+
+        configDef.define(TXEVENTQ_BATCH_SIZE_CONFIG, ConfigDef.Type.INT,
+                TXEVENTQ_BATCH_SIZE_DEFAULT, ConfigDef.Range.atLeast(TXEVENTQ_BATCH_SIZE_MINIMUM),
+                ConfigDef.Importance.MEDIUM, TXEVENTQ_BATCH_SIZE_DOC, groupName, ++orderInGroup,
+                ConfigDef.Width.MEDIUM, TXEVENTQ_BATCH_SIZE_DISPLAY);
+
         // KAFKA Group Configurations
         groupName = "kafka";
         orderInGroup = 0;
@@ -154,13 +181,19 @@ public class TxEventQConnectorConfig extends AbstractConfig {
                 BOOTSTRAP_SERVERS_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM,
                 BOOTSTRAP_SERVERS_DISPLAY);
 
-        configDef.define(TASK_BATCH_SIZE_CONFIG, ConfigDef.Type.INT, TASK_BATCH_SIZE_DEFAULT,
-                ConfigDef.Importance.MEDIUM, TASK_BATCH_SIZE_DOC, groupName, ++orderInGroup,
-                ConfigDef.Width.MEDIUM, TASK_BATCH_SIZE_DISPLAY);
-
         configDef.define(TASK_MAX_CONFIG, ConfigDef.Type.INT, TASK_MAX_DEFAULT,
                 ConfigDef.Importance.HIGH, TASK_MAX_DOC, groupName, ++orderInGroup,
                 ConfigDef.Width.MEDIUM, TASK_MAX_DISPLAY);
+
+        configDef.define(SOURCE_MAX_POLL_BLOCKED_TIME_MS_CONFIG, ConfigDef.Type.INT,
+                SOURCE_MAX_POLL_BLOCKED_TIME_MS_DEFAULT, ConfigDef.Range.atLeast(0),
+                ConfigDef.Importance.MEDIUM, SOURCE_MAX_POLL_BLOCKED_TIME_MS_DOC, groupName,
+                ++orderInGroup, ConfigDef.Width.MEDIUM, SOURCE_MAX_POLL_BLOCKED_TIME_MS_DISPLAY);
+
+        configDef.define(USE_SCHEMA_FOR_JMS_MESSAGES_CONFIG, ConfigDef.Type.BOOLEAN,
+                USE_SCHEMA_FOR_JMS_MESSAGES_DEFAULT, ConfigDef.Importance.LOW,
+                USE_SCHEMA_FOR_JMS_MESSAGES_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM,
+                USE_SCHEMA_FOR_JMS_MESSAGES_DISPLAY);
 
         return configDef;
     }

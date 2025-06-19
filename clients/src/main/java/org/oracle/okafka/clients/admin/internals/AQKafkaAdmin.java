@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
 import org.apache.kafka.clients.admin.internals.AdminMetadataManager;
+import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.clients.NetworkClient;
 import org.oracle.okafka.clients.admin.AdminClientConfig;
 import org.oracle.okafka.common.Node;
@@ -526,26 +527,42 @@ public class AQKafkaAdmin extends AQClient{
 	 */
 	private Connection getConnection(Node node) {
 		try {
-			int nodeHash = node.hashCode();
 			Connection newConn = ConnectionUtils.createJDBCConnection(node, configs, this.log);
-			connections.put(node, newConn);
-			int mayBeUpdatedNodeHash = node.hashCode();
-			
-			/*
-			 * Fetching the nodes and updating the metadataManager to ensure that Cluster
-			 * have the correct mapping in the nodesById Map even when the bootstrap node
-			 * have been updated after the initial connection
-			 */
-			if (nodeHash != mayBeUpdatedNodeHash) {
+			String dbHost = ((oracle.jdbc.internal.OracleConnection)newConn).getServerSessionInfo().getProperty("AUTH_SC_SERVER_HOST");
+			String instanceName = ((oracle.jdbc.internal.OracleConnection)newConn).getServerSessionInfo().getProperty("INSTANCE_NAME");
+			if(node.isBootstrap()){
+				int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection)newConn).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
+				String serviceName = ((oracle.jdbc.internal.OracleConnection)newConn).getServerSessionInfo().getProperty("SERVICE_NAME");
+				String user = newConn.getMetaData().getUserName();
+
+				String oldHost = node.host();
+				node.setHost(dbHost + oldHost.substring(oldHost.indexOf('.')));
+				node.setId(instId);
+				node.setService(serviceName);
+				node.setInstanceName(instanceName);
+				node.setUser(user);
+				node.updateHashCode();
+
+				/*
+				 * Fetching the nodes and updating the metadataManager to ensure that Cluster
+				 * have the correct mapping in the nodesById Map even when the bootstrap node
+				 * have been updated after the initial connection
+				 */
 				List<Node> nodes = new ArrayList<>();
 				String clusterId = ((oracle.jdbc.internal.OracleConnection) newConn).getServerSessionInfo()
 						.getProperty("DATABASE_NAME");
-				this.getNodes(nodes, newConn, node, true);
+				this.getNodes(nodes, newConn, node, forceMetadata);
+				for(Node n: nodes) {
+					n.setBootstrapFlag(false);
+				}
+				
 				Cluster newCluster = new Cluster(clusterId, NetworkClient.convertToKafkaNodes(nodes),
 						Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
 						nodes.size() > 0 ? nodes.get(0) : null);// , configs);
 				this.metadataManager.update(newCluster, System.currentTimeMillis());
 			}
+			connections.put(node, newConn);
+			
 		} catch (SQLException excp) {
 			log.error("Exception while connecting to Oracle Database " + excp, excp);
 			int errorCode = excp.getErrorCode();

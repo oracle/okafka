@@ -14,6 +14,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Stack;
 import java.util.StringTokenizer;
 public class TNSParser {
@@ -38,6 +40,7 @@ public class TNSParser {
         	return null;
         return connStr.substring(index1 + 1, index2).trim();
     }
+	
     public String getConnectionString(String alias) {
         String aliasTmp = alias.trim().toUpperCase();
         Stack<String> stack = new Stack<>();

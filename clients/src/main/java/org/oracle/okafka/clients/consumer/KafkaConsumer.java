@@ -566,7 +566,6 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 			String serviceName = config.getString(ConsumerConfig.ORACLE_SERVICE_NAME);
 			String instanceName = null;
 
-			System.setProperty("oracle.net.tns_admin", config.getString(ConsumerConfig.ORACLE_NET_TNS_ADMIN));
 			if (config.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG).equalsIgnoreCase("PLAINTEXT")) {
 				// Changes for 2.8.1
 				// addresses =
@@ -614,6 +613,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 				for (InetSocketAddress inetAddr : addresses) {
 					org.oracle.okafka.common.Node bootStrapNode = new org.oracle.okafka.common.Node(id--,
 							inetAddr.getHostName(), inetAddr.getPort(), serviceName, instanceName);
+					bootStrapNode.setBootstrapFlag(true);
 					bootStrapNodeList.add((Node) bootStrapNode);
 				}
 				Cluster bootStrapCluster = new Cluster(null, bootStrapNodeList, new ArrayList<>(0),

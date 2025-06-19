@@ -587,8 +587,13 @@ public class NetworkClient implements KafkaClient {
 			else
 				metadataManager.requestUpdate();
 
-			if (e instanceof ConnectionException) // from Admin
-				throw (ConnectionException) e;
+			if (e instanceof ConnectionException) {  // from Admin
+				Throwable t = e.getCause();
+				if(t instanceof ConnectException) {
+					throw (ConnectionException)e;
+				}
+			}
+				
 			if (e instanceof InvalidLoginCredentialsException)
 				throw (InvalidLoginCredentialsException) e;
 

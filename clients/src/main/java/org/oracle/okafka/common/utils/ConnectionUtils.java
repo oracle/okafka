@@ -65,17 +65,14 @@ public class ConnectionUtils {
 		OracleDataSource s=new OracleDataSource();
 		String dbUrl = createUrl(node, configs);
 		s.setURL(dbUrl);
+		s.setConnectionProperty(CommonClientConfigs.ORACLE_NET_TNS_ADMIN, configs.getString(CommonClientConfigs.ORACLE_NET_TNS_ADMIN));
+		if( !configs.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG).equalsIgnoreCase("PLAINTEXT")) {
+			s.setConnectionProperty("oracle.net.wallet_location", "file:" + configs.getString(CommonClientConfigs.ORACLE_NET_TNS_ADMIN));
+			if(!node.isBootstrap())
+				s.setConnectionProperty("oracle.jdbc.targetInstanceName", node.instanceName());
+		}
 		try {
 			Connection conn =  s.getConnection();
-			int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection)conn).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
-			String serviceName = ((oracle.jdbc.internal.OracleConnection)conn).getServerSessionInfo().getProperty("SERVICE_NAME");
-			String instanceName = ((oracle.jdbc.internal.OracleConnection)conn).getServerSessionInfo().getProperty("INSTANCE_NAME");
-			String userName = conn.getMetaData().getUserName();
-			node.setId(instId);
-			node.setService(serviceName);
-			node.setInstanceName(instanceName);
-			node.setUser(userName);
-			node.updateHashCode();
 			return conn;
 		}catch(Exception e)
 		{
@@ -110,6 +107,13 @@ public class ConnectionUtils {
 		try {
 			dataSource =new OracleDataSource();
 			dataSource.setURL(url);	
+			dataSource.setConnectionProperty(CommonClientConfigs.ORACLE_NET_TNS_ADMIN, configs.getString(CommonClientConfigs.ORACLE_NET_TNS_ADMIN));
+			if( !configs.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG).equalsIgnoreCase("PLAINTEXT")) {
+				dataSource.setConnectionProperty("oracle.net.wallet_location", "file:" + configs.getString(CommonClientConfigs.ORACLE_NET_TNS_ADMIN));
+				if(!node.isBootstrap())
+					dataSource.setConnectionProperty("oracle.jdbc.targetInstanceName", node.instanceName());
+			}
+				
 		}
 		catch(SQLException sql) {
 			throw new JMSException(sql.toString(), String.valueOf(sql.getErrorCode()));
@@ -269,7 +273,10 @@ public class ConnectionUtils {
 			return false;
 		
 		boolean msgIdExists = false;
-		OKafkaOffset okafkaOffset = MessageIdConverter.getOKafkaOffset("ID:"+msgId,true, true); 
+		if(!msgId.startsWith("ID:"))
+			msgId = "ID:" + msgId;
+			
+		OKafkaOffset okafkaOffset = MessageIdConverter.getOKafkaOffset(msgId,true, true); 
 		
 		String qry = 
 				"DECLARE " +
@@ -340,7 +347,7 @@ public class ConnectionUtils {
 	{
 		String hostnPort = null;
 		try {
-			String url = conn.getMetaData().getURL();
+			String url = conn.getMetaData().getURL().toUpperCase();
 			String host = TNSParser.getProperty(url, "HOST");
 			if(host == null)
 			{

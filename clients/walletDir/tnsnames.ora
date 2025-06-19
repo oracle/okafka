@@ -1,0 +1,14 @@
+#sdb = (DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=stbm000120-vm3.dev3rac1phx.databasede3phx.oraclevcn.com)(PORT=5800))(CONNECT_DATA=(SERVICE_NAME=pdb1.regress.rdbms.dev.us.oracle.com)))
+
+sdb =
+  (DESCRIPTION =
+    (ADDRESS_LIST =
+      (LOAD_BALANCE = OFF)
+      (FAILOVER = ON)
+      (ADDRESS = (PROTOCOL = TCP)(HOST = phoenix307317.dev3sub2phx.databasede3phx.oraclevcn.com)(PORT = 1521))
+      (ADDRESS = (PROTOCOL = TCP)(HOST = phoenix307317.dev3sub2phx.databasede3phx.oraclevcn.com)(PORT = 1522))
+    )
+    (CONNECT_DATA =
+      (SERVICE_NAME = cdb1_pdb1.regress.rdbms.dev.us.oracle.com)
+    )
+  )

@@ -40,12 +40,14 @@ import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
 import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.clients.Metadata;
 import org.oracle.okafka.clients.NetworkClient;
 import org.oracle.okafka.clients.TopicTeqParameters;
 import org.oracle.okafka.clients.producer.ProducerConfig;
 import org.oracle.okafka.clients.producer.internals.OracleTransactionManager.TransactionState;
 import org.oracle.okafka.common.Node;
+import org.oracle.okafka.common.errors.ConnectionException;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
@@ -1148,7 +1150,7 @@ public final class AQKafkaProducer extends AQClient {
 				isAlive = true;*/
 			}catch(Exception e)
 			{
-				log.error("Exception while getting instance id from conneciton " + e, e);
+				log.error("Exception while setting up Publisher Session for node: " + node, e);
 				throw e;
 			}
 
@@ -1181,23 +1183,29 @@ public final class AQKafkaProducer extends AQClient {
 				conn = createTopicConnection();
 				sess = createTopicSession(sessionAckMode);
 				Connection oConn = ((AQjmsSession)sess).getDBConnection();
-
-				int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
-				String serviceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("SERVICE_NAME");
 				String instanceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("INSTANCE_NAME");
-				String user = oConn.getMetaData().getUserName();
+
+				if(metadata.isBootstrap()) {
+					String dbHost = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SC_SERVER_HOST");
+					int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
+					String serviceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("SERVICE_NAME");
+					String user = oConn.getMetaData().getUserName();
+
+					String oldHost = node.host();
+					node.setHost(dbHost + oldHost.substring(oldHost.indexOf('.')));
+					node.setId(instId);
+					node.setService(serviceName);
+					node.setInstanceName(instanceName);
+					node.setUser(user);
+					node.updateHashCode();
+				}
+
 				String sessionId = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SESSION_ID");
 				String serialNum = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SERIAL_NUM");
 				String serverPid = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SERVER_PID");
 				connInfo = "Session_Info:"+ sessionId +","+serialNum+". Process Id:" + serverPid +". Instance Name:"+instanceName;
 				log.info("Database Producer "+connInfo);
 
-				node.setId(instId);
-				node.setService(serviceName);
-				node.setInstanceName(instanceName);
-				node.setUser(user);
-				node.updateHashCode();
-				
 				pingStmt = oConn.prepareStatement(PING_QUERY);
 				pingStmt.setQueryTimeout(1);
 				isAlive = true;
