@@ -14,6 +14,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Stack;
 import java.util.StringTokenizer;
 public class TNSParser {
@@ -38,6 +40,7 @@ public class TNSParser {
         	return null;
         return connStr.substring(index1 + 1, index2).trim();
     }
+	
     public String getConnectionString(String alias) {
         String aliasTmp = alias.trim().toUpperCase();
         Stack<String> stack = new Stack<>();
@@ -75,19 +78,19 @@ public class TNSParser {
 	        	   sb.append(fileStr.charAt(ind));
 	        }
 	        String strtmp = new String (sb.toString());
-	        String filestr = "";
+	        StringBuilder filestr = new StringBuilder();
 	        String tokenstr = new String ();
 	        StringTokenizer st = new StringTokenizer(strtmp, eol);
 	        while(st.hasMoreTokens()) {
 	          tokenstr = st.nextToken().trim();
 	          if (!tokenstr.contains(hashChar))
-	             filestr = filestr + tokenstr + eol;
+	             filestr = filestr.append(tokenstr);
 	          else {
 	        	  if(tokenstr.indexOf(hashChar) != 0)
-	        		  filestr = filestr + tokenstr.substring(0, tokenstr.indexOf(hashChar)) + eol;
+	        		  filestr.append(tokenstr, 0, tokenstr.indexOf(hashChar));
               }
 	        }
-            return filestr;	        
+            return filestr.toString();	        
 	        
 	    }
 		public void readFile() throws FileNotFoundException, IOException {

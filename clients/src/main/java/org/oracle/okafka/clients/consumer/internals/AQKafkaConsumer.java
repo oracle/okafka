@@ -48,6 +48,7 @@ import org.apache.kafka.clients.consumer.ConsumerPartitionAssignor;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.oracle.okafka.clients.consumer.TxEQAssignor;
 import org.oracle.okafka.common.Node;
+import org.oracle.okafka.common.errors.ConnectionException;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
@@ -1578,39 +1579,51 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 		public TopicConsumers(Node node,int mode) throws JMSException {
 			this.node = node;
-			conn = createTopicConnection(node);
 
-			sess = createTopicSession(mode);
 			try {
-				Connection oConn = ((AQjmsSession)sess).getDBConnection();
-				int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
-				String serviceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("SERVICE_NAME");
-				String instanceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("INSTANCE_NAME");
-				String user = oConn.getMetaData().getUserName();
-				try {
-					String sessionId = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SESSION_ID");
-					String serialNum = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SERIAL_NUM");
-					String serverPid = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SERVER_PID");
+				conn = createTopicConnection(node);
+				sess = createTopicSession(mode);
+				Connection oConn = ((AQjmsSession) sess).getDBConnection();
+				String instanceName = ((oracle.jdbc.internal.OracleConnection) oConn).getServerSessionInfo()
+						.getProperty("INSTANCE_NAME");
+				if (metadata.isBootstrap()) {
+					String dbHost = ((oracle.jdbc.internal.OracleConnection) oConn).getServerSessionInfo()
+							.getProperty("AUTH_SC_SERVER_HOST");
+					int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection) oConn).getServerSessionInfo()
+							.getProperty("AUTH_INSTANCE_NO"));
+					String serviceName = ((oracle.jdbc.internal.OracleConnection) oConn).getServerSessionInfo()
+							.getProperty("SERVICE_NAME");
+					String user = oConn.getMetaData().getUserName();
 
-					log.info("Database Consumer Session Info: "+ sessionId +","+serialNum+". Process Id " + serverPid +" Instance Name "+ instanceName);
+					String oldHost = node.host();
+					node.setHost(dbHost + oldHost.substring(oldHost.indexOf('.')));
+					node.setId(instId);
+					node.setService(serviceName);
+					node.setInstanceName(instanceName);
+					node.setUser(user);
+					node.updateHashCode();
+				}
+				try {
+					String sessionId = ((oracle.jdbc.internal.OracleConnection) oConn).getServerSessionInfo()
+							.getProperty("AUTH_SESSION_ID");
+					String serialNum = ((oracle.jdbc.internal.OracleConnection) oConn).getServerSessionInfo()
+							.getProperty("AUTH_SERIAL_NUM");
+					String serverPid = ((oracle.jdbc.internal.OracleConnection) oConn).getServerSessionInfo()
+							.getProperty("AUTH_SERVER_PID");
+
+					log.info("Database Consumer Session Info: " + sessionId + "," + serialNum + ". Process Id "
+							+ serverPid + " Instance Name " + instanceName);
 
 					try {
 						this.dbVersion = ConnectionUtils.getDBVersion(oConn);
-					}catch(Exception e)
-					{
+					} catch (Exception e) {
 						log.error("Exception whle fetching DB Version " + e);
 					}
 
-				}catch(Exception e)
-				{
+				} catch (Exception e) {
 					log.error("Exception wnile getting database session information " + e);
 				}
 
-				node.setId(instId);
-				node.setService(serviceName);
-				node.setInstanceName(instanceName);
-				node.setUser(user);
-				node.updateHashCode();
 			}catch(Exception e)
 			{
 				log.error("Exception while getting instance id from conneciton " + e, e);
