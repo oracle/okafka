@@ -43,7 +43,7 @@ public class TxEventQSourceRecord extends SourceRecord {
     private byte[] messageId = new byte[0];
 
     public enum PayloadType {
-        RAW, JSON, JMS
+        RAW, JSON, JMS_BYTES, JMS_TEXT, JMS_MAP
     }
 
     private final PayloadType payloadType;

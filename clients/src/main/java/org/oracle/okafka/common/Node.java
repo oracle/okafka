@@ -159,11 +159,10 @@ public class Node  extends org.apache.kafka.common.Node{
 
     @Override
     public int hashCode() {
-    	Integer h = this.hash;
-    	if (h == null) {
-    		h  = getHashCode();
+    	if (this.hash == null) {
+    		this.hash = getHashCode();
     	} 
-    	return h;
+    	return this.hash;
     }
     
     public int updateHashCode()

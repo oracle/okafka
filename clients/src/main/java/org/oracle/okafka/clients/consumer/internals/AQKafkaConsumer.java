@@ -54,6 +54,7 @@ import org.oracle.okafka.common.Node;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.errors.DisconnectException;
 import org.apache.kafka.common.metrics.Metrics;
 
 import org.oracle.okafka.common.internals.PartitionData;
@@ -97,7 +98,7 @@ import oracle.jdbc.OracleConnection;
  */
 public final class AQKafkaConsumer extends AQClient{
 	//private final Logger log ;
-	//Holds TopicPublishers of each node. Each TopicPublisher can contain a connection to corresponding node, session associated with that connection and topic publishers associated with that session
+	//Holds TopicConsumers of each node. Each TopicConsumer can contain a connection to corresponding node, session associated with that connection and topic consumers associated with that session
 	private final Map<Node, TopicConsumers> topicConsumersMap;
 	private final ConsumerConfig configs;
 	private final Time time;
@@ -324,11 +325,11 @@ public final class AQKafkaConsumer extends AQClient{
 			if(node.getValue().size() > 0) {
 				String topic = node.getValue().get(0).topic();
 				TopicConsumers consumers = topicConsumersMap.get(node.getKey());
+				TopicSession jmsSession = null;
 				try {
+          log.debug("Committing now for node " + node.toString());
 					Boolean ltwtSub = configs.getBoolean(ConsumerConfig.ORACLE_CONSUMER_LIGHTWEIGHT);
-
 					if(!ltwtSub.equals(true)) {
-						log.debug("Committing now for node " + node.toString());
 						TopicSession jmsSession =consumers.getSession();
 						if(jmsSession != null)
 						{
@@ -345,21 +346,20 @@ public final class AQKafkaConsumer extends AQClient{
 					}
 					result.put(node.getKey(), null);
 
-				} catch(JMSException exception) {
+				} catch(Exception exception) {
+          log.error("Exception from commit " + exception, exception);
 					error = true;
+					if(ConnectionUtils.isSessionClosed((AQjmsSession)jmsSession))
+						result.put(node.getKey(), new DisconnectException(exception.getMessage(),exception));
+					else
 					result.put(node.getKey(), exception);
-				}
-				catch(Exception e)
-				{
-					log.error("Exception from commit " + e, e);
-				}
+				}				
 			}
 			else {
 				log.info("Not Committing on Node " + node);
 			}
 
 		}
-
 		return createCommitResponse(request, nodes, offsets, result, error);
 	}
 
@@ -769,6 +769,12 @@ public final class AQKafkaConsumer extends AQClient{
 					}
 
 				} catch(Exception e) {
+					if (e instanceof SQLException && ((SQLException) e).getErrorCode() == 6550) {
+						log.error("Not all privileges granted to the database user.", e.getMessage());
+						
+						log.info("Check Oracle Documentation for Kafka Java Client Interface for Oracle Transactional"
+								+ " Event Queues to get the complete list of privileges required for the database user.");
+					}
 					for(Map.Entry<TopicPartition, Long> offsets : offsetResetTimestampOfTopic.getValue().entrySet()) {
 						responses.put(offsets.getKey(), e);
 					}

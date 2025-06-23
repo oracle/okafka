@@ -46,6 +46,7 @@ import javax.jms.JMSException;
 import org.apache.kafka.clients.consumer.ConsumerGroupMetadata;
 import org.apache.kafka.clients.consumer.ConsumerPartitionAssignor;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
+import org.apache.kafka.common.errors.DisconnectException;
 import org.apache.kafka.common.errors.InterruptException;
 import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.TimeoutException;
@@ -852,7 +853,8 @@ public class ConsumerNetworkClient {
 		Map<TopicPartition, OffsetAndMetadata> offsets = commitResponse.offsets();
 		Map<Node, Exception> result = commitResponse.getResult();
 		for(Map.Entry<Node, Exception> nodeResult : result.entrySet()) {
-			if(nodeResult.getValue() == null) {
+			Exception exe = nodeResult.getValue();
+			if(exe == null) {
 				this.sensors.commitSensor.record(response.requestLatencyMs());
 				for(TopicPartition tp : nodes.get(nodeResult.getKey())) {
 					log.debug("Commited to topic partiton: {} with  offset: {} ", tp, offsets.get(tp));
@@ -861,7 +863,9 @@ public class ConsumerNetworkClient {
 				nodes.remove(nodeResult.getKey());	
 			} else {
 				for(TopicPartition tp : nodes.get(nodeResult.getKey())) {
-					log.error("Failed to commit to topic partiton: {} with  offset: {} ", tp, offsets.get(tp));
+					log.error("Failed to commit to topic partiton: {} with  offset: {} ", tp, offsets.get(tp), exe);
+					if(exe instanceof DisconnectException)
+						client.disconnected(nodeResult.getKey(), time.milliseconds());
 				}
 
 			}	

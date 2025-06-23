@@ -1765,6 +1765,9 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 			long nowNanos = time.nanoseconds();
 			oracleTransctionManager.abortTransaction();
 			okpMetrics.recordAbortTxn(time.nanoseconds() - nowNanos);
+		}
+		catch (DisconnectException dE) {
+			throw dE;
 		} catch (Exception e) {
 			KafkaException okafkaE = new KafkaException("Exception while aborting transaction:" + e.getMessage(), e);
 			throw okafkaE;
@@ -2025,6 +2028,10 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 			// handling exceptions and record the errors;
 			// for API exceptions return them in the future,
 			// for other exceptions throw directly
+		} catch (DisconnectException e) {
+			this.errors.record();
+			this.interceptors.onSendError(record, tp, e);
+			throw e;
 		} catch (ApiException e) {
 			log.debug("Exception occurred during message send:", e);
 			if (callback != null)
@@ -2071,7 +2078,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 	 *                          where this method is called after producer close
 	 */
 	private ClusterAndWaitTime waitOnMetadata(String topic, Integer partition, long nowMs, long maxWaitMs)
-			throws InterruptedException {
+			throws InterruptedException, DisconnectException {
 		// add topic to metadata topic list if it is not there already and reset expiry
 		Cluster cluster = metadata.fetch();
 
@@ -2110,7 +2117,8 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 					(org.oracle.okafka.common.Node) requestNode, true);
 			MetadataResponse mResponse = (MetadataResponse) response.responseBody();
 			if (response.wasDisconnected()) {
-				// ToDo: handle disconnect
+				String excpMsg = "Exception while fetching Metadata. Database connection found closed.";
+				throw new DisconnectException(excpMsg);
 			}
 			for (String topicM : metadata.topics()) {
 				try {

@@ -11,9 +11,7 @@ package org.oracle.okafka.clients.producer.internals;
 import java.nio.ByteBuffer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -292,7 +290,6 @@ public final class AQKafkaProducer extends AQClient {
 				org.apache.kafka.common.Node bootStrapNode = null;
 				if(externalDbConn != null)
 				{
-					log.debug("");
 					int instId = ConnectionUtils.getInstanceId(externalDbConn);
 					bootStrapNode =  metadata.fetch().nodeById(instId);
 					if(bootStrapNode == null )
@@ -385,7 +382,8 @@ public final class AQKafkaProducer extends AQClient {
 
 			produceResult = new ProduceRequestResult(tp);
 
-			produceResult.set(thisOffset.subPartitionId(), (publishException==null)?byteMessage.getJMSTimestamp():-1, 
+			produceResult.set(thisOffset.subPartitionId() * MessageIdConverter.DEFAULT_SUBPARTITION_SIZE,
+					(publishException == null) ? byteMessage.getJMSTimestamp() : -1,
 					Collections.singletonList(thisOffset), publishException);
 
 			frm = new FutureRecordMetadata(produceResult, 0, System.currentTimeMillis(),
@@ -440,6 +438,7 @@ public final class AQKafkaProducer extends AQClient {
 		ProduceRequest.Builder builder = (ProduceRequest.Builder)request.requestBuilder();
 		ProduceRequest produceRequest = builder.build();
 		Node node = metadata.getNodeById(Integer.parseInt(request.destination()));
+
 		TopicPartition topicPartition = produceRequest.getTopicpartition();
 		MemoryRecords memoryRecords = produceRequest.getMemoryRecords();
 		TopicPublishers nodePublishers = null;
@@ -507,7 +506,7 @@ public final class AQKafkaProducer extends AQClient {
 								log.debug("Duplicate Check for parition " + topicPartition + "for msgId  " + checkMsgId);
 							}
 
-							boolean msgIdExist = checkIfMsgIdExist(dbConn, topicPartition.topic(), checkMsgId);
+							boolean msgIdExist = ConnectionUtils.checkIfMsgIdExist(dbConn, topicPartition.topic(), checkMsgId, log);
 							if(msgIdExist)
 							{
 								log.info("Message Id " +checkMsgId +" exists for topic partition "+ topicPartition+". Records were succesfully produced.");
@@ -518,7 +517,7 @@ public final class AQKafkaProducer extends AQClient {
 							}
 							else
 							{
-								log.info("Message Id " + checkMsgId +" exists for topic partition "+ topicPartition +" does not exist. Retrying to publish");
+								log.info("Message Id " + checkMsgId +" for topic partition "+ topicPartition +" does not exist. Retrying to publish");
 							}
 						}
 
@@ -615,17 +614,19 @@ public final class AQKafkaProducer extends AQClient {
 					{
 						try {
 							nodePublishers.close();
-							if( !stopReconnect && retryCnt > 0)
-							{
+							if (!stopReconnect && retryCnt > 0) {
 								log.info("Reconnecting to node " + node);
+
 								boolean reCreate = nodePublishers.reCreate();
-								if(!reCreate) {
-									log.info("Failed to reconnect to  " + node +" . Failing this batch for " + topicPartition);
+								if (!reCreate) {
+									log.info("Failed to reconnect to  " + node + " . Failing this batch for "
+											+ topicPartition);
 									disconnected = true;
 								}
-							}else {
+							} else {
 								disconnected = true;
-								log.info("Failed to reconnect to  " + node +" . Failing this batch for " + topicPartition);
+								log.info("Failed to reconnect to  " + node + " . Failing this batch for "
+										+ topicPartition);
 							}
 							stopReconnect = false;
 
@@ -648,8 +649,9 @@ public final class AQKafkaProducer extends AQClient {
 								log.debug("Connection to node is fine. Checking if previous publish was successfull or not.");
 								nodePublishers = topicPublishersMap.get(node);
 								java.sql.Connection conn = ((AQjmsSession)nodePublishers.sess).getDBConnection();
-								String msgId = msgs[0].getJMSMessageID().substring(3);
-								boolean msgIdExists = checkIfMsgIdExist(conn, topicPartition.topic(), msgId);
+								String jmsMsgId = msgs[0].getJMSMessageID();
+								String msgId = jmsMsgId != null ? jmsMsgId.substring(3) : null;
+								boolean msgIdExists = ConnectionUtils.checkIfMsgIdExist(conn, topicPartition.topic(), msgId, log);
 								checkForCommit = false;
 								if(msgIdExists) {
 									//successfully produced the message
@@ -688,7 +690,7 @@ public final class AQKafkaProducer extends AQClient {
 				partitionResponse =  createResponses(topicPartition, new NotLeaderForPartitionException(pException), msgs);  
 				this.metadata.requestUpdate();
 			}
-			if(disconnected)
+			else if(disconnected)
 			{
 				TopicPublishers tpRemoved = topicPublishersMap.remove(node);
 				log.trace("Connection with node {} is closed", request.destination());
@@ -696,6 +698,8 @@ public final class AQKafkaProducer extends AQClient {
 				org.apache.kafka.common.errors.DisconnectException disconnExcp = new org.apache.kafka.common.errors.DisconnectException(exceptionMsg,pException);
 				partitionResponse =  createResponses(topicPartition, disconnExcp, msgs);
 			}
+			else
+				partitionResponse =  createResponses(topicPartition, new KafkaException(pException), msgs);		
 		}
 		else 
 		{
@@ -718,47 +722,6 @@ public final class AQKafkaProducer extends AQClient {
 		}
 
 	}
-
-	private boolean checkIfMsgIdExist(Connection con,String topicName, String msgId)
-	{
-		boolean msgIdExists = false;
-		String qry =" Select count(*) from " +ConnectionUtils.enquote(topicName) + " where msgid = '" + msgId+"'";
-		log.debug("Executing " + qry);
-		ResultSet rs = null;
-		try (Statement stmt = con.prepareCall(qry);) {
-			stmt.execute(qry);
-			rs = stmt.getResultSet();
-			if(rs.next())
-			{
-				int msgCnt = rs.getInt(1);
-
-				if(msgCnt == 0)
-				{
-					msgIdExists = false;
-				}
-				else
-					msgIdExists = true;
-			}
-			else {
-				msgIdExists = false;
-			}
-			rs.close();
-			rs = null;
-
-		}catch(Exception e)
-		{
-			log.info("Exception while checking if msgId Exists or not. " + e,e);
-			if(rs!=null)
-			{
-				try { 
-					rs.close();
-				}catch(Exception ignoreE) {}
-			}
-		}
-		log.debug("Message Id "+  msgId +" Exists?: " + msgIdExists);
-		return msgIdExists;
-	}
-
 
 	private ClientResponse createClientResponse(ClientRequest request, TopicPartition topicPartition, ProduceResponse.PartitionResponse partitionResponse, boolean disconnected) {
 		return  new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
@@ -1149,7 +1112,7 @@ public final class AQKafkaProducer extends AQClient {
 			this.node = node;
 			this.externalConn = externalConn;
 			sessionAckMode = javax.jms.Session.SESSION_TRANSACTED;
-			createPublishers(false);
+			createPublishers();
 			topicPublishers = new HashMap<>();
 			log.debug("ExternalConnection " + externalConn);
 		}
@@ -1162,7 +1125,7 @@ public final class AQKafkaProducer extends AQClient {
 			this.sessionAckMode = mode;
 
 			try {
-				createPublishers(false);
+				createPublishers();
 				topicPublishers = new HashMap<>();
 				/*
 				Connection oConn = ((AQjmsSession)sess).getDBConnection();
@@ -1219,7 +1182,7 @@ public final class AQKafkaProducer extends AQClient {
 			return tpDesc;
 		}
 
-		private boolean createPublishers(boolean reCreate) throws JMSException {
+		private boolean createPublishers() throws JMSException {
 			try {
 				conn = createTopicConnection();
 				sess = createTopicSession(sessionAckMode);
@@ -1235,14 +1198,12 @@ public final class AQKafkaProducer extends AQClient {
 				connInfo = "Session_Info:"+ sessionId +","+serialNum+". Process Id:" + serverPid +". Instance Name:"+instanceName;
 				log.info("Database Producer "+connInfo);
 
-				if(reCreate)
-				{
-					node.setId(instId);
-					node.setService(serviceName);
-					node.setInstanceName(instanceName);
-					node.setUser(user);
-					node.updateHashCode();
-				}
+				node.setId(instId);
+				node.setService(serviceName);
+				node.setInstanceName(instanceName);
+				node.setUser(user);
+				node.updateHashCode();
+				
 				pingStmt = oConn.prepareStatement(PING_QUERY);
 				pingStmt.setQueryTimeout(1);
 				isAlive = true;
@@ -1353,7 +1314,7 @@ public final class AQKafkaProducer extends AQClient {
 		{
 			log.debug("Recreating TopicPublisher " + this.toString());
 			close();
-			boolean reCreateSucc = createPublishers(true);
+			boolean reCreateSucc = createPublishers();
 			if(!reCreateSucc) {
 				log.debug("Recreation failed");
 				return false;
