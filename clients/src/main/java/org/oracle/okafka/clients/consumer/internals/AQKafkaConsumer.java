@@ -1576,45 +1576,23 @@ public final class AQKafkaConsumer extends AQClient{
 		public TopicConsumers(Node node) throws JMSException {
 			this(node, TopicSession.AUTO_ACKNOWLEDGE);
 		}
-		public TopicConsumers(Node node,int mode) throws JMSException {
+
+		public TopicConsumers(Node node, int mode) throws JMSException {
 			this.node = node;
 
 			try {
 				conn = createTopicConnection(node);
 				sess = createTopicSession(mode);
-				Connection oConn = ((AQjmsSession) sess).getDBConnection();
-				String instanceName = ((oracle.jdbc.internal.OracleConnection) oConn).getServerSessionInfo()
-						.getProperty("INSTANCE_NAME");
-				if (metadata.isBootstrap()) {
-					String dbHost = ((oracle.jdbc.internal.OracleConnection) oConn).getServerSessionInfo()
-							.getProperty("AUTH_SC_SERVER_HOST");
-					int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection) oConn).getServerSessionInfo()
-							.getProperty("AUTH_INSTANCE_NO"));
-					String serviceName = ((oracle.jdbc.internal.OracleConnection) oConn).getServerSessionInfo()
-							.getProperty("SERVICE_NAME");
-					String user = oConn.getMetaData().getUserName();
+				Connection conn = ((AQjmsSession) sess).getDBConnection();
 
-					String oldHost = node.host();
-					node.setHost(dbHost + oldHost.substring(oldHost.indexOf('.')));
-					node.setId(instId);
-					node.setService(serviceName);
-					node.setInstanceName(instanceName);
-					node.setUser(user);
-					node.updateHashCode();
+				if (metadata.isBootstrap()) {
+					ConnectionUtils.updateNodeInfo(node, conn);
 				}
 				try {
-					String sessionId = ((oracle.jdbc.internal.OracleConnection) oConn).getServerSessionInfo()
-							.getProperty("AUTH_SESSION_ID");
-					String serialNum = ((oracle.jdbc.internal.OracleConnection) oConn).getServerSessionInfo()
-							.getProperty("AUTH_SERIAL_NUM");
-					String serverPid = ((oracle.jdbc.internal.OracleConnection) oConn).getServerSessionInfo()
-							.getProperty("AUTH_SERVER_PID");
-
-					log.info("Database Consumer Session Info: " + sessionId + "," + serialNum + ". Process Id "
-							+ serverPid + " Instance Name " + instanceName);
-
+					String connInfo = ConnectionUtils.getDatabaseSessionInfo(conn);
+					log.info("Database Consumer "+connInfo);
 					try {
-						this.dbVersion = ConnectionUtils.getDBVersion(oConn);
+						this.dbVersion = ConnectionUtils.getDBVersion(conn);
 					} catch (Exception e) {
 						log.error("Exception whle fetching DB Version " + e);
 					}
@@ -1623,8 +1601,7 @@ public final class AQKafkaConsumer extends AQClient{
 					log.error("Exception wnile getting database session information " + e);
 				}
 
-			}catch(Exception e)
-			{
+			} catch (Exception e) {
 				log.error("Exception while getting instance id from conneciton " + e, e);
 			}
 

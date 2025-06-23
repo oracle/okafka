@@ -557,20 +557,9 @@ public class AQKafkaAdmin extends AQClient{
 	private Connection getConnection(Node node) {
 		try {
 			Connection newConn = ConnectionUtils.createJDBCConnection(node, configs, this.log);
-			String dbHost = ((oracle.jdbc.internal.OracleConnection)newConn).getServerSessionInfo().getProperty("AUTH_SC_SERVER_HOST");
-			String instanceName = ((oracle.jdbc.internal.OracleConnection)newConn).getServerSessionInfo().getProperty("INSTANCE_NAME");
+			
 			if(node.isBootstrap()){
-				int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection)newConn).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
-				String serviceName = ((oracle.jdbc.internal.OracleConnection)newConn).getServerSessionInfo().getProperty("SERVICE_NAME");
-				String user = newConn.getMetaData().getUserName();
-
-				String oldHost = node.host();
-				node.setHost(dbHost + oldHost.substring(oldHost.indexOf('.')));
-				node.setId(instId);
-				node.setService(serviceName);
-				node.setInstanceName(instanceName);
-				node.setUser(user);
-				node.updateHashCode();
+				ConnectionUtils.updateNodeInfo(node, newConn);
 
 				/*
 				 * Fetching the nodes and updating the metadataManager to ensure that Cluster
