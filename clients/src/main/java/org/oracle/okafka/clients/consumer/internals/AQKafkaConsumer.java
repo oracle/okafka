@@ -1723,14 +1723,14 @@ public final class AQKafkaConsumer extends AQClient{
 			}
 			TopicConsumers consumers = topicConsumersMap.get(node);	
 			metadata.setDBVersion(consumers.getDBVersion());	
-			
-			if(consumers.getlightWeightSub() && metadata.getDBMajorVersion() > 26) {
+
+			if(consumers.getlightWeightSub() && metadata.getDBMajorVersion() >= 26) {
 				consumers.createLightWeightSub(topic, node);
 			}
 			else {
 				consumers.getTopicSubscriber(topic);
 			}
-				
+
 		} catch(JMSException exception) { 
 			log.error("Exception during Subscribe request " + exception, exception);
 			log.info("Exception during Subscribe request. " + exception);
@@ -1740,7 +1740,7 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 		return createSubscribeResponse(request, topic, null, false);
 	}
-
+	
 	private ClientResponse createSubscribeResponse(ClientRequest request, String topic, JMSException exception, boolean disconnected) {
 		return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
 				request.createdTimeMs(), time.milliseconds(), disconnected, null,null,
