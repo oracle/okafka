@@ -24,7 +24,6 @@ import java.util.Set;
 import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
 import org.apache.kafka.clients.admin.internals.AdminMetadataManager;
-import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.clients.NetworkClient;
 import org.oracle.okafka.clients.admin.AdminClientConfig;
 import org.oracle.okafka.common.Node;

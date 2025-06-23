@@ -48,7 +48,6 @@ import org.apache.kafka.clients.consumer.ConsumerPartitionAssignor;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.oracle.okafka.clients.consumer.TxEQAssignor;
 import org.oracle.okafka.common.Node;
-import org.oracle.okafka.common.errors.ConnectionException;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
