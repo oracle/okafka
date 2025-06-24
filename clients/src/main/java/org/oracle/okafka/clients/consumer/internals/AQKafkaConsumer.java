@@ -330,7 +330,7 @@ public final class AQKafkaConsumer extends AQClient{
           log.debug("Committing now for node " + node.toString());
 					Boolean ltwtSub = configs.getBoolean(ConsumerConfig.ORACLE_CONSUMER_LIGHTWEIGHT);
 					if(!ltwtSub.equals(true)) {
-						TopicSession jmsSession =consumers.getSession();
+						jmsSession = consumers.getSession();
 						if(jmsSession != null)
 						{
 							log.debug("Committing now for node " + node.toString());
@@ -363,7 +363,7 @@ public final class AQKafkaConsumer extends AQClient{
 		return createCommitResponse(request, nodes, offsets, result, error);
 	}
 
-	private void commitOffsetsLightWeightSub(Node node, String topic, Map<TopicPartition, OffsetAndMetadata> offsets) {
+	private void commitOffsetsLightWeightSub(Node node, String topic, Map<TopicPartition, OffsetAndMetadata> offsets) throws Exception {
      	int size = offsets.size();
 		int[] partitions = new int[size];
 		int[] priorities = new int[size];
@@ -384,7 +384,7 @@ public final class AQKafkaConsumer extends AQClient{
 		commitSyncAll(node, topic, partitions, priorities, subshards, sequences);
 	}
 
-	public void CommitSync(Node node, String topic, int partition_id, int priority, 
+	public void commitSync(Node node, String topic, int partition_id, int priority, 
 			long subshard_id, long seq_num ) {
 
 		try {
@@ -406,7 +406,7 @@ public final class AQKafkaConsumer extends AQClient{
 	}
 
 	public void commitSyncAll(Node node, String topic, int[] partition_id, int[] priority, 
-			long[] subshard_id, long[] seq_num ) {
+			long[] subshard_id, long[] seq_num ) throws Exception {
 
 		try {
 			OracleConnection oracleCon = (OracleConnection) getConnection(node);
@@ -429,6 +429,7 @@ public final class AQKafkaConsumer extends AQClient{
 			log.debug("Light weight CommitSyncAll executed for topic: {}, partitions: {}", topic, partition_id.length);
 		} catch(Exception ex) {
 			log.error("Error in light weight commitSyncAll for topic: " + topic + ", node: " + node, ex);
+			throw ex;
 		}
 	}
 
