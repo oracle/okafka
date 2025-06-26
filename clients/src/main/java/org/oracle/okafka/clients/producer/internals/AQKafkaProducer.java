@@ -1154,7 +1154,7 @@ public final class AQKafkaProducer extends AQClient {
 				isAlive = true;*/
 			}catch(Exception e)
 			{
-				log.error("Exception while getting instance id from conneciton " + e, e);
+				log.error("Exception while setting up Publisher Session for node: " + node, e);
 				throw e;
 			}
 
@@ -1186,36 +1186,23 @@ public final class AQKafkaProducer extends AQClient {
 			try {
 				conn = createTopicConnection();
 				sess = createTopicSession(sessionAckMode);
-				Connection oConn = ((AQjmsSession)sess).getDBConnection();
+				Connection conn = ((AQjmsSession) sess).getDBConnection();
 
-				int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
-				String serviceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("SERVICE_NAME");
-				String instanceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("INSTANCE_NAME");
-				String user = oConn.getMetaData().getUserName();
-				String sessionId = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SESSION_ID");
-				String serialNum = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SERIAL_NUM");
-				String serverPid = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SERVER_PID");
-				connInfo = "Session_Info:"+ sessionId +","+serialNum+". Process Id:" + serverPid +". Instance Name:"+instanceName;
-				log.info("Database Producer "+connInfo);
+				ConnectionUtils.updateNodeInfo(node, conn);
 
-				node.setId(instId);
-				node.setService(serviceName);
-				node.setInstanceName(instanceName);
-				node.setUser(user);
-				node.updateHashCode();
-				
-				pingStmt = oConn.prepareStatement(PING_QUERY);
+				connInfo = ConnectionUtils.getDatabaseSessionInfo(conn);
+				log.info("Database Producer " + connInfo);
+
+				pingStmt = conn.prepareStatement(PING_QUERY);
 				pingStmt.setQueryTimeout(1);
 				isAlive = true;
 
-			}catch(JMSException jme) {
+			} catch (JMSException jme) {
 				throw jme;
-			}
-			catch(Exception setupException)
-			{	
+			} catch (Exception setupException) {
 				String errorCode = null;
-				if(setupException instanceof SQLException)
-					errorCode = String.valueOf(((SQLException)setupException).getErrorCode());
+				if (setupException instanceof SQLException)
+					errorCode = String.valueOf(((SQLException) setupException).getErrorCode());
 				JMSException crPublisherException = new JMSException(setupException.getMessage(), errorCode);
 				crPublisherException.setLinkedException(setupException);
 				throw crPublisherException;

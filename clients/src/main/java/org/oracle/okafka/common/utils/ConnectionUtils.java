@@ -37,7 +37,7 @@ import org.oracle.okafka.common.errors.RecordNotFoundSQLException;
 import org.oracle.okafka.common.utils.MessageIdConverter.OKafkaOffset;
 import org.slf4j.Logger;
 
-import oracle.jdbc.driver.OracleConnection;
+import oracle.jdbc.internal.OracleConnection;
 import oracle.jdbc.pool.OracleDataSource;
 import oracle.jms.AQjmsFactory;
 import oracle.jms.AQjmsSession;
@@ -61,27 +61,23 @@ public class ConnectionUtils {
 		return url;
 	}
 	
-	public static Connection createJDBCConnection(Node node, AbstractConfig configs, Logger log) throws SQLException{
-		OracleDataSource s=new OracleDataSource();
+	public static OracleDataSource getOracleDataSource(Node node, AbstractConfig configs, Logger log) throws SQLException  {
+		OracleDataSource dataSource=new OracleDataSource();
 		String dbUrl = createUrl(node, configs);
-		s.setURL(dbUrl);
-		try {
-			Connection conn =  s.getConnection();
-			int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection)conn).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
-			String serviceName = ((oracle.jdbc.internal.OracleConnection)conn).getServerSessionInfo().getProperty("SERVICE_NAME");
-			String instanceName = ((oracle.jdbc.internal.OracleConnection)conn).getServerSessionInfo().getProperty("INSTANCE_NAME");
-			String userName = conn.getMetaData().getUserName();
-			node.setId(instId);
-			node.setService(serviceName);
-			node.setInstanceName(instanceName);
-			node.setUser(userName);
-			node.updateHashCode();
-			return conn;
-		}catch(Exception e)
-		{
-			log.error("Exception while connecting to database with connection string " + dbUrl +":" + e);
-			throw e;
+		dataSource.setURL(dbUrl);
+		log.info("Connecting to Oracle Database : "+ dbUrl);
+		dataSource.setConnectionProperty(CommonClientConfigs.ORACLE_NET_TNS_ADMIN, configs.getString(CommonClientConfigs.ORACLE_NET_TNS_ADMIN));
+		if( !configs.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG).equalsIgnoreCase("PLAINTEXT")) {
+			dataSource.setConnectionProperty("oracle.net.wallet_location", "file:" + configs.getString(CommonClientConfigs.ORACLE_NET_TNS_ADMIN));
+			if(!node.isBootstrap())
+				dataSource.setConnectionProperty("oracle.jdbc.targetInstanceName", node.instanceName());
 		}
+		return dataSource;
+	}
+	
+	public static Connection createJDBCConnection(Node node, AbstractConfig configs, Logger log) throws SQLException{
+			Connection conn =  getOracleDataSource(node, configs, log).getConnection();
+			return conn;
 	}
 	
 	public static TopicConnection createTopicConnection(java.sql.Connection dbConn, AbstractConfig configs, Logger log)
@@ -104,12 +100,9 @@ public class ConnectionUtils {
 		if(node==null) 
 			throw new ConnectionException("Invalid argument: Node cannot be null");
 
-		String url = createUrl(node, configs);
-		log.info("Connecting to Oracle Database : "+ url);
 		OracleDataSource dataSource;
 		try {
-			dataSource =new OracleDataSource();
-			dataSource.setURL(url);	
+			dataSource = getOracleDataSource(node, configs, log);
 		}
 		catch(SQLException sql) {
 			throw new JMSException(sql.toString(), String.valueOf(sql.getErrorCode()));
@@ -171,6 +164,33 @@ public class ConnectionUtils {
 
 		}
 		throw new IllegalArgumentException("Invalid argument provided: " + name);	
+	}
+	
+	public static void updateNodeInfo(Node node, Connection conn) throws SQLException {
+		OracleConnection oConn = (OracleConnection) conn;
+		String instanceName = oConn.getServerSessionInfo().getProperty("INSTANCE_NAME");
+		String dbHost = oConn.getServerSessionInfo().getProperty("AUTH_SC_SERVER_HOST");
+		int instId = Integer.parseInt(oConn.getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
+		String serviceName = oConn.getServerSessionInfo().getProperty("SERVICE_NAME");
+		String user = oConn.getMetaData().getUserName();
+
+		String oldHost = node.host();
+		node.setHost(dbHost + oldHost.substring(oldHost.indexOf('.')));
+		node.setId(instId);
+		node.setService(serviceName);
+		node.setInstanceName(instanceName);
+		node.setUser(user);
+		node.updateHashCode();
+	}
+	
+	public static String getDatabaseSessionInfo(Connection conn) throws SQLException {
+		OracleConnection oConn = (OracleConnection) conn;
+		String instanceName = oConn.getServerSessionInfo().getProperty("INSTANCE_NAME");
+		String sessionId = oConn.getServerSessionInfo().getProperty("AUTH_SESSION_ID");
+		String serialNum = oConn.getServerSessionInfo().getProperty("AUTH_SERIAL_NUM");
+		String serverPid = oConn.getServerSessionInfo().getProperty("AUTH_SERVER_PID");
+		String connInfo = "Session_Info:"+ sessionId +","+serialNum+". Process Id:" + serverPid +". Instance Name:"+instanceName;
+		return connInfo;
 	}
 
 	public static String getDBVersion(Connection conn) throws Exception
@@ -335,7 +355,7 @@ public class ConnectionUtils {
 	{
 		String hostnPort = null;
 		try {
-			String url = conn.getMetaData().getURL();
+			String url = conn.getMetaData().getURL().toUpperCase();
 			String host = TNSParser.getProperty(url, "HOST");
 			if(host == null)
 			{

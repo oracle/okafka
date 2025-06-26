@@ -1854,46 +1854,33 @@ public final class AQKafkaConsumer extends AQClient{
 		public TopicConsumers(Node node) throws JMSException {
 			this(node, TopicSession.AUTO_ACKNOWLEDGE);
 		}
-		public TopicConsumers(Node node,int mode) throws JMSException {
-			
+
+		public TopicConsumers(Node node, int mode) throws JMSException {
 			this.node = node;
-			conn = createTopicConnection(node);
-
-			sess = createTopicSession(mode);
 			try {
-				Connection oConn = ((AQjmsSession)sess).getDBConnection();
-				int instId = Integer.parseInt(((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_INSTANCE_NO"));
-				String serviceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("SERVICE_NAME");
-				String instanceName = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("INSTANCE_NAME");
-				String user = oConn.getMetaData().getUserName();
+				conn = createTopicConnection(node);
+				sess = createTopicSession(mode);
+				Connection conn = ((AQjmsSession) sess).getDBConnection();
+
+				ConnectionUtils.updateNodeInfo(node, conn);
+				
 				try {
-					String sessionId = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SESSION_ID");
-					String serialNum = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SERIAL_NUM");
-					String serverPid = ((oracle.jdbc.internal.OracleConnection)oConn).getServerSessionInfo().getProperty("AUTH_SERVER_PID");
-
-					log.info("Database Consumer Session Info: "+ sessionId +","+serialNum+". Process Id " + serverPid +" Instance Name "+ instanceName);
-
-					try {
-						this.dbVersion = ConnectionUtils.getDBVersion(oConn);
-						this.lightWeightSub = configs.getBoolean(ConsumerConfig.ORACLE_CONSUMER_LIGHTWEIGHT);
-							
-					}catch(Exception e)
-					{
-						log.error("Exception whle fetching DB Version and lightweight consumer config" + e);
-					}
-
-				}catch(Exception e)
-				{
+					String connInfo = ConnectionUtils.getDatabaseSessionInfo(conn);
+					log.info("Database Consumer "+connInfo);
+				} catch (Exception e) {
 					log.error("Exception wnile getting database session information " + e);
 				}
+				try {
+					this.dbVersion = ConnectionUtils.getDBVersion(conn);
+					this.lightWeightSub = configs.getBoolean(ConsumerConfig.ORACLE_CONSUMER_LIGHTWEIGHT);
+						
+				}catch(Exception e)
+				{
+					log.error("Exception whle fetching DB Version and lightweight consumer config" + e);
+				}
 
-				node.setId(instId);
-				node.setService(serviceName);
-				node.setInstanceName(instanceName);
-				node.setUser(user);
-				node.updateHashCode();
-			}catch(Exception e)
-			{
+
+			} catch (Exception e) {
 				log.error("Exception while getting instance id from conneciton " + e, e);
 			}
 

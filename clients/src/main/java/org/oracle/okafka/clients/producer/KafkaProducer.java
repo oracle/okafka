@@ -709,7 +709,6 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 			List<InetSocketAddress> addresses = null;
 			String serviceName = null;
 			String instanceName = null;
-			System.setProperty("oracle.net.tns_admin", config.getString(ProducerConfig.ORACLE_NET_TNS_ADMIN));
 
 			if (config.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG).trim().equalsIgnoreCase("PLAINTEXT")) {
 
@@ -764,6 +763,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 					for (InetSocketAddress inetAddr : addresses) {
 						org.oracle.okafka.common.Node bootStrapNode = new org.oracle.okafka.common.Node(id--,
 								inetAddr.getHostName(), inetAddr.getPort(), serviceName, instanceName);
+						bootStrapNode.setBootstrapFlag(true);
 						bootStrapNodeList.add((Node) bootStrapNode);
 					}
 					Cluster bootStrapCluster = new Cluster(null, bootStrapNodeList, new ArrayList<>(0),

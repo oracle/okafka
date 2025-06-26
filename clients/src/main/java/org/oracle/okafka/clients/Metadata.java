@@ -281,6 +281,9 @@ public final class Metadata implements Closeable {
 		this.lastRefreshMs = now;
 		this.lastSuccessfulRefreshMs = now;
 		this.version += 1;
+		if(this.isBootStrap)
+			for(org.apache.kafka.common.Node n : this.cluster.nodes())
+				((Node)n).setBootstrapFlag(false);
 		this.isBootStrap = bootstrap;
 		
 		/* if (topicExpiryEnabled) {
@@ -320,10 +323,10 @@ public final class Metadata implements Closeable {
 		
 		boolean oldNodesAdded = false;
 		for(org.apache.kafka.common.Node oldNode : cluster.nodes())
-		{
+		{	
 			org.apache.kafka.common.Node nodeById = newCluster.nodeById(oldNode.id());
 			if(nodeById == null)
-			{
+			{	
 				newClusterNodes.add(oldNode);
 				//newCluster.nodes().add(oldNode);
 				oldNodesAdded = true;
@@ -331,7 +334,7 @@ public final class Metadata implements Closeable {
 				
 				log.debug("Added Down Node  " + oldNode );
 				
-			}		
+			}
 		}
 		if(oldNodesAdded)
 		{

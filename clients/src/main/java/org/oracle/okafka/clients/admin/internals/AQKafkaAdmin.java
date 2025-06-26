@@ -556,26 +556,30 @@ public class AQKafkaAdmin extends AQClient{
 	 */
 	private Connection getConnection(Node node) {
 		try {
-			int nodeHash = node.hashCode();
 			Connection newConn = ConnectionUtils.createJDBCConnection(node, configs, this.log);
-			connections.put(node, newConn);
-			int mayBeUpdatedNodeHash = node.hashCode();
 			
-			/*
-			 * Fetching the nodes and updating the metadataManager to ensure that Cluster
-			 * have the correct mapping in the nodesById Map even when the bootstrap node
-			 * have been updated after the initial connection
-			 */
-			if (nodeHash != mayBeUpdatedNodeHash) {
+			ConnectionUtils.updateNodeInfo(node, newConn);
+
+				/*
+				 * Fetching the nodes and updating the metadataManager to ensure that Cluster
+				 * have the correct mapping in the nodesById Map even when the bootstrap node
+				 * have been updated after the initial connection
+				 */
+			if(node.isBootstrap()){
 				List<Node> nodes = new ArrayList<>();
 				String clusterId = ((oracle.jdbc.internal.OracleConnection) newConn).getServerSessionInfo()
 						.getProperty("DATABASE_NAME");
 				this.getNodes(nodes, newConn, node, forceMetadata);
+				for(Node n: nodes) {
+					n.setBootstrapFlag(false);
+				}
 				Cluster newCluster = new Cluster(clusterId, NetworkClient.convertToKafkaNodes(nodes),
 						Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
 						nodes.size() > 0 ? nodes.get(0) : null);// , configs);
 				this.metadataManager.update(newCluster, System.currentTimeMillis());
 			}
+			connections.put(node, newConn);
+			
 		} catch (SQLException excp) {
 			log.error("Exception while connecting to Oracle Database " + excp, excp);
 			int errorCode = excp.getErrorCode();
