@@ -558,14 +558,14 @@ public class AQKafkaAdmin extends AQClient{
 		try {
 			Connection newConn = ConnectionUtils.createJDBCConnection(node, configs, this.log);
 			
-			if(node.isBootstrap()){
-				ConnectionUtils.updateNodeInfo(node, newConn);
+			ConnectionUtils.updateNodeInfo(node, newConn);
 
 				/*
 				 * Fetching the nodes and updating the metadataManager to ensure that Cluster
 				 * have the correct mapping in the nodesById Map even when the bootstrap node
 				 * have been updated after the initial connection
 				 */
+			if(node.isBootstrap()){
 				List<Node> nodes = new ArrayList<>();
 				String clusterId = ((oracle.jdbc.internal.OracleConnection) newConn).getServerSessionInfo()
 						.getProperty("DATABASE_NAME");

@@ -1862,9 +1862,8 @@ public final class AQKafkaConsumer extends AQClient{
 				sess = createTopicSession(mode);
 				Connection conn = ((AQjmsSession) sess).getDBConnection();
 
-				if (metadata.isBootstrap()) {
-					ConnectionUtils.updateNodeInfo(node, conn);
-				}
+				ConnectionUtils.updateNodeInfo(node, conn);
+				
 				try {
 					String connInfo = ConnectionUtils.getDatabaseSessionInfo(conn);
 					log.info("Database Consumer "+connInfo);

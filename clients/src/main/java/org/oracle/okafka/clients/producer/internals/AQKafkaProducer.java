@@ -1188,9 +1188,7 @@ public final class AQKafkaProducer extends AQClient {
 				sess = createTopicSession(sessionAckMode);
 				Connection conn = ((AQjmsSession) sess).getDBConnection();
 
-				if (metadata.isBootstrap()) {
-					ConnectionUtils.updateNodeInfo(node, conn);
-				}
+				ConnectionUtils.updateNodeInfo(node, conn);
 
 				connInfo = ConnectionUtils.getDatabaseSessionInfo(conn);
 				log.info("Database Producer " + connInfo);
