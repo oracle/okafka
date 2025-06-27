@@ -680,6 +680,7 @@ public class NetworkClient implements KafkaClient {
 						
 						Node oldNode = nodes.get(0);
 						Node newNode = new Node(oldNode.host(), oldNode.port(), oldNode.serviceName());
+						newNode.setBootstrapFlag(true);
 						log.info("MetaData Updater : Trying to connect to: " + newNode);
 						boolean connected = initiateConnect(newNode,now);
 						if(connected) {
