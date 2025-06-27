@@ -557,14 +557,14 @@ public class AQKafkaAdmin extends AQClient{
 	private Connection getConnection(Node node) {
 		try {
 			Connection newConn = ConnectionUtils.createJDBCConnection(node, configs, this.log);
-			
+
 			ConnectionUtils.updateNodeInfo(node, newConn);
 
-				/*
-				 * Fetching the nodes and updating the metadataManager to ensure that Cluster
-				 * have the correct mapping in the nodesById Map even when the bootstrap node
-				 * have been updated after the initial connection
-				 */
+			/*
+			 * Fetching the nodes and updating the metadataManager to ensure that Cluster
+			 * have the correct mapping in the nodesById Map even when the bootstrap node
+			 * have been updated after the initial connection
+			 */
 			if(node.isBootstrap()){
 				List<Node> nodes = new ArrayList<>();
 				String clusterId = ((oracle.jdbc.internal.OracleConnection) newConn).getServerSessionInfo()
@@ -579,7 +579,7 @@ public class AQKafkaAdmin extends AQClient{
 				this.metadataManager.update(newCluster, System.currentTimeMillis());
 			}
 			connections.put(node, newConn);
-			
+
 		} catch (SQLException excp) {
 			log.error("Exception while connecting to Oracle Database " + excp, excp);
 			int errorCode = excp.getErrorCode();
