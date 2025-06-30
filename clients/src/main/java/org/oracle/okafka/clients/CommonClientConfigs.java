@@ -58,6 +58,9 @@ public class CommonClientConfigs extends org.apache.kafka.clients.CommonClientCo
 	
 	public static final String ORACLE_TRANSACTIONAL_PRODUCER ="oracle.transactional.producer";
 	
+	public static final String ORACLE_CONSUMER_LIGHTWEIGHT = "oracle.consumer.lightweight";
+	public static final String ORACLE_CONSUMER_LIGHTWEIGHT_DOC = "Creates a light weight subscriber";
+	
 	/*
     public static final String METADATA_MAX_AGE_CONFIG = "metadata.max.age.ms";
     public static final String METADATA_MAX_AGE_DOC = "The period of time in milliseconds after which we force a refresh of metadata even if we haven't seen any partition leadership changes to proactively discover any new brokers or partitions.";

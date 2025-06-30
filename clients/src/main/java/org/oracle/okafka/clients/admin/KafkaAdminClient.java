@@ -643,7 +643,22 @@ public class KafkaAdminClient extends AdminClient {
 	private class MetadataUpdateNodeIdProvider implements NodeProvider {
 		@Override
 		public Node provide() {
-			return client.leastLoadedNode(time.milliseconds());
+			Node node = client.leastLoadedNode(time.milliseconds());
+			if (node == null)  
+			{
+				if(metadataManager != null)
+				{
+					List<Node> nodes = metadataManager.updater().fetchNodes();
+					if(nodes != null)
+					{
+						org.oracle.okafka.common.Node oldNode = (org.oracle.okafka.common.Node)(nodes.get(0));
+						Node newNode = new org.oracle.okafka.common.Node(oldNode.host(), oldNode.port(), oldNode.serviceName());
+						((org.oracle.okafka.common.Node)newNode).setBootstrapFlag(true);
+						node = newNode;
+					}
+				}
+			}
+			return node;
 		}
 	}
 
