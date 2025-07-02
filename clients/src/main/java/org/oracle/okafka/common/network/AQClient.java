@@ -474,17 +474,19 @@ public abstract class AQClient {
 							String protocolNow = getProperty(str,"PROTOCOL");
 							log.debug("Protocol used by this local listener " + protocolNow);
 
-							String host = getProperty(str, "HOST");;
-							Integer port = Integer.parseInt(getProperty(str, "PORT"));
-							log.debug("Hot:PORT " + host +":"+port);
+							if(protocolNow.equalsIgnoreCase("TCP") || protocolNow.equalsIgnoreCase("TCPS")){
+								String host = getProperty(str, "HOST");;
+								Integer port = Integer.parseInt(getProperty(str, "PORT"));
+								log.debug("Hot:PORT " + host +":"+port);
 
-							// ToDo: Assign Service List instead of a single Service
-							Node newNode =new Node(instIdNow, host, port, services.get(instIdNow).get(0), instance_names.get(instIdNow));
-							newNode.setUser(user);
-							log.debug("New Node created: " + newNode);
-							newNode.updateHashCode();
-							nodes.add(newNode);
-							all_nodes = nodes;
+								// ToDo: Assign Service List instead of a single Service
+								Node newNode =new Node(instIdNow, host, port, services.get(instIdNow).get(0), instance_names.get(instIdNow));
+								newNode.setUser(user);
+								log.debug("New Node created: " + newNode);
+								newNode.updateHashCode();
+								nodes.add(newNode);
+								all_nodes = nodes;
+							}
 
 						}
 						log.debug("Exploring hosts of the cluster. #Nodes " + nodes.size());
