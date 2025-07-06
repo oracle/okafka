@@ -9,18 +9,16 @@ package org.oracle.okafka.common.requests;
 
 import java.util.Map;
 
-import javax.jms.JMSException;
-
 import org.apache.kafka.common.protocol.ApiMessage;
 import org.apache.kafka.common.protocol.Errors;
 import org.oracle.okafka.common.errors.FeatureNotSupportedException;
 import org.oracle.okafka.common.protocol.ApiKeys;
 
 public class SubscribeResponse extends AbstractResponse {
-    private final JMSException exception;
+    private final Exception exception;
 	private final String topic;
 	
-	public SubscribeResponse(String topic, JMSException exception) {
+	public SubscribeResponse(String topic, Exception exception) {
 		super(ApiKeys.SUBSCRIBE);
 		this.topic = topic;
 		this.exception = exception;
@@ -31,7 +29,7 @@ public class SubscribeResponse extends AbstractResponse {
 		
 	}
 	
-	public JMSException getException() {
+	public Exception getException() {
 		return this.exception;
 	}
 

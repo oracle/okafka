@@ -128,6 +128,13 @@ public class AQKafkaAdmin extends AQClient{
 			 exception = sql;
 			 log.trace("Unexcepted error occured with connection to node {}, closing the connection", request.destination());
 			 log.trace("Failed to create topics {}", topics.keySet());
+			 try {
+				 jdbcConn.close(); 
+				 connections.remove(node);				 
+				 log.trace("Connection with node {} is closed", request.destination());
+			 } catch(SQLException sqlException) {
+				 log.trace("Failed to close connection with node {}", request.destination());
+			 }
 		 } 
 		 return createTopicsResponse(result, exception, exception != null, request, topicIdMap);	 
 	}
@@ -192,7 +199,13 @@ public class AQKafkaAdmin extends AQClient{
 		 } catch(SQLException sql) {
 			 log.trace("Unexcepted error occured with connection to node {}, closing the connection", node);
 			 log.trace("Failed to delete topics : {}", topicSet);
-
+			 try {
+				 connections.remove(node);
+				 jdbcConn.close(); 
+				 log.trace("Connection with node {} is closed", request.destination());
+			 } catch(SQLException sqlException) {
+				 log.trace("Failed to close connection with node {}", node);
+			 }
 			 return deleteTopicsResponse(result,Collections.emptyMap(), sql,true, request);
 		 }
 		 try {
@@ -246,7 +259,13 @@ public class AQKafkaAdmin extends AQClient{
 		 } catch(SQLException sql) {
 			 log.trace("Unexcepted error occured with connection to node {}, closing the connection", node);
 			 log.trace("Failed to delete topics with Ids : {}", topicIdSet);
-
+			 try {
+				 connections.remove(node);
+				 jdbcConn.close(); 
+				 log.trace("Connection with node {} is closed", request.destination());
+			 } catch(SQLException sqlException) {
+				 log.trace("Failed to close connection with node {}", node);
+			 }
 			 return deleteTopicsResponse(Collections.emptyMap(), result, sql,true, request);
 		 }
 		 try {

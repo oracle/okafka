@@ -941,10 +941,9 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 				if (includeMetadataInTimeout) {
 					final long metadataStart = time.milliseconds();
 					if (!updateMetadataAndSubscribeIfNeeded(timer.remainingMs())) {
+						timer.update(time.milliseconds());
 						continue;
 					}
-
-					timer.update(time.milliseconds());
 					metadataEnd = time.milliseconds();
 					elapsedTime += metadataEnd - metadataStart;
 
@@ -953,9 +952,8 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 						log.warn("Still waiting for metadata");
 					}
 					metadataEnd = time.milliseconds();
-					timer.update(time.milliseconds());
 				}
-
+				timer.update(time.milliseconds());
 				final long syncStart = time.milliseconds();
 				client.maybeAutoCommitOffsetsSync(time.milliseconds());
 				final long syncEnd = time.milliseconds();

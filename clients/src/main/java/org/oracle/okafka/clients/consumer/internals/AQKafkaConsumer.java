@@ -326,7 +326,7 @@ public final class AQKafkaConsumer extends AQClient{
 				TopicConsumers consumers = topicConsumersMap.get(node.getKey());
 				TopicSession jmsSession = null;
 				try {
-          log.debug("Committing now for node " + node.toString());
+					log.debug("Committing now for node " + node.toString());
 					Boolean ltwtSub = configs.getBoolean(ConsumerConfig.ORACLE_CONSUMER_LIGHTWEIGHT);
 					if(!ltwtSub.equals(true)) {
 						jmsSession = consumers.getSession();
@@ -346,12 +346,12 @@ public final class AQKafkaConsumer extends AQClient{
 					result.put(node.getKey(), null);
 
 				} catch(Exception exception) {
-          log.error("Exception from commit " + exception, exception);
+					log.error("Exception from commit " + exception, exception);
 					error = true;
 					if(ConnectionUtils.isSessionClosed((AQjmsSession)jmsSession))
 						result.put(node.getKey(), new DisconnectException(exception.getMessage(),exception));
 					else
-					result.put(node.getKey(), exception);
+						result.put(node.getKey(), exception);
 				}				
 			}
 			else {
@@ -999,12 +999,14 @@ public final class AQKafkaConsumer extends AQClient{
 		} catch(Exception exception) {
 			boolean disconnected = false;
 			log.error("Exception while executing JoinGroup " + exception.getMessage() , exception);
+			if(ConnectionUtils.isConnectionClosed(con))
+				disconnected = true;
 			if(exception instanceof SQLException )
 			{
 				SQLException sqlExcp = (SQLException)exception;
 				int errorCode = sqlExcp.getErrorCode();
 				log.error("JoinGroup: SQL ERROR: ORA-"+ errorCode, exception);
-				if(errorCode == 1403 || ConnectionUtils.isConnectionClosed(con)) {
+				if(errorCode == 1403) {
 					disconnected = true;
 				}
 			}
@@ -1379,14 +1381,15 @@ public final class AQKafkaConsumer extends AQClient{
 		} catch(Exception exception) {
 			boolean disconnected = false;
 			log.error("Exception in syncGroup " + exception.getMessage(), exception);
+			if(ConnectionUtils.isConnectionClosed(con))
+				disconnected = true;
 			if(exception instanceof SQLException)
 			{
 				SQLException sqlExcp = (SQLException) exception;
 				int sqlErrorCode = sqlExcp.getErrorCode();
 				log.error("syncGroup: SQL ERROR: ORA-"+ sqlErrorCode, exception);
-				if(sqlErrorCode == 1403 || ConnectionUtils.isConnectionClosed(con)) {
+				if(sqlErrorCode == 1403)
 					disconnected = true;
-				}
 			}
 			return createSyncResponse(request, null, -1, exception, disconnected);
 		} finally {
@@ -1580,14 +1583,12 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 
 		ArrayList<Node> nodeList = connMeResponse.processUrl();
-		String security = configs.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG);
-		boolean plainText = security.equalsIgnoreCase("PLAINTEXT")?true:false;
+		
 		if(nodeList != null)
 		{
 			for(Node nodeNow: nodeList)
 			{
-				if( (plainText && nodeNow.protocol().equalsIgnoreCase("TCP")) ||
-						(!plainText && nodeNow.protocol().equalsIgnoreCase("TCPS")))
+				if(nodeNow.protocol().equalsIgnoreCase("TCP") || nodeNow.protocol().equalsIgnoreCase("TCPS"))
 				{
 					connMeResponse.setPreferredNode(nodeNow);
 					break;
@@ -1733,9 +1734,9 @@ public final class AQKafkaConsumer extends AQClient{
 				consumers.getTopicSubscriber(topic);
 			}
 
-		} catch(JMSException exception) { 
+		} catch(Exception exception) { 
 			log.debug("Exception in Subscribe " + exception.getMessage(),exception);
-
+			
 			if(ConnectionUtils.isSessionClosed((AQjmsSession)consumers.getSession())) {
 				disconnected = true;
 			}
@@ -1748,7 +1749,7 @@ public final class AQKafkaConsumer extends AQClient{
 		return createSubscribeResponse(request, topic, null, disconnected);
 	}
 	
-	private ClientResponse createSubscribeResponse(ClientRequest request, String topic, JMSException exception, boolean disconnected) {
+	private ClientResponse createSubscribeResponse(ClientRequest request, String topic, Exception exception, boolean disconnected) {
 		return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
 				request.createdTimeMs(), time.milliseconds(), disconnected, null,null,
 				new SubscribeResponse(topic, exception));
@@ -1867,6 +1868,7 @@ public final class AQKafkaConsumer extends AQClient{
 				try {
 					String connInfo = ConnectionUtils.getDatabaseSessionInfo(conn);
 					log.info("Database Consumer "+connInfo);
+		
 				} catch (Exception e) {
 					log.error("Exception wnile getting database session information " + e);
 				}
@@ -1879,9 +1881,17 @@ public final class AQKafkaConsumer extends AQClient{
 					log.error("Exception whle fetching DB Version and lightweight consumer config" + e);
 				}
 
-
-			} catch (Exception e) {
-				log.error("Exception while getting instance id from conneciton " + e, e);
+			}catch(JMSException e)
+			{
+				log.error("Exception while setting up Consumer Session for node: " + node, e);
+				throw e;
+			}catch (Exception e) {
+				String errorCode = null;
+				if (e instanceof SQLException)
+					errorCode = String.valueOf(((SQLException) e).getErrorCode());
+				JMSException jmsException = new JMSException(e.getMessage(), errorCode);
+				jmsException.setLinkedException(e);
+				throw jmsException;
 			}
 
 			topicSubscribers = new HashMap<>();
@@ -1931,7 +1941,7 @@ public final class AQKafkaConsumer extends AQClient{
 			return subscriber;
 		}
 		
-		private void createLightWeightSub(String topic, Node node)  { 
+		private void createLightWeightSub(String topic, Node node) throws Exception  { 
 			try {		 
 				CallableStatement cStmt = getOrCreateCallable(node, "CREATE_LTWT_SUB", LTWT_SUB);
 				cStmt.setString(1, ConnectionUtils.enquote(topic));
@@ -1941,6 +1951,7 @@ public final class AQKafkaConsumer extends AQClient{
 			} 
 			catch(Exception ex) { 
 				log.error("Error creating lightweight subscriber for topic: " + topic + ", node: " + node, ex);
+				throw ex;
 			}
 		}
 

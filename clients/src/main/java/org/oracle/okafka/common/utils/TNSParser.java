@@ -82,7 +82,7 @@ public class TNSParser {
 	        while(st.hasMoreTokens()) {
 	          tokenstr = st.nextToken().trim();
 	          if (!tokenstr.contains(hashChar))
-	             filestr.append(tokenstr);
+	             filestr = filestr.append(tokenstr);
 	          else {
 	        	  if(tokenstr.indexOf(hashChar) != 0)
 	        		  filestr.append(tokenstr, 0, tokenstr.indexOf(hashChar));

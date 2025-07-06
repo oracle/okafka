@@ -1047,9 +1047,9 @@ public final class AQKafkaProducer extends AQClient {
 
 	//Close publishers for this node only
 	public void close(Node node) {
-
 		TopicPublishers tpNode = topicPublishersMap.get(node);
 		close(node, tpNode);
+		topicPublishersMap.remove(node);
 	}
 
 	public boolean isClosed()
