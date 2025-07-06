@@ -479,6 +479,7 @@ public abstract class AQClient {
 							if(protocolNow.equalsIgnoreCase("TCP") || protocolNow.equalsIgnoreCase("TCPS")){
 								String host = getProperty(str, "HOST");;
 								Integer port = Integer.parseInt(getProperty(str, "PORT"));
+								
 								log.debug("Host:PORT " + host +":"+port);
 
 								// ToDo: Assign Service List instead of a single Service
