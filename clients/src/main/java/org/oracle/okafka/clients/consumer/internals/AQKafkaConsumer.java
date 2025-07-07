@@ -1587,14 +1587,12 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 
 		ArrayList<Node> nodeList = connMeResponse.processUrl();
-		String security = configs.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG);
-		boolean plainText = security.equalsIgnoreCase("PLAINTEXT")?true:false;
+
 		if(nodeList != null)
 		{
 			for(Node nodeNow: nodeList)
 			{
-				if( (plainText && nodeNow.protocol().equalsIgnoreCase("TCP")) ||
-						(!plainText && nodeNow.protocol().equalsIgnoreCase("TCPS")))
+				if(nodeNow.protocol().equalsIgnoreCase("TCP") || nodeNow.protocol().equalsIgnoreCase("TCPS"))
 				{
 					connMeResponse.setPreferredNode(nodeNow);
 					break;
