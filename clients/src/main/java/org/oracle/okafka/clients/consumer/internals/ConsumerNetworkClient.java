@@ -727,13 +727,10 @@ public class ConsumerNetworkClient {
 			}
 			catch(Exception e){
 				log.error("Exception while subscribing to the topic" + e.getMessage(),e);
-				if(e instanceof SQLException) {
-					int errorCode = ((SQLException) e).getErrorCode();
-					if(errorCode == 28 || errorCode == 17410) {
+				if(e instanceof DisconnectException) {
 						this.aqConsumer.close(node);
 						this.client.disconnected(node, now);;
 						return false;
-					}
 				}
 			}
 		}
@@ -742,7 +739,6 @@ public class ConsumerNetworkClient {
 	}
 
 	public void maybeUpdateMetadata(long timeout) {
-		Cluster cluster = metadata.fetch();
 		long curr = time.milliseconds();
 		if(metadata.isBootstrap() || metadata.timeToNextUpdate(curr) == 0 ? true : false) {
 			int lastVersion = metadata.version();

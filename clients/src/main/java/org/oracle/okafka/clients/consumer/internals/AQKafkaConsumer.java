@@ -35,7 +35,6 @@ import javax.jms.TopicSubscriber;
 
 import oracle.jdbc.OracleData;
 import oracle.jdbc.OracleTypes;
-import oracle.jdbc.OracleArray;
 import oracle.jms.AQjmsBytesMessage;
 import oracle.jms.AQjmsConnection;
 import oracle.jms.AQjmsConsumer;
@@ -43,7 +42,6 @@ import oracle.jms.AQjmsSession;
 
 import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
-import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.clients.Metadata;
 import org.oracle.okafka.clients.NetworkClient;
 import org.oracle.okafka.clients.consumer.ConsumerConfig;
@@ -1114,11 +1112,11 @@ public final class AQKafkaConsumer extends AQClient{
 	}
 
 
-	public int getSubcriberCount(Node node, String topic) throws SQLException {
+	public int getSubcriberCount(Node node, String topic) throws Exception {
 		int count =0;
 		PreparedStatement Stmt = null;
 		ResultSet rs = null;
-		Connection con;
+		Connection con= null;
 		try {
 			con = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();
 			String query = "select count(*) from  user_durable_subs where name = :1 and queue_name = :2";
@@ -1130,13 +1128,12 @@ public final class AQKafkaConsumer extends AQClient{
 			rs.next();
 			count = rs.getInt(1);
 			return count;
-		}catch(SQLException sqlE){
-			log.error("Error in getting the subscriber count");
-			throw sqlE;
-		} catch(JMSException jmsE){
-			log.error("Error in getting the subscriber count");
-			throw new SQLException(jmsE.getMessage(),null ,Integer.parseInt(jmsE.getErrorCode()),jmsE);
-		}finally {
+		}catch(SQLException | JMSException e){
+			log.error("Error in getting the subscriber count",e);
+			if(ConnectionUtils.isConnectionClosed(con))
+				throw new DisconnectException("Connection got disconnected while getting subscriber count",e);
+			throw e;
+		} finally {
 			try {
 				if(rs != null)
 					rs.close();
@@ -1512,6 +1509,7 @@ public final class AQKafkaConsumer extends AQClient{
 		Node nodeNow = metadata.getNodeById(Integer.parseInt(request.destination()));
 		TopicConsumers consumers = topicConsumersMap.get(nodeNow);
 		ConnectMeResponse connMeResponse = null;
+		boolean disconnected = false;
 
 		if(consumers != null)
 		{
@@ -1520,6 +1518,7 @@ public final class AQKafkaConsumer extends AQClient{
 				connMeResponse = connectMe(connectMeRequest, conn);
 			} catch(Exception e)
 			{
+				disconnected = true;
 				log.error("Exception while executing DBMS_TEQK.AQ$_connect_me " + e.getMessage(), e);
 			}
 		}
@@ -1531,7 +1530,7 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 
 		return new ClientResponse(request.makeHeader((short)1), request.callback(), request.destination(), 
-				request.createdTimeMs(), time.milliseconds(), false, null,null, connMeResponse );
+				request.createdTimeMs(), time.milliseconds(), disconnected || connMeResponse.isDisconnected() , null,null, connMeResponse );
 	}
 
 
@@ -1579,6 +1578,8 @@ public final class AQKafkaConsumer extends AQClient{
 
 		} catch(Exception connMeEx)
 		{
+			if(ConnectionUtils.isConnectionClosed(conn))
+				connMeResponse.setDisconnection();
 			log.error("Exception while executing DBMS_TEQK.AQ$_CONNECTME " + connMeEx, connMeEx);
 		}
 
