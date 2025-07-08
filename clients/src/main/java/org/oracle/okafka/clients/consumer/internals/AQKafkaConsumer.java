@@ -1584,7 +1584,7 @@ public final class AQKafkaConsumer extends AQClient{
 		}
 
 		ArrayList<Node> nodeList = connMeResponse.processUrl();
-		
+
 		if(nodeList != null)
 		{
 			for(Node nodeNow: nodeList)
