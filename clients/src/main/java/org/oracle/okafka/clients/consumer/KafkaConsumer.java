@@ -991,7 +991,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 		client.maybeUpdateMetadata(timeout);
 		elapsed = time.milliseconds() - subscriptionStart;
 		if(elapsed > timeout) {
-			log.debug("Timeout Exceeded");
+			log.debug("Timeout Exceeded in updateMetadataAndSubscribeIfNeeded() after maybeUpdateMetadata()");
 			return false;
 		}
 		if (!client.mayBeTriggerSubcription(timeout - elapsed)) {
@@ -1014,7 +1014,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 
 		} 
 		else {
-			log.debug("Timeout Exceeded");
+			log.debug("Timeout Exceeded in updateMetadataAndSubscribeIfNeeded() after mayBeTriggerSubscription(");
 			return false;
 		}
 	}
