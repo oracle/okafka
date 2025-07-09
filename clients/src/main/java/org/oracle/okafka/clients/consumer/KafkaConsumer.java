@@ -1014,7 +1014,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 
 		} 
 		else {
-			log.debug("Timeout Exceeded in updateMetadataAndSubscribeIfNeeded() after mayBeTriggerSubscription(");
+			log.debug("Timeout Exceeded in updateMetadataAndSubscribeIfNeeded() after mayBeTriggerSubscription()");
 			return false;
 		}
 	}

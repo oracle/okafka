@@ -44,6 +44,8 @@ import oracle.jms.AQjmsSession;
 import oracle.jms.AQjmsTopicConnectionFactory;
 
 public class ConnectionUtils {
+	
+	public static final int CONNECTION_VALIDATION_TIMEOUT_SEC = 5;
 
 	public static String createUrl(Node node, AbstractConfig configs) {
 
@@ -136,7 +138,7 @@ public class ConnectionUtils {
 	
 	public static boolean isConnectionClosed(Connection con) {
 		try {
-			return con.isClosed() || !(con.isValid(5));
+			return con.isClosed() || !(con.isValid(CONNECTION_VALIDATION_TIMEOUT_SEC));
 		} catch (SQLException e) {
 			return true;
 		}

@@ -1717,8 +1717,8 @@ public final class AQKafkaConsumer extends AQClient{
 			}
 		}
 		SubscribeRequest.Builder builder = (SubscribeRequest.Builder)request.requestBuilder();
-		SubscribeRequest commitRequest = builder.build();
-		String topic = commitRequest.getTopic();
+		SubscribeRequest subscribeRequest = builder.build();
+		String topic = subscribeRequest.getTopic();
 		Node node = metadata.getNodeById(Integer.parseInt(request.destination()));
 		TopicConsumers consumers = null;	
 		try {
