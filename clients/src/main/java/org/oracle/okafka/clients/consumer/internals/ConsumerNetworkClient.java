@@ -260,6 +260,10 @@ public class ConsumerNetworkClient {
 							+" using Admin.createTopics() or dbms_aqadm.create_database_kafka_topic procedure";
 					throw new InvalidTopicException(errMsg);				
 				}
+				
+				long connectionDelay = this.client.connectionDelay(node, time.milliseconds());
+				if(connectionDelay != Long.MAX_VALUE)
+					time.sleep(connectionDelay);
 				if(!this.client.ready(node, now)) {
 					log.debug("Failed to consume messages from node: {}", node);
 					//ToDo: Retry poll to get new connection to same or different node.
