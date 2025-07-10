@@ -44,6 +44,8 @@ import oracle.jms.AQjmsSession;
 import oracle.jms.AQjmsTopicConnectionFactory;
 
 public class ConnectionUtils {
+	
+	public static final int CONNECTION_VALIDATION_TIMEOUT_SEC = 5;
 
 	public static String createUrl(Node node, AbstractConfig configs) {
 
@@ -125,13 +127,21 @@ public class ConnectionUtils {
 	public static boolean isSessionClosed(AQjmsSession sess) {
 		Connection con;
 		try {
-			con = ((oracle.jms.AQjmsSession)sess).getDBConnection();
-			if(con == null || con.isClosed())
+			con = sess.getDBConnection();
+			if (con == null || isConnectionClosed(con))
 				return true;
-		} catch (JMSException | SQLException e) {
+		} catch (JMSException e) {
 			return true;
 		}
 		return false;
+	}
+	
+	public static boolean isConnectionClosed(Connection con) {
+		try {
+			return con.isClosed() || !(con.isValid(CONNECTION_VALIDATION_TIMEOUT_SEC));
+		} catch (SQLException e) {
+			return true;
+		}
 	}
 
 	public static String getUsername(AbstractConfig configs) {

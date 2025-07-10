@@ -55,7 +55,7 @@ public class TopicMetadataFetcher {
 				retry = true;
 			else {
 				log.error("Exception Caught: ", metadataResponse.getException());
-				throw new KafkaException("Unexpected error listing topics", metadataResponse.getException());
+				throw new KafkaException("Unexpected error getting topic Metadata", metadataResponse.getException());
 			}
 		} while (retry && timer.notExpired());
 

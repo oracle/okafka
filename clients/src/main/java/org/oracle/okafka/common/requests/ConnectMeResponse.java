@@ -31,6 +31,8 @@ public class ConnectMeResponse extends AbstractResponse {
 	ArrayList<DBListener> dbListenerList;
 	ArrayList<Node> nodeList;
 	Node preferredNode;
+	
+	boolean disconnected = false;
 
 	public ConnectMeResponse() {
 		super(ApiKeys.CONNECT_ME);
@@ -76,6 +78,14 @@ public class ConnectMeResponse extends AbstractResponse {
 
 	public void setPreferredNode(Node _node) {
 		this.preferredNode = _node;
+	}
+	
+	public void setDisconnection() {
+		this.disconnected = true;
+	}
+	
+	public boolean isDisconnected() {
+		return this.disconnected;
 	}
 
 	public ArrayList<Node> processUrl() {

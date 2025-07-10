@@ -941,10 +941,9 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 				if (includeMetadataInTimeout) {
 					final long metadataStart = time.milliseconds();
 					if (!updateMetadataAndSubscribeIfNeeded(timer.remainingMs())) {
-						return ConsumerRecords.empty();
+						timer.update(time.milliseconds());
+						continue;
 					}
-
-					timer.update(time.milliseconds());
 					metadataEnd = time.milliseconds();
 					elapsedTime += metadataEnd - metadataStart;
 
@@ -953,9 +952,8 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 						log.warn("Still waiting for metadata");
 					}
 					metadataEnd = time.milliseconds();
-					timer.update(time.milliseconds());
 				}
-
+				timer.update(time.milliseconds());
 				final long syncStart = time.milliseconds();
 				client.maybeAutoCommitOffsetsSync(time.milliseconds());
 				final long syncEnd = time.milliseconds();
@@ -967,7 +965,8 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 
 					return this.interceptors.onConsume(new ConsumerRecords<>(records));
 				}
-
+				
+				timer.update(time.milliseconds());
 			} while (timer.notExpired());
 			// final long fetchEnd = time.milliseconds();
 			// elapsedTime += fetchEnd - fetchStart;
@@ -990,11 +989,15 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 		long elapsed = 0L;
 		long subscriptionStart = time.milliseconds();
 		client.maybeUpdateMetadata(timeout);
-		elapsed += time.milliseconds() - subscriptionStart;
+		elapsed = time.milliseconds() - subscriptionStart;
+		if(elapsed > timeout) {
+			log.debug("Timeout Exceeded in updateMetadataAndSubscribeIfNeeded() after maybeUpdateMetadata()");
+			return false;
+		}
 		if (!client.mayBeTriggerSubcription(timeout - elapsed)) {
 			return false;
 		}
-		elapsed += time.milliseconds() - subscriptionStart;
+		elapsed = time.milliseconds() - subscriptionStart;
 		if (elapsed <= timeout) {
 			Set<TopicPartition> partitions = subscriptions.partitionsNeedingReset(time.milliseconds());
 			if (partitions.isEmpty())
@@ -1009,8 +1012,11 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 
 			return client.resetOffsetsSync(offsetResetTimestamps, timeout - elapsed);
 
+		} 
+		else {
+			log.debug("Timeout Exceeded in updateMetadataAndSubscribeIfNeeded() after mayBeTriggerSubscription()");
+			return false;
 		}
-		return true;
 	}
 
 	private Map<TopicPartition, List<ConsumerRecord<K, V>>> pollForFetches(final long timeoutMs) {

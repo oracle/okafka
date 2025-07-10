@@ -323,10 +323,10 @@ public final class Metadata implements Closeable {
 		
 		boolean oldNodesAdded = false;
 		for(org.apache.kafka.common.Node oldNode : cluster.nodes())
-		{	
+		{
 			org.apache.kafka.common.Node nodeById = newCluster.nodeById(oldNode.id());
 			if(nodeById == null)
-			{	
+			{
 				newClusterNodes.add(oldNode);
 				//newCluster.nodes().add(oldNode);
 				oldNodesAdded = true;
