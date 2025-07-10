@@ -762,9 +762,11 @@ public class ConsumerNetworkClient {
 	public ClientResponse sendMetadataRequest(MetadataRequest.Builder requestBuilder) {
 		log.debug("Sending Metadata Request");
 		long now = time.milliseconds();
-		ClientRequest clientRequest = client.newClientRequest(client.leastLoadedNode(now),
-				requestBuilder, now, true, requestTimeoutMs, null);
-		ClientResponse response = this.client.send(clientRequest, now);  
+		Node node = client.leastLoadedNode(now);
+		if (node == null)
+			throw new KafkaException("Couldn't connect to any node for sending metadata request");
+		ClientRequest clientRequest = client.newClientRequest(node, requestBuilder, now, true, requestTimeoutMs, null);
+		ClientResponse response = this.client.send(clientRequest, now);
 		log.debug("Got Metadata Response");
 		return response;
 	}
