@@ -717,12 +717,12 @@ public class NetworkClient implements KafkaClient {
 
 			// check if any topics metadata failed to get updated
 			Map<String, Exception> errors = response.topicErrors();
-			if (response.getException()!=null || !errors.isEmpty())
-				log.warn("Error while fetching metadata : {}", errors);
+			if (!errors.isEmpty())
+				log.warn("Error while fetching metadata for topics : {}", errors);
 
 			// don't update the cluster if there are no valid nodes...the topic we want may still be in the process of being
 			// created which means we will get errors and no nodes until it exists
-			if (cluster.nodes().size() > 0) {
+			if (response.getException() != null && errors.isEmpty()) {
 				this.metadata.update(cluster, null, now, false);
 			} else {
 				log.debug("Ignoring empty metadata response with correlation id {}.", requestHeader.correlationId());

@@ -16,6 +16,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLSyntaxErrorException;
 import java.sql.Types;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -138,7 +139,7 @@ public class ConnectionUtils {
 	
 	public static boolean isConnectionClosed(Connection con) {
 		try {
-			return con.isClosed() || !(con.isValid(CONNECTION_VALIDATION_TIMEOUT_SEC));
+			return con == null || con.isClosed() || !(con.isValid(CONNECTION_VALIDATION_TIMEOUT_SEC));
 		} catch (SQLException e) {
 			return true;
 		}

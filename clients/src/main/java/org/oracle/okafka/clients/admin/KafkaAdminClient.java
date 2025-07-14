@@ -1146,7 +1146,6 @@ public class KafkaAdminClient extends AdminClient {
 					client.disconnected((org.oracle.okafka.common.Node) (metadataManager
 							.nodeById(Integer.parseInt(response.destination()))), now);
 					metadataManager.requestUpdate();
-
 				}
 				call.handleResponse(response.responseBody());
 			} catch (Throwable t) {
@@ -1489,6 +1488,8 @@ public class KafkaAdminClient extends AdminClient {
 				@Override
 				public void handleResponse(org.apache.kafka.common.requests.AbstractResponse abstractResponse) {
 					MetadataResponse response = (MetadataResponse) abstractResponse;
+					if(response.getException() != null)
+						handleFailure(response.getException());
 					long now = time.milliseconds();
 					metadataManager.update(response.cluster(), now);
 

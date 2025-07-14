@@ -21,18 +21,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
 import org.oracle.okafka.clients.CommonClientConfigs;
 import org.oracle.okafka.clients.TopicTeqParameters;
 import org.oracle.okafka.common.Node;
+import org.oracle.okafka.common.errors.ConnectionException;
 import org.oracle.okafka.common.errors.RecordNotFoundSQLException;
 import org.apache.kafka.common.PartitionInfo;
-import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.config.AbstractConfig;
+import org.apache.kafka.common.errors.DisconnectException;
 import org.oracle.okafka.common.requests.MetadataRequest;
 import org.oracle.okafka.common.requests.MetadataResponse;
 import org.oracle.okafka.common.requests.CreateTopicsRequest.TopicDetails;
@@ -40,7 +40,6 @@ import org.oracle.okafka.common.requests.ListOffsetsRequest;
 import org.oracle.okafka.common.requests.ListOffsetsRequest.ListOffsetsPartition;
 import org.oracle.okafka.common.requests.ListOffsetsResponse;
 import org.oracle.okafka.common.requests.ListOffsetsResponse.ListOffsetsPartitionResponse;
-import org.oracle.okafka.common.requests.OffsetFetchResponse.PartitionOffsetData;
 import org.oracle.okafka.common.utils.ConnectionUtils;
 import org.oracle.okafka.common.utils.CreateTopics;
 import org.oracle.okafka.common.utils.FetchOffsets;
@@ -155,7 +154,7 @@ public abstract class AQClient {
 
 			if (con == null) {
 				disconnected = true;
-				throw new NullPointerException("Database connection to fetch metadata is null");
+				throw new ConnectionException("Database connection to fetch metadata is null");
 			}
 
 			if (builder.isListTopics()) {
@@ -188,12 +187,6 @@ public abstract class AQClient {
 				teqParaList = metadataTopics;
 			}
 
-			topicParameterMap = new HashMap<String, TopicTeqParameters>(teqParaList.size());
-			for (String teqTopic : teqParaList) {
-
-				TopicTeqParameters teqPara = fetchQueueParameters(teqTopic, con);
-				topicParameterMap.put(teqTopic, teqPara);
-			}
 			// Database Name to be set as Cluster ID
 			clusterId = ((oracle.jdbc.internal.OracleConnection) con).getServerSessionInfo()
 					.getProperty("DATABASE_NAME");
@@ -202,6 +195,12 @@ public abstract class AQClient {
 				getPartitionInfo(metadataTopics, new ArrayList<>(metadataTopics), con,
 						nodes.isEmpty() ? all_nodes : nodes, metadataRequest.allowAutoTopicCreation(), partitionInfo,
 						errorsPerTopic, topicNameIdMap);
+			}
+			
+			topicParameterMap = new HashMap<String, TopicTeqParameters>(teqParaList.size());
+			for (String teqTopic : teqParaList) {
+				TopicTeqParameters teqPara = fetchQueueParameters(teqTopic, con);
+				topicParameterMap.put(teqTopic, teqPara);
 			}
 
 			if (topicIds != null) {
@@ -214,27 +213,21 @@ public abstract class AQClient {
 
 		} catch (Exception exception) {
 			log.error("Exception while getting metadata " + exception.getMessage(), exception);
-
-			if (exception instanceof SQLException)
-				if (((SQLException) exception).getErrorCode() == 6550) {
-					log.error("Not all privileges granted to the database user.",
-							((SQLException) exception).getMessage());
-					log.info("Please grant all the documented privileges to database user.");
+			if (ConnectionUtils.isConnectionClosed(con)) {
+				metadataException = new DisconnectException("Database connection got severed while fetching metadata", exception);
+				disconnected = true;
+			} else {
+				if (exception instanceof SQLException)
+					if (((SQLException) exception).getErrorCode() == 6550) {
+						log.error("Not all privileges granted to the database user.",
+								((SQLException) exception).getMessage());
+						log.info("Please grant all the documented privileges to database user.");
+					}
+				if (exception instanceof SQLSyntaxErrorException) {
+					log.error("Please grant all the documented privileges to database user.");
+					log.trace("Please grant all the documented privileges to database user.");
 				}
-			if (exception instanceof SQLSyntaxErrorException) {
-				log.trace("Please grant all the documented privileges to database user.");
-			}
-			metadataException=exception;
-			disconnected = true;
-			try {
-				log.debug("Unexcepted error occured with connection to node {}, closing the connection",
-						request.destination());
-				if (con != null)
-					con.close();
-
-				log.trace("Connection with node {} is closed", request.destination());
-			} catch (SQLException sqlEx) {
-				log.trace("Failed to close connection with node {}", request.destination());
+				metadataException = exception;
 			}
 		}
 		MetadataResponse metadataResponse = new MetadataResponse(clusterId, all_nodes, partitionInfoList, errorsPerTopic, errorsPerTopicId, topicParameterMap, topicNameIdMap);
@@ -271,32 +264,24 @@ public abstract class AQClient {
 				getPartitionInfo(allTopics, new ArrayList<>(allTopics), con, nodes.isEmpty()?all_nodes:nodes , false, partitionInfo, errorsPerTopic, new HashMap<>());
 			}
 
-			}catch (Exception exception) {
-				log.error("Exception while listing topics " + exception.getMessage(), exception);
-
+		} catch (Exception exception) {
+			log.error("Exception while listing topics " + exception.getMessage(), exception);
+			if (ConnectionUtils.isConnectionClosed(con)) {
+				listTopicsException=new DisconnectException("Database connection got severed while listing topics",exception);
+				disconnected = true;
+			} else {
 				if (exception instanceof SQLException)
 					if (((SQLException) exception).getErrorCode() == 6550) {
-						listTopicsException=exception;
 						log.error("Not all privileges granted to the database user.", exception);
 					}
 				if (exception instanceof SQLSyntaxErrorException) {
-					listTopicsException=exception;
+					log.error("Please grant all the documented privileges to database user.");
 					log.trace("Please grant all the documented privileges to database user.");
 				}
-					
-				disconnected=true;
-				try {
-					log.debug("Unexcepted error occured with connection to node {}, closing the connection",
-							request.destination());
-					if (con != null)
-						con.close();
-
-					log.trace("Connection with node {} is closed", request.destination());
-				} catch (SQLException sqlEx) {
-					log.trace("Failed to close connection with node {}", request.destination());
-				}
-				
+				listTopicsException = exception;
 			}
+
+		}
 		MetadataResponse metadataResponse = new MetadataResponse(clusterId, builder.needPartitionInfo() ? all_nodes:null, partitionInfoList, null, null, topicParameterMap, null);
 		metadataResponse.setException(listTopicsException);
 		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
@@ -346,17 +331,23 @@ public abstract class AQClient {
 			Map<Integer, String> instance_names = new HashMap<>();
 			Map<Integer, Timestamp> instance_startTimes = new HashMap<>();
 
-			while(result.next()) {
+			while (result.next()) {
 				int instId = result.getInt(1);
 				String instName = result.getString(2);
 				instance_names.put(instId, instName);
 				Date startup_time = result.getDate(3);
-				Timestamp ts=new Timestamp(startup_time.getTime());
+				Timestamp ts = new Timestamp(startup_time.getTime());
 				instance_startTimes.put(instId, ts);
 			}
-			result.close();
+
+			try {
+				if (result != null)
+					result.close();
+			} catch (SQLException e) {
+				// do nothing
+			}
 			result = null;
-			
+
 			if (instance_names.size()==1)
 			{
 				// Connected Node is :
@@ -393,7 +384,6 @@ public abstract class AQClient {
 				Map<Integer, ArrayList<String>> services = new HashMap<>();
 				Map<Integer,ArrayList<String>> localListenersMap = new HashMap<>();
 
-				String security = configs.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG);
 				String preferredService = configs.getString(CommonClientConfigs.ORACLE_SERVICE_NAME);
 				if(preferredService == null)
 				{
@@ -402,8 +392,6 @@ public abstract class AQClient {
 						preferredService = ConnectionUtils.getConnectedService(con);
 					}
 				}
-
-				boolean plainText = security.equalsIgnoreCase("PLAINTEXT")?true:false;
 
 				while(result.next()) {
 					int instId = result.getInt(1);
@@ -437,9 +425,7 @@ public abstract class AQClient {
 						localListenerList.add(value);
 					}
 				} //Result set Parsed
-				result.close();
-				result = null;
-
+				
 				for(Integer instIdNow : instance_names.keySet())
 				{
 					/*if( instIdNow.intValue() == connectedInst)
@@ -510,12 +496,12 @@ public abstract class AQClient {
 		}
 		catch(Exception e)
 		{
-			log.error("Exception while updating metadata " ,e);
+			log.error("Exception while fetching nodes " ,e);
+			throw e;
 		} finally {
 			try {
 				if(result != null)
 					result.close();
-
 				if(stmt != null)
 				stmt.close();
 			} catch(SQLException sqlEx) {
@@ -525,7 +511,7 @@ public abstract class AQClient {
 
 		return furtherMetadata;
 	}
-	
+
 	private Node getNodeToThisConnection(Connection con)
 	{
 		Node node = null;
@@ -633,7 +619,7 @@ public abstract class AQClient {
 					try {
 						//Get number of partitions
 						partCnt = getQueueParameter(SHARDNUM_PARAM, ConnectionUtils.enquote(topic), con);
-					} catch(SQLException sqlE) {
+					}catch(SQLException sqlE) {
 						int errorNo = sqlE.getErrorCode();
 						if(errorNo == 24010)  {
 							if (!allowAutoTopicCreation) {
@@ -643,13 +629,9 @@ public abstract class AQClient {
 							//Topic does not exist, it will be created
 							continue;
 						}
-					}catch(Exception excp) {
-						// Topic May or may not exists. We will not attempt to create it again
-						errorsPerTopic.put(topic, excp);
-						topicsRem.remove(topic);
-						continue;
+						throw sqlE;
 					}
-
+					
 					boolean partArr[] =  new boolean[partCnt];
 					for(int i =0; i < partCnt ;i++)
 						partArr[i] = false;
@@ -693,6 +675,7 @@ public abstract class AQClient {
 							topicNameIdMap.put(topic,ConnectionUtils.getIdByTopic(con,topic));
 						}catch(SQLException sqle) {
 							topicNameIdMap.put(topic, Uuid.ZERO_UUID);
+							throw sqle;
 						}
 					}
 					if(topicDone)
@@ -705,7 +688,7 @@ public abstract class AQClient {
 						topicDetails.put(topicRem, new TopicDetails(1, (short)0 , Collections.<String, String>emptyMap()));
 					}
 					Map<String,Uuid> remTopicIdMap = new HashMap<>();
-					Map<String, Exception> errors= CreateTopics.createTopics(con, topicDetails, remTopicIdMap);
+					Map<String, Exception> errors= CreateTopics.createTopics(con, topicDetails, remTopicIdMap, log);
 					for(String topicRem : topicsRem) {
 						if(errors.get(topicRem) == null) {
 							partitionInfo.add(new PartitionInfo(topicRem, 0, nodes.get(nodeIndex++%nodesSize), null, null));
@@ -723,7 +706,9 @@ public abstract class AQClient {
 					qryIndex++;
 					userQueueShardsQueryIndex = qryIndex;
 					continue;
-				}	
+				}
+				else
+					throw sqe;
 			}
 			finally {
 			
@@ -739,11 +724,12 @@ public abstract class AQClient {
 	}
 	
 	// returns the value for a queue Parameter
-    public int getQueueParameter(String queueParamName, String topic, Connection con) throws SQLException {
-		if(topic == null) return 0;
+	public int getQueueParameter(String queueParamName, String topic, Connection con) throws SQLException {
+		if (topic == null)
+			return 0;
 		String query = "begin dbms_aqadm.get_queue_parameter(?,?,?); end;";
 		CallableStatement cStmt = null;
-		int para= 1;
+		int para = 1;
 
 		try {
 			cStmt = con.prepareCall(query);
@@ -752,11 +738,14 @@ public abstract class AQClient {
 			cStmt.registerOutParameter(3, OracleTypes.NUMBER);
 			cStmt.execute();
 			para = cStmt.getInt(3);
-		} 
-		finally {
-			if(cStmt != null)
-				cStmt.close();
-		}		   
+		} finally {
+			try {
+				if (cStmt != null)
+					cStmt.close();
+			} catch (SQLException e) {
+				// do nothing
+			}
+		}
 		return para;
 	}  
     
@@ -832,7 +821,7 @@ public abstract class AQClient {
 						}
 						offsetPartitionResponseMap.put(entry.getKey(), offSetPartitionRespList);
 					}
-					continue;
+					throw sqlE;
 				}
 				for (ListOffsetsPartition listOffsetPartition : offSetPartitionList) {
 					long timestamp = listOffsetPartition.timestamp();
@@ -860,18 +849,9 @@ public abstract class AQClient {
 				offsetPartitionResponseMap.put(entry.getKey(), offSetPartitionRespList);
 			}
 		} catch (Exception e) {
-			try {
+				log.error("Exception while getting offsets " + e.getMessage(), e);
 				disconnected = true;
 				exception = e;
-				log.debug("Unexcepted error occured with connection to node {}, closing the connection",
-						request.destination());
-				if (jdbcConn != null)
-					jdbcConn.close();
-
-				log.trace("Connection with node {} is closed", request.destination());
-			} catch (SQLException sqlEx) {
-				log.trace("Failed to close connection with node {}", request.destination());
-			}
 		}
 		ListOffsetsResponse listOffsetResponse = new ListOffsetsResponse(offsetPartitionResponseMap);
 		listOffsetResponse.setException(exception);

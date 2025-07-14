@@ -14,11 +14,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.apache.kafka.common.Uuid;
+import org.apache.kafka.common.errors.DisconnectException;
 import org.apache.kafka.common.errors.InvalidConfigurationException;
 import org.apache.kafka.common.errors.InvalidTopicException;
 import org.apache.kafka.common.errors.TopicExistsException;
 import org.oracle.okafka.common.network.AQClient;
 import org.oracle.okafka.common.requests.CreateTopicsRequest.TopicDetails;
+import org.slf4j.Logger;
 
 public class CreateTopics {
 
@@ -73,7 +75,7 @@ public class CreateTopics {
 	}
 	
 	public static Map<String, Exception> createTopics(Connection jdbcConn, Map<String, TopicDetails> topics,
-			Map<String, Uuid> topicIdMap) throws SQLException {
+			Map<String, Uuid> topicIdMap, Logger log) throws SQLException {
 		CallableStatement cStmt = null;
 		Map<String, Exception> result = new HashMap<>();
 		try {
@@ -92,12 +94,14 @@ public class CreateTopics {
 							throw new InvalidConfigurationException(
 									"Invalid configuration: " + property + " provided for topic: " + topic);
 					}
+					log.debug("Creating Topic: {}",topic);
 					cStmt = jdbcConn.prepareCall(
 							"{call DBMS_TEQK.AQ$_CREATE_KAFKA_TOPIC(topicname=>? ,partition_num=>?, retentiontime=>?)}");
 					cStmt.setString(1, ConnectionUtils.enquote(topic));
 					cStmt.setInt(2, details.numPartitions);
 					cStmt.setLong(3, retentionSec);
 					cStmt.execute();
+					log.debug("Topic Created: {}",topic);
 					try {
 						topicIdMap.put(topic, ConnectionUtils.getIdByTopic(jdbcConn, topic));
 					} catch (SQLException sqle) {
@@ -105,6 +109,9 @@ public class CreateTopics {
 					}
 
 				} catch (SQLException sqlEx) {
+					log.error("Exception while creating topic: {}", topic, sqlEx);
+					if(ConnectionUtils.isConnectionClosed(jdbcConn))
+						throw new DisconnectException("Database connection got servered while creating topics", sqlEx);
 					if (sqlEx.getErrorCode() == 24019 || sqlEx.getErrorCode() == 44003) {
 						result.put(topic, new InvalidTopicException(sqlEx));
 					} else if (sqlEx.getErrorCode() == 24001) {

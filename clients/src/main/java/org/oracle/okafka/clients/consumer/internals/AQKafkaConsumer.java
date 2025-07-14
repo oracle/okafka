@@ -49,6 +49,7 @@ import org.apache.kafka.clients.consumer.ConsumerPartitionAssignor;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.oracle.okafka.clients.consumer.TxEQAssignor;
 import org.oracle.okafka.common.Node;
+import org.oracle.okafka.common.errors.ConnectionException;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.TopicPartition;
@@ -295,8 +296,6 @@ public final class AQKafkaConsumer extends AQClient{
 			return createFetchResponse(request, topic, Collections.emptyList(), disconnected, exception);
 		}catch(Exception ex) {
 			log.error("Exception from bulkReceive " + ex, ex );
-			close(node);
-			disconnected = true;
 			return createFetchResponse(request, topic, Collections.emptyList(), true, ex);
 		}
 	}
@@ -866,37 +865,19 @@ public final class AQKafkaConsumer extends AQClient{
 		try {
 			TopicConsumers  tConsumer = topicConsumersMap.get(node);
 			if(tConsumer == null)
-				throw new NullPointerException("TConsumer for Node "+ node);
+				throw new ConnectionException("TConsumer for Node "+ node + " is null.");
 
 			TopicSession tSession = tConsumer.getSession();
 			if(tSession == null)
-				throw new NullPointerException ("TSesion for TConsumer for node" + node);
+				throw new ConnectionException ("TSesion for TConsumer for node" + node + " is null.");
 
 			conn = ((AQjmsSession)topicConsumersMap.get(node).getSession()).getDBConnection();			
-		} catch(JMSException jmsExcp) {			
-			try {
-				log.trace("Unexcepted error occured with connection to node {}, closing the connection", request.destination());
-				topicConsumersMap.get(node).getConnection().close();
-				log.trace("Connection with node {} is closed", request.destination());
-			} catch(JMSException jmsEx) {
-				log.trace("Failed to close connection with node {}", request.destination());
-			}
+		} catch(Exception e) {			
+				log.error("Unexcepted error occured with connection to node {} ", request.destination());
 		}
 
 		ClientResponse response = getMetadataNow(request, conn, node, metadata.updateRequested());
-
-		MetadataResponse metadataresponse = (MetadataResponse)response.responseBody();
-
-		org.apache.kafka.common.Cluster updatedCluster = metadataresponse.cluster();
-
-		for(String topic: updatedCluster.topics()) {
-			try {
-				super.fetchQueueParameters(topic, conn, metadata.topicParaMap);
-			} catch (SQLException e) {
-				log.error("Exception while fetching TEQ parameters and updating metadata " + e.getMessage());
-			}
-		}
-
+		
 		return response;
 	}
 
@@ -1479,19 +1460,10 @@ public final class AQKafkaConsumer extends AQClient{
 
 
 		} catch (Exception e) {
+			log.debug("Unexcepted error occured with connection to node {}", request.destination());
 			log.error("Exception while fetching offsets " + e.getMessage(), e);
-			try {
-				exception = e;
-				log.debug("Unexcepted error occured with connection to node {}, closing the connection",
-						request.destination());
-				if (jdbcConn != null)
-					jdbcConn.close();
-				close(node);
-
-				log.trace("Connection with node {} is closed", request.destination());
-			} catch (SQLException sqlEx) {
-				log.trace("Failed to close connection with node {}", request.destination());
-			}
+			disconnected = true;
+			exception = e;
 		}
 
 		OffsetFetchResponse offsetResponse = new OffsetFetchResponse(Collections.singletonMap(groupId, offsetFetchResponseMap));
@@ -1738,13 +1710,11 @@ public final class AQKafkaConsumer extends AQClient{
 		} catch(Exception exception) { 
 			log.debug("Exception in Subscribe " + exception.getMessage(),exception);
 			
-			if(ConnectionUtils.isSessionClosed((AQjmsSession)consumers.getSession())) {
+			if(consumers == null || ConnectionUtils.isSessionClosed((AQjmsSession)consumers.getSession())) {
 				disconnected = true;
 			}
 			log.error("Exception during Subscribe request " + exception, exception);
 			log.info("Exception during Subscribe request. " + exception);
-			log.info("Closing connection to node. " + node);
-			close(node);
 			return createSubscribeResponse(request, topic, exception, disconnected);
 		}
 		return createSubscribeResponse(request, topic, null, disconnected);
@@ -1871,7 +1841,7 @@ public final class AQKafkaConsumer extends AQClient{
 					log.info("Database Consumer "+connInfo);
 		
 				} catch (Exception e) {
-					log.error("Exception wnile getting database session information " + e);
+					log.error("Exception while getting database session information " + e);
 				}
 				try {
 					this.dbVersion = ConnectionUtils.getDBVersion(conn);
@@ -1879,7 +1849,7 @@ public final class AQKafkaConsumer extends AQClient{
 						
 				}catch(Exception e)
 				{
-					log.error("Exception whle fetching DB Version and lightweight consumer config" + e);
+					log.error("Exception while fetching DB Version and lightweight consumer config" + e);
 				}
 
 			}catch(JMSException e)
