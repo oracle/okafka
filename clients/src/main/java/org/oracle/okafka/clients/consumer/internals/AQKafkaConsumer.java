@@ -1421,7 +1421,6 @@ public final class AQKafkaConsumer extends AQClient{
 		List<TopicPartition> topicPartitions = offsetFetchRequest.perGroupTopicpartitions().values().iterator().next();
 		String groupId = offsetFetchRequest.perGroupTopicpartitions().keySet().iterator().next();
 		Map<TopicPartition, PartitionOffsetData> offsetFetchResponseMap = new HashMap<>();
-		Node node = null;
 		boolean disconnected = false;
 		Exception exception = null;
 		Connection jdbcConn = null;
@@ -1429,7 +1428,6 @@ public final class AQKafkaConsumer extends AQClient{
 
 		for (Node nodeNow : topicConsumersMap.keySet()) {
 			if (request.destination().equals("" + nodeNow.id())) {
-				node = nodeNow;
 				topicConsumer = topicConsumersMap.get(nodeNow);
 				break;
 			}
@@ -1451,7 +1449,7 @@ public final class AQKafkaConsumer extends AQClient{
 						log.error("SQL ERROR while fetching commit offset: ORA- " + errorCode, sqlE);
 						if(ConnectionUtils.isConnectionClosed(jdbcConn)) {
 							disconnected = true;
-							throw sqlE;
+							throw new DisconnectException("Database connection got severed while fetching offsets",sqlE);
 						}
 						else
 							offsetFetchResponseMap.put(tp, new PartitionOffsetData(-1L,sqlE));
@@ -1460,9 +1458,7 @@ public final class AQKafkaConsumer extends AQClient{
 
 
 		} catch (Exception e) {
-			log.debug("Unexcepted error occured with connection to node {}", request.destination());
 			log.error("Exception while fetching offsets " + e.getMessage(), e);
-			disconnected = true;
 			exception = e;
 		}
 
