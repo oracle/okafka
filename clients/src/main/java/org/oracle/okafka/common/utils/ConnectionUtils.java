@@ -46,7 +46,7 @@ import oracle.jms.AQjmsTopicConnectionFactory;
 
 public class ConnectionUtils {
 	
-	public static final int CONNECTION_VALIDATION_TIMEOUT_SEC = 5;
+	static final int CONNECTION_VALIDATION_TIMEOUT_SEC = 5;
 
 	public static String createUrl(Node node, AbstractConfig configs) {
 
