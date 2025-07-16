@@ -692,7 +692,6 @@ public final class AQKafkaProducer extends AQClient {
 			}
 			else if(disconnected)
 			{
-				TopicPublishers tpRemoved = topicPublishersMap.remove(node);
 				log.trace("Connection with node {} is closed", request.destination());
 				String exceptionMsg = "Database instance not reachable: " + node;
 				org.apache.kafka.common.errors.DisconnectException disconnExcp = new org.apache.kafka.common.errors.DisconnectException(exceptionMsg,pException);
@@ -1032,11 +1031,6 @@ public final class AQKafkaProducer extends AQClient {
 			}
 		}
 
-
-		if(response.wasDisconnected()) {
-			topicPublishersMap.remove(metadata.getNodeById(Integer.parseInt(request.destination())));
-			metadata.requestUpdate();
-		}
 		return response;
 	}
 
@@ -1053,9 +1047,9 @@ public final class AQKafkaProducer extends AQClient {
 
 	//Close publishers for this node only
 	public void close(Node node) {
-
 		TopicPublishers tpNode = topicPublishersMap.get(node);
 		close(node, tpNode);
+		topicPublishersMap.remove(node);
 	}
 
 	public boolean isClosed()

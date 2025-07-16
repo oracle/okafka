@@ -41,8 +41,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import javax.jms.JMSException;
-
 import org.apache.kafka.clients.consumer.ConsumerGroupMetadata;
 import org.apache.kafka.clients.consumer.ConsumerPartitionAssignor;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
@@ -124,7 +122,6 @@ public class ConsumerNetworkClient {
 	private final long defaultApiTimeoutMs;
 	private final SubscriptionState subscriptions;
 	private Set<String> subscriptionSnapshot;
-	private boolean rejoin = false;
 	private boolean needsJoinPrepare = true;
 	private SessionData sessionData = null;
 	private final List<ConsumerPartitionAssignor> assignors;
@@ -201,7 +198,7 @@ public class ConsumerNetworkClient {
 			//Assigning currentSession to BootStrapNode. All further operation will go through the same session
 			currentSession = bootStrapNode;
 			metadata.setLeader(currentSession);
-			// A connection was created before poll is invoked. This connection is passed on to the application and may be used for transactionala activity.
+			// A connection was created before poll is invoked. This connection is passed on to the application and may be used for transactional activity.
 			// OKafkaConsumer must use this connection going forward. Hence it should not look for optimal database instance to consume records. Hence avoid connectMe call.
 			aqConsumer.setSkipConnectMe(true);
 		}
@@ -263,6 +260,7 @@ public class ConsumerNetworkClient {
 							+" using Admin.createTopics() or dbms_aqadm.create_database_kafka_topic procedure";
 					throw new InvalidTopicException(errMsg);				
 				}
+				
 				if(!this.client.ready(node, now)) {
 					log.debug("Failed to consume messages from node: {}", node);
 					//ToDo: Retry poll to get new connection to same or different node.
@@ -270,6 +268,9 @@ public class ConsumerNetworkClient {
 					{
 						currentSession = null;
 					}
+					long connectionDelay = this.client.connectionDelay(node, time.milliseconds());
+					if(connectionDelay != Long.MAX_VALUE)
+						time.sleep(connectionDelay);
 				} else {
 					ClientRequest request  = createFetchRequest(node, poll.getValue(), callback, requestTimeoutMs < timeoutMs ? requestTimeoutMs : (int)timeoutMs);
 					ClientResponse response = client.send(request, now);
@@ -282,7 +283,7 @@ public class ConsumerNetworkClient {
 				}
 			}
 			timeSpent = System.currentTimeMillis() - pollStartTime;
-		}while(retry &&  timeSpent < timeoutMs );
+		}while(retry &&  timeSpent < timeoutMs);
 		
 		return this.messages;
 	}
@@ -385,8 +386,6 @@ public class ConsumerNetworkClient {
 		FetchResponse fetchResponse = (FetchResponse)response.responseBody();
 		messages.addAll(fetchResponse.getMessages());
 		if(response.wasDisconnected()) {
-			client.disconnected(metadata.getNodeById(Integer.parseInt(response.destination())), time.milliseconds()); 
-			rejoin = true;
 			currentSession = null;
 			if(sessionData != null)
 			{
@@ -402,10 +401,7 @@ public class ConsumerNetworkClient {
 		try {
 			FetchResponse fResponse = (FetchResponse)response.responseBody();
 			Exception exception = fResponse.getException();
-			long elapsed = response.requestLatencyMs();
-			long prevTime = time.milliseconds();
-			long current;
-			while(elapsed < timeoutMs && rejoinNeeded(exception)) {
+			if(rejoinNeeded(exception)) {
 				log.debug("JoinGroup Is Needed");
 				if (needsJoinPrepare) {
 					log.debug("Revoking");
@@ -417,10 +413,6 @@ public class ConsumerNetworkClient {
 				log.debug("Sending Join Group Request to database via node " + response.destination());
 				sendJoinGroupRequest(metadata.getNodeById(Integer.parseInt(response.destination())));
 				log.debug("Join Group Response received");
-				exception = null;
-				current = time.milliseconds();
-				elapsed = elapsed + (current - prevTime);
-				prevTime = current;
 			}
 			
 		} catch(Exception e)
@@ -439,7 +431,7 @@ public class ConsumerNetworkClient {
 				return true;
 			}
 		}
-		return rejoin;
+		return false;
 	}
 
 	private void onJoinPrepare() {
@@ -483,8 +475,6 @@ public class ConsumerNetworkClient {
 		
 		if(response.wasDisconnected()) {
 			log.info("Join Group failed as connection to database was severed.");
-			client.disconnected(metadata.getNodeById(Integer.parseInt(response.destination())), time.milliseconds()); 
-			rejoin = true;
 			currentSession = null;
 			if(sessionData != null)
 			{
@@ -492,7 +482,8 @@ public class ConsumerNetworkClient {
 				sessionData.invalidSessionData();
 			}
 			return;
-		}
+		} 
+		
 		sensors.joinSensor.record(response.requestLatencyMs());
 		
 		//Map<Integer, Map<Integer, SessionData>> sData = jResponse.getSessionData();
@@ -558,8 +549,11 @@ public class ConsumerNetworkClient {
 	private void sendSyncGroupRequest(Node node, List<SessionData> sessionData, int version) {
 		long now = time.milliseconds();
 		ClientRequest request = this.client.newClientRequest(node, new SyncGroupRequest.Builder(sessionData, version), now, true);
+		log.debug("Sending SyncGroup Request");
 		ClientResponse response = this.client.send(request, now);
+		log.debug("Got SyncGroup Response, Handling Sync Group Response");
 		handleSyncGroupResponse(response);
+		log.debug("Handled SyncGroup Response");
 	}
 	private void handleSyncGroupResponse(ClientResponse response) {
 		SyncGroupResponse syncResponse = (SyncGroupResponse)response.responseBody();
@@ -567,8 +561,6 @@ public class ConsumerNetworkClient {
 		
 		if(response.wasDisconnected()) {
 			log.info("Sync Group failed as connection to database was severed.");
-			client.disconnected(metadata.getNodeById(Integer.parseInt(response.destination())), time.milliseconds()); 
-			rejoin = true;
 			currentSession = null;
 			if(sessionData != null)
 			{
@@ -582,7 +574,6 @@ public class ConsumerNetworkClient {
 		if(exception == null) {
 			sensors.syncSensor.record(response.requestLatencyMs());
 			onJoinComplete(syncResponse.getSessionData());
-			rejoin = false;
 			needsJoinPrepare = true;
 			this.sessionData = syncResponse.getSessionData();    	  
 		}
@@ -740,21 +731,23 @@ public class ConsumerNetworkClient {
 			}
 			catch(Exception e){
 				log.error("Exception while subscribing to the topic" + e.getMessage(),e);
+				if(e instanceof DisconnectException) {
+						this.aqConsumer.close(node);
+						this.client.disconnected(node, now);;
+						return false;
+				}
 			}
-		
 		}
 		return true;
 
 	}
 
 	public void maybeUpdateMetadata(long timeout) {
-		Cluster cluster = metadata.fetch();
 		long curr = time.milliseconds();
-		if(cluster.isBootstrapConfigured() || metadata.timeToNextUpdate(curr) == 0 ? true : false) {
+		if(metadata.isBootstrap() || metadata.timeToNextUpdate(curr) == 0 ? true : false) {
 			int lastVersion = metadata.version();
 			long elapsed = 0;
 			long prev;
-			
 			while ((elapsed <= timeout) && (metadata.version() <= lastVersion) && !metadata.isClosed()) {
 				prev = time.milliseconds();
 				client.maybeUpdateMetadata(curr);
@@ -769,19 +762,19 @@ public class ConsumerNetworkClient {
 	public ClientResponse sendMetadataRequest(MetadataRequest.Builder requestBuilder) {
 		log.debug("Sending Metadata Request");
 		long now = time.milliseconds();
-		ClientRequest clientRequest = client.newClientRequest(client.leastLoadedNode(now),
-				requestBuilder, now, true, requestTimeoutMs, null);
-		ClientResponse response = this.client.send(clientRequest, now);  
+		Node node = client.leastLoadedNode(now);
+		if (node == null)
+			throw new KafkaException("Couldn't connect to any node for sending metadata request");
+		ClientRequest clientRequest = client.newClientRequest(node, requestBuilder, now, true, requestTimeoutMs, null);
+		ClientResponse response = this.client.send(clientRequest, now);
 		log.debug("Got Metadata Response");
 		return response;
 	}
 
 	private boolean handleSubscribeResponse(ClientResponse response) {
-		if(response.wasDisconnected()) {
-			client.disconnected(metadata.getNodeById(Integer.parseInt(response.destination())), time.milliseconds());
-		}
+
 		SubscribeResponse subscribeResponse = (SubscribeResponse)response.responseBody();
-		JMSException exception = subscribeResponse.getException();
+		Exception exception = subscribeResponse.getException();
 		if(exception != null) { 
 			log.error("failed to subscribe to topic {}", subscribeResponse.getTopic());		
 			return false;
@@ -1055,8 +1048,6 @@ public class ConsumerNetworkClient {
 
 		if(response.wasDisconnected()) {
 			log.debug("handleUnsubscribeResponse : node in disconnected state\n");
-			client.disconnected(metadata.getNodeById(Integer.parseInt(response.destination())), time.milliseconds()); 
-			rejoin = true;
 			currentSession = null;
 			if(sessionData != null)
 			{
