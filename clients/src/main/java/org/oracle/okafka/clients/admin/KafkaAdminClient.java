@@ -1488,8 +1488,10 @@ public class KafkaAdminClient extends AdminClient {
 				@Override
 				public void handleResponse(org.apache.kafka.common.requests.AbstractResponse abstractResponse) {
 					MetadataResponse response = (MetadataResponse) abstractResponse;
-					if(response.getException() != null)
+					if(response.getException() != null) {
 						handleFailure(response.getException());
+						return;
+					}
 					long now = time.milliseconds();
 					metadataManager.update(response.cluster(), now);
 
