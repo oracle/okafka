@@ -19,9 +19,9 @@ public class SyncGroupRequest extends AbstractRequest {
 		}
 		
 		@Override
-        public SyncGroupRequest build() {
-            return new SyncGroupRequest(sessionData, version);
-        }
+		public SyncGroupRequest build(short apiVersion) {
+			return new SyncGroupRequest(sessionData, version, apiVersion);
+		}
 		
 		@Override
         public String toString() {
@@ -31,17 +31,12 @@ public class SyncGroupRequest extends AbstractRequest {
             return bld.toString();
         }
 
-		@Override
-		public SyncGroupRequest build(short version) {
-			return build();
-		}
-		
 	}
 	
 	private List<SessionData> sessionData;
 	private int version;
-	public SyncGroupRequest(List<SessionData> sessionData, int version) {
-		super(ApiKeys.SYNC_GROUP,(short)1);
+	public SyncGroupRequest(List<SessionData> sessionData, int version, short apiVersion) {
+		super(ApiKeys.SYNC_GROUP, apiVersion);
 		this.sessionData = sessionData;
 		this.version = version;
 	}

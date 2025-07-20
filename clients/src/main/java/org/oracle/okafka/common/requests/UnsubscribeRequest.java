@@ -17,11 +17,11 @@ public static class Builder extends AbstractRequest.Builder<UnsubscribeRequest> 
 		public Builder() {
 			super(ApiKeys.UNSUBSCRIBE);
 		}
-		
+
 		@Override
-        public UnsubscribeRequest build() {
-            return new UnsubscribeRequest();
-        }
+		public UnsubscribeRequest build(short version) {
+			return new UnsubscribeRequest(version);
+		}
 		
 		@Override
         public String toString() {
@@ -31,13 +31,9 @@ public static class Builder extends AbstractRequest.Builder<UnsubscribeRequest> 
             return bld.toString();
         }
 
-		@Override
-		public UnsubscribeRequest build(short version) {
-			return build();
-		}
 	}
-    public UnsubscribeRequest() {
-    	super(ApiKeys.UNSUBSCRIBE,(short)1);
+    public UnsubscribeRequest(short version) {
+    	super(ApiKeys.UNSUBSCRIBE, version);
     }
 	@Override
 	public ApiMessage data() {

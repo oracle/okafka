@@ -44,7 +44,7 @@ public abstract class AbstractRequest extends org.apache.kafka.common.requests.A
 
         
         public Builder(ApiKeys apiKey) { 
-        	super(ApiKeys.convertToApacheKafkaKey(apiKey), (short)1);
+        	super(ApiKeys.convertToApacheKafkaKey(apiKey));
             this.apiKey = apiKey;
         }
 

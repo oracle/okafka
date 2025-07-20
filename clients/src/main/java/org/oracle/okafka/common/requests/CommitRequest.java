@@ -28,11 +28,11 @@ public static class Builder extends AbstractRequest.Builder<CommitRequest>  {
 			this.nodeTPMap = _nodeTPMap;
 			this.offsetAndMetadata = offsetAndMetadata;
 		}
-		
+	
 		@Override
-        public CommitRequest build() {
-            return new CommitRequest(nodeTPMap, offsetAndMetadata);
-        }
+		public CommitRequest build(short version) {
+			return new CommitRequest(nodeTPMap, offsetAndMetadata, version);
+		}
 		
 		@Override
         public String toString() {
@@ -42,16 +42,13 @@ public static class Builder extends AbstractRequest.Builder<CommitRequest>  {
             return bld.toString();
         }
 
-		@Override
-		public CommitRequest build(short version) {
-			return new CommitRequest(nodeTPMap, offsetAndMetadata);
-		}
 	}
 	
-private final Map<Node, List<TopicPartition>> nodeTPMap;
-private final Map<TopicPartition, OffsetAndMetadata> offsetAndMetadata;
-	private CommitRequest(Map<Node, List<TopicPartition>> _nodeTPMap, Map<TopicPartition, OffsetAndMetadata> offsetAndMetadata) {
-		super(ApiKeys.COMMIT,(short)1);
+	private final Map<Node, List<TopicPartition>> nodeTPMap;
+	private final Map<TopicPartition, OffsetAndMetadata> offsetAndMetadata;
+	
+	private CommitRequest(Map<Node, List<TopicPartition>> _nodeTPMap, Map<TopicPartition, OffsetAndMetadata> offsetAndMetadata, short version) {
+		super(ApiKeys.COMMIT, version);
 		this.nodeTPMap = _nodeTPMap;
 		this.offsetAndMetadata = offsetAndMetadata;
 	}

@@ -18,7 +18,7 @@ public class DeleteGroupsRequest extends AbstractRequest {
 
         @Override
         public DeleteGroupsRequest build(short version) {
-            return new DeleteGroupsRequest(groups);
+            return new DeleteGroupsRequest(groups, version);
         }
 
         @Override
@@ -27,8 +27,8 @@ public class DeleteGroupsRequest extends AbstractRequest {
         }
     }
 	
-	public DeleteGroupsRequest(List<String> groups) {
-        super(ApiKeys.DELETE_GROUPS, (short)1);
+	public DeleteGroupsRequest(List<String> groups, short version) {
+        super(ApiKeys.DELETE_GROUPS, version);
         this.groups = groups;
     }
 	

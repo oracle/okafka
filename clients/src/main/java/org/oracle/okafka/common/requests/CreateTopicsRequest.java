@@ -103,11 +103,11 @@ public class CreateTopicsRequest extends AbstractRequest {
             this.validateOnly = validateOnly;
         }
 
-        @Override
-        public CreateTopicsRequest build() {
-            return new CreateTopicsRequest(topics, timeout, validateOnly);
-        }
-
+    	@Override
+		public CreateTopicsRequest build(short version) {
+			return new CreateTopicsRequest(topics, timeout, validateOnly, version);
+		}
+    	
         @Override
         public String toString() {
             StringBuilder bld = new StringBuilder();
@@ -119,10 +119,6 @@ public class CreateTopicsRequest extends AbstractRequest {
             return bld.toString();
         }
 
-		@Override
-		public CreateTopicsRequest build(short version) {
-			return new CreateTopicsRequest(topics, timeout, validateOnly);
-		}
     }
 
     private final Map<String, TopicDetails> topics;
@@ -136,8 +132,8 @@ public class CreateTopicsRequest extends AbstractRequest {
     public static final int NO_NUM_PARTITIONS = -1;
     public static final short NO_REPLICATION_FACTOR = -1;
 
-    private CreateTopicsRequest(Map<String, TopicDetails> topics, Integer timeout, boolean validateOnly) {
-    	super(ApiKeys.CREATE_TOPICS,(short)1);
+    private CreateTopicsRequest(Map<String, TopicDetails> topics, Integer timeout, boolean validateOnly, short version) {
+    	super(ApiKeys.CREATE_TOPICS, version);
         this.topics = topics;
         this.timeout = timeout;
         this.validateOnly = validateOnly;
