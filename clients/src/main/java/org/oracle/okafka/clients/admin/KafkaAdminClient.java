@@ -2465,7 +2465,7 @@ public class KafkaAdminClient extends AdminClient {
 	@Override
 	public CreatePartitionsResult createPartitions(Map<String, NewPartitions> newPartitions,
 			final CreatePartitionsOptions options) {
-		final Map<String, NewPartitions> newPartitionsCopy = new HashMap<>(newPartitions);
+		final Map<String, NewPartitions> newPartitionsRem = new HashMap<>(newPartitions);
 		final Map<String, KafkaFutureImpl<Void>> futures = new HashMap<>(newPartitions.size());
 		
 		for (String topic : newPartitions.keySet()) {
@@ -2476,7 +2476,7 @@ public class KafkaAdminClient extends AdminClient {
 
 			@Override
 			public AbstractRequest.Builder createRequest(int timeoutMs) {
-				return new CreatePartitionsRequest.Builder(newPartitionsCopy);
+				return new CreatePartitionsRequest.Builder(newPartitionsRem);
 			}
 
 			@Override
@@ -2491,7 +2491,7 @@ public class KafkaAdminClient extends AdminClient {
 							future.complete(null);
 						else
 							future.completeExceptionally(entry.getValue());
-						newPartitionsCopy.remove(entry.getKey());
+						newPartitionsRem.remove(entry.getKey());
 					}
 					if (exception instanceof DisconnectException)
 						this.fail(time.milliseconds(), exception);
