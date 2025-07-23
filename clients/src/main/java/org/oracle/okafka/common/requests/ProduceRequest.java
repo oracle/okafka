@@ -51,15 +51,16 @@ public class ProduceRequest extends AbstractRequest{
   //  private String checkForMsgId = null;
     private List<OKafkaOffset> retryMsgList = null;
 	
-	public ProduceRequest(TopicPartition topicPartition, MemoryRecords memoryRecords, short acks, int timeout, boolean checkForDups, List<OKafkaOffset> retryMsgList) {
-		super(ApiKeys.PRODUCE, (short)1);
+	public ProduceRequest(TopicPartition topicPartition, MemoryRecords memoryRecords, short acks, int timeout,
+			boolean checkForDups, List<OKafkaOffset> retryMsgList, short version) {
+		super(ApiKeys.PRODUCE, version);
 		this.topicPartition = topicPartition;
-    	this.memoryRecords = memoryRecords;
-    	this.acks = acks;
-    	this.timeout = timeout;
-    	this.checkForDups = checkForDups;
-    	this.retryMsgList = retryMsgList;
-    	//this.checkForMsgId = checkForMsgId;
+		this.memoryRecords = memoryRecords;
+		this.acks = acks;
+		this.timeout = timeout;
+		this.checkForDups = checkForDups;
+		this.retryMsgList = retryMsgList;
+		// this.checkForMsgId = checkForMsgId;
 	}
 
 	/*public Map<String, Map<TopicPartition, MemoryRecords>> getproduceRecordsByTopic() {
@@ -105,14 +106,9 @@ public class ProduceRequest extends AbstractRequest{
         	this.retryMsgList = retryMsgList;
         }
         
-        @Override
-        public ProduceRequest build() {
-            return new ProduceRequest(topicPartition, memoryRecords, acks, timeout, checkForDups, retryMsgList);
-        }
-
 		@Override
 		public ProduceRequest build(short version) {
-			return new ProduceRequest(topicPartition, memoryRecords, acks, timeout, checkForDups, retryMsgList);
+			return new ProduceRequest(topicPartition, memoryRecords, acks, timeout, checkForDups, retryMsgList, version);
 		}
 	}
 

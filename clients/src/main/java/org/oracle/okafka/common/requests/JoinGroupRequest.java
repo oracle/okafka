@@ -14,11 +14,11 @@ public class JoinGroupRequest extends AbstractRequest {
 			super(ApiKeys.JOIN_GROUP);
 			this.sessionData = sessionData;
 		}
-		
+
 		@Override
-        public JoinGroupRequest build() {
-            return new JoinGroupRequest(sessionData);
-        }
+		public JoinGroupRequest build(short version) {
+			return new JoinGroupRequest(sessionData, version);
+		}
 		
 		@Override
         public String toString() {
@@ -27,17 +27,11 @@ public class JoinGroupRequest extends AbstractRequest {
             .append(")");
             return bld.toString();
         }
-
-		@Override
-		public JoinGroupRequest build(short version) {
-			return build();
-		}
-		
 	}
 	
 	private SessionData sessionData;
-	public JoinGroupRequest(SessionData sessionData ) {
-		super(ApiKeys.JOIN_GROUP, (short)1);
+	public JoinGroupRequest(SessionData sessionData, short version) {
+		super(ApiKeys.JOIN_GROUP, version);
 		this.sessionData = sessionData;
 		
 	}

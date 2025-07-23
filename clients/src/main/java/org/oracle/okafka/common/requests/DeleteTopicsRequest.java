@@ -55,14 +55,9 @@ public class DeleteTopicsRequest extends AbstractRequest {
             this.timeout = timeout;
         }
         
-        @Override
-        public DeleteTopicsRequest build() {
-            return new DeleteTopicsRequest(topics, topicIds, timeout);
-        }
-        
     	@Override
 		public DeleteTopicsRequest build(short version) {
-			 return new DeleteTopicsRequest(topics,topicIds , timeout);
+			 return new DeleteTopicsRequest(topics,topicIds , timeout, version);
 		}
     	
         @Override
@@ -79,8 +74,8 @@ public class DeleteTopicsRequest extends AbstractRequest {
 	
     }
 
-    private DeleteTopicsRequest(Set<String> topics, Set<Uuid> topicIds, Integer timeout) {
-    	super(ApiKeys.DELETE_TOPICS, (short)1);
+    private DeleteTopicsRequest(Set<String> topics, Set<Uuid> topicIds, Integer timeout, short version) {
+    	super(ApiKeys.DELETE_TOPICS, version);
         this.topics = topics;
         this.topicIds=topicIds;
         this.timeout = timeout;

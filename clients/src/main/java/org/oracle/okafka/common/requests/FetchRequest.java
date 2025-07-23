@@ -47,9 +47,9 @@ public class FetchRequest extends AbstractRequest {
 		}
 		
 		@Override
-        public FetchRequest build() {
-            return new FetchRequest(topic, pollTimeoutMs);
-        }
+		public FetchRequest build(short version) {
+			return new FetchRequest(topic, pollTimeoutMs, version);
+		}
 		
 		@Override
         public String toString() {
@@ -60,16 +60,12 @@ public class FetchRequest extends AbstractRequest {
             return bld.toString();
         }
 
-		@Override
-		public FetchRequest build(short version) {
-			return build();
-		}
 	}
 	
 	private final String topic;
 	private final long pollTimeoutMs;
-	private FetchRequest(String topic, long pollTimeoutMs) {
-		super(ApiKeys.FETCH, (short)1);
+	private FetchRequest(String topic, long pollTimeoutMs, short version) {
+		super(ApiKeys.FETCH, version);
 		this.topic = topic;
 		this.pollTimeoutMs = pollTimeoutMs;
 	}

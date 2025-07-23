@@ -101,10 +101,10 @@ public class MetadataRequest extends AbstractRequest {
 		}
 
 		@Override
-		public MetadataRequest build() {
-			return new MetadataRequest(topics, topicIds, allowAutoTopicCreation, teqParaTopic);
+		public MetadataRequest build(short version) {
+			return new MetadataRequest(topics, topicIds, allowAutoTopicCreation, teqParaTopic, version);
 		}
-
+		
 		@Override
 		public String toString() {
 			StringBuilder bld = new StringBuilder();
@@ -113,10 +113,6 @@ public class MetadataRequest extends AbstractRequest {
 			return bld.toString();
 		}
 
-		@Override
-		public MetadataRequest build(short version) {
-			return build();
-		}
 	}
 
 	private final List<String> teqParaTopic;
@@ -125,8 +121,8 @@ public class MetadataRequest extends AbstractRequest {
 	private final boolean allowAutoTopicCreation;
 
 	private MetadataRequest(List<String> topics, List<Uuid> topicIds, boolean allowAutoTopicCreation,
-			List<String> teqParaTopic) {
-		super(ApiKeys.METADATA, (short) 1);
+			List<String> teqParaTopic, short version) {
+		super(ApiKeys.METADATA, version);
 		this.topics = topics;
 		this.topicIds = topicIds;
 		this.allowAutoTopicCreation = allowAutoTopicCreation;

@@ -18,11 +18,11 @@ public static class Builder extends AbstractRequest.Builder<SubscribeRequest> {
 			super(ApiKeys.SUBSCRIBE);
 			this.topic = topic;
 		}
-		
+
 		@Override
-        public SubscribeRequest build() {
-            return new SubscribeRequest(topic);
-        }
+		public SubscribeRequest build(short version) {
+			return new SubscribeRequest(topic, version);
+		}
 		
 		@Override
         public String toString() {
@@ -32,15 +32,12 @@ public static class Builder extends AbstractRequest.Builder<SubscribeRequest> {
                 append(")");
             return bld.toString();
         }
-
-		@Override
-		public SubscribeRequest build(short version) {
-			return build();
-		}
 	}
+
     private final String topic;
-    public SubscribeRequest(String topic) {
-    	super(ApiKeys.SUBSCRIBE,(short)1);
+    
+    public SubscribeRequest(String topic, short version) {
+    	super(ApiKeys.SUBSCRIBE, version);
 	    this.topic = topic;
     }
 
