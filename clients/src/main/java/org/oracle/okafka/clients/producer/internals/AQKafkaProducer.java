@@ -1016,21 +1016,8 @@ public final class AQKafkaProducer extends AQClient {
 			}
 		}
 
-
 		ClientResponse response = getMetadataNow(request, conn, node, metadata.updateRequested());
-
-		MetadataResponse metadataresponse = (MetadataResponse)response.responseBody();
-
-		org.apache.kafka.common.Cluster updatedCluster = metadataresponse.cluster();
-
-		for(String topic: updatedCluster.topics()) {
-			try {
-				super.fetchQueueParameters(topic, conn, metadata.topicParaMap);
-			} catch (SQLException e) {
-				log.error("Exception while fetching TEQ parameters and updating metadata " + e.getMessage());
-			}
-		}
-
+		
 		return response;
 	}
 
