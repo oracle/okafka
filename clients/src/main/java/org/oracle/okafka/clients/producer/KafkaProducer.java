@@ -2120,16 +2120,11 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 				String excpMsg = "Exception while fetching Metadata. Database connection found closed.";
 				throw new DisconnectException(excpMsg);
 			}
-			for (String topicM : metadata.topics()) {
-				try {
-					aqProducer.fetchQueueParameters(topicM, conn, metadata.topicParaMap);
-				} catch (SQLException e) {
-					log.error("Exception while fetching TEQ parameters and updating metadata " + e.getMessage());
-				}
-			}
+
 			elapsed = time.milliseconds() - nowMs;
 			Cluster newCluster = mResponse.cluster();
 			metadata.update(newCluster, null, time.milliseconds(), false);
+			metadata.updateTeqParameters(mResponse.teqParameters());
 			return new ClusterAndWaitTime(newCluster, elapsed);
 		}
 

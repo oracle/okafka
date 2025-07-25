@@ -365,9 +365,17 @@ public final class Metadata implements Closeable {
 				log.info("Cluster ID: {}", newClusterId);
 			clusterResourceListeners.onUpdate(newCluster.clusterResource());
 		}
-
+		
 		notifyAll();
 		log.debug("Updated cluster metadata version {} to {}", this.version, this.cluster);
+	}
+	
+	public void updateTeqParameters(Map<String, TopicTeqParameters> teqParams) {
+		for (Map.Entry<String, TopicTeqParameters> entry : teqParams.entrySet()) {
+			if (!this.topicParaMap.containsKey(entry.getKey())) {
+				topicParaMap.put(entry.getKey(), entry.getValue());
+			}
+		}
 	}
 
 	private  Node  getLeaderNode(Cluster oldCluster, Cluster newCluster)
