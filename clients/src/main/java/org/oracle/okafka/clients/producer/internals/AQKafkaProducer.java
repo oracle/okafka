@@ -57,7 +57,6 @@ import org.apache.kafka.common.metrics.Metrics;
 import org.oracle.okafka.common.network.AQClient;
 import org.oracle.okafka.common.network.SelectorMetrics;
 import org.oracle.okafka.common.protocol.ApiKeys;
-import org.oracle.okafka.common.requests.MetadataResponse;
 import org.oracle.okafka.common.requests.ProduceRequest;
 import org.oracle.okafka.common.requests.ProduceResponse;
 import org.apache.kafka.common.record.MemoryRecords;
