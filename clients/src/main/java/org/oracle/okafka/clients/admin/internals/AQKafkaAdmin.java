@@ -532,7 +532,9 @@ public class AQKafkaAdmin extends AQClient{
 						cStmt = jdbcConn.prepareCall(plsql);
 						cStmt.setString(1, topic);
 						cStmt.setInt(2, newPartitionCount - currentPartitionCount);
+						log.debug("Adding {} more partitions to the topic {}.", newPartitionCount - currentPartitionCount, topic);
 						cStmt.execute();
+						log.debug("Successfully added {} partitions to the topic {}.", newPartitionCount - currentPartitionCount, topic);
 						errors.put(topic, null);
 					} else if (currentPartitionCount > newPartitionCount)
 						errors.put(topic, new InvalidPartitionsException(String.format("Topic currently has %d partitions, which is higher than the requested %d.",
@@ -553,7 +555,7 @@ public class AQKafkaAdmin extends AQClient{
 			exception = sqlE;
 			int errorNo = sqlE.getErrorCode();
 			if (errorNo == 6550)
-				log.error("Not all privileges granted to the database user.", sqlE.getMessage());
+				log.error("Please grant all the documented privileges to the database user.", sqlE.getMessage());
 			if (ConnectionUtils.isConnectionClosed(jdbcConn)) {
 				disconnected = true;
 				exception = new DisconnectException("Database Connection got severed while creating Partitions.", sqlE);
