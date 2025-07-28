@@ -73,7 +73,6 @@ import org.oracle.okafka.common.requests.FetchRequest;
 import org.oracle.okafka.common.requests.FetchResponse;
 import org.oracle.okafka.common.requests.JoinGroupRequest;
 import org.oracle.okafka.common.requests.JoinGroupResponse;
-import org.oracle.okafka.common.requests.MetadataResponse;
 import org.oracle.okafka.common.requests.OffsetFetchRequest;
 import org.oracle.okafka.common.requests.OffsetFetchResponse;
 import org.oracle.okafka.common.requests.OffsetFetchResponse.PartitionOffsetData;

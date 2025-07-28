@@ -57,7 +57,6 @@ import org.apache.kafka.common.metrics.Metrics;
 import org.oracle.okafka.common.network.AQClient;
 import org.oracle.okafka.common.network.SelectorMetrics;
 import org.oracle.okafka.common.protocol.ApiKeys;
-import org.oracle.okafka.common.requests.MetadataResponse;
 import org.oracle.okafka.common.requests.ProduceRequest;
 import org.oracle.okafka.common.requests.ProduceResponse;
 import org.apache.kafka.common.record.MemoryRecords;
@@ -1016,21 +1015,8 @@ public final class AQKafkaProducer extends AQClient {
 			}
 		}
 
-
 		ClientResponse response = getMetadataNow(request, conn, node, metadata.updateRequested());
-
-		MetadataResponse metadataresponse = (MetadataResponse)response.responseBody();
-
-		org.apache.kafka.common.Cluster updatedCluster = metadataresponse.cluster();
-
-		for(String topic: updatedCluster.topics()) {
-			try {
-				super.fetchQueueParameters(topic, conn, metadata.topicParaMap);
-			} catch (SQLException e) {
-				log.error("Exception while fetching TEQ parameters and updating metadata " + e.getMessage());
-			}
-		}
-
+		
 		return response;
 	}
 

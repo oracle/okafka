@@ -724,6 +724,7 @@ public class NetworkClient implements KafkaClient {
 			// created which means we will get errors and no nodes until it exists
 			if (response.getException() == null && errors.isEmpty()) {
 				this.metadata.update(cluster, null, now, false);
+				this.metadata.updateTeqParameters(response.teqParameters());
 			} else {
 				log.debug("Ignoring empty metadata response with correlation id {}.", requestHeader.correlationId());
 				this.metadata.failedUpdate(now, null);
