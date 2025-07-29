@@ -55,6 +55,7 @@ import org.apache.kafka.common.errors.DisconnectException;
 import org.apache.kafka.common.errors.GroupIdNotFoundException;
 import org.apache.kafka.common.errors.InvalidPartitionsException;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
+import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.Time;
 
@@ -544,7 +545,7 @@ public class AQKafkaAdmin extends AQClient{
 				} catch (SQLException sqlE) {
 					int errorNo = sqlE.getErrorCode();
 					if (errorNo == 24010) 
-						errors.put(topic, new UnknownTopicOrPartitionException("Topic doesn't exist",sqlE));
+						errors.put(topic, new UnknownTopicOrPartitionException("Topic does not exist",sqlE));
 					else
 						throw sqlE;
 				}
@@ -554,8 +555,14 @@ public class AQKafkaAdmin extends AQClient{
 			log.error("Unexpected error occured while creating Partitions", sqlE);
 			exception = sqlE;
 			int errorNo = sqlE.getErrorCode();
-			if (errorNo == 6550)
-				log.error("Please grant all the documented privileges to the database user.", sqlE.getMessage());
+			if (errorNo == 6550) {
+				if (sqlE.getMessage().contains("PLS-00302")) {
+					log.error("This version of database does not support adding more partitions after the topic is created.");
+					exception = new UnsupportedVersionException(
+							"This version of database does not support adding more partitions after the topic is created.");
+				} else
+					log.error("Please grant all the documented privileges to the database user.", sqlE.getMessage());
+			}
 			if (ConnectionUtils.isConnectionClosed(jdbcConn)) {
 				disconnected = true;
 				exception = new DisconnectException("Database Connection got severed while creating Partitions.", sqlE);
