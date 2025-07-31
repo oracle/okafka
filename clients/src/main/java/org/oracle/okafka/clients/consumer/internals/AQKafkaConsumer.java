@@ -262,8 +262,8 @@ public final class AQKafkaConsumer extends AQClient{
 				else {
 					log.debug("Received other than AQjmsBytesMessage");
 					try {
-						int partition = messages[i].getIntProperty(AQClient.PARTITION_PROPERTY);
-						OKafkaOffset  okOffset = 	MessageIdConverter.getOKafkaOffset(messages[i].getJMSMessageID(), true, true);
+						int partition = getMessagePartition(messages[i]);
+						OKafkaOffset  okOffset = MessageIdConverter.getOKafkaOffset(messages[i].getJMSMessageID(), true, true);
 						long offset = okOffset.getOffset();
 						log.error("Message is not an instance of AQjmsBytesMessage: Topic {} partition {} offset{}",topic, partition, offset );
 					} catch(Exception exception) {

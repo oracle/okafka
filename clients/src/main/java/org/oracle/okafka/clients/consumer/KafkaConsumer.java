@@ -1185,15 +1185,9 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 				}
 
 				topic = ((AQjmsDestination) message.getJMSDestination()).getTopicName();
-				try {
-					partition = message.getIntProperty(AQClient.PARTITION_PROPERTY) / 2;
-				} catch (Exception e) {
-					try {
-						partition = (int) message.getLongProperty(AQClient.PARTITION_PROPERTY) / 2;
-					} catch (Exception e1) {
-
-					}
-				}
+				
+				partition = AQClient.getMessagePartition(message);
+				
 				K key = this.keyDeserializer.deserialize(topic, keyArray);
 				V value = this.valueDeserializer.deserialize(topic, valueArray);
 				OKafkaOffset okOffset = MessageIdConverter.getOKafkaOffset(message.getJMSMessageID(), true, true);

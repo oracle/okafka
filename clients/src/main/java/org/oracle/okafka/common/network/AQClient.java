@@ -48,6 +48,8 @@ import java.sql.Timestamp;
 import java.sql.Date;
 
 import javax.jms.JMSException;
+import javax.jms.Message;
+
 import oracle.jdbc.OracleTypes;
 
 /*
@@ -94,6 +96,24 @@ public abstract class AQClient {
 	public static final String STICKYDEQ_PARAM = "STICKY_DEQUEUE";
 	public static final String KEYBASEDENQ_PARAM = "KEY_BASED_ENQUEUE";
 	public static final String SHARDNUM_PARAM = "SHARD_NUM";
+	
+	public static int getMessagePartition(Message message) {
+		int partition = -1;
+		try {
+			partition = (int) message.getLongProperty(PARTITION_PROPERTY) / 2;
+		} catch(Exception e1) {
+			try {
+				partition = message.getIntProperty(PARTITION_PROPERTY) / 2;
+			} catch(Exception e2) {
+				try {
+					partition = Integer.parseInt(message.getStringProperty(PARTITION_PROPERTY)) / 2;
+				} catch(Exception e3) {
+					// do nothing
+				}
+			}
+		}
+		return partition;
+	}
 	
 	public AQClient(Logger log, AbstractConfig configs) {
 		this.log = log;

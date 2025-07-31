@@ -26,7 +26,8 @@ package org.oracle.okafka.common;
 
 public class Node  extends org.apache.kafka.common.Node{
 	private static final Node NO_NODE = new Node(-1, "", -1, "", "");
-
+	public static final String NODE_ID_STRING_PREFIX = "INSTANCE_";
+	
     private int id;
     private String idString;
     private String instanceName;
@@ -54,7 +55,7 @@ public class Node  extends org.apache.kafka.common.Node{
     	if(id<=0)
     		id = 0;
         this.id = id;
-        this.idString = "INSTANCE_"+id;
+        this.idString = NODE_ID_STRING_PREFIX +id;
         if(host != null)
         	this.host = host.toUpperCase();
         this.port = port;
@@ -92,6 +93,7 @@ public class Node  extends org.apache.kafka.common.Node{
     	if(id <=0)
     	{
     		id = newId;
+    		this.idString = NODE_ID_STRING_PREFIX + newId;
     	}
     }
     

@@ -28,9 +28,9 @@ public class OffsetResetRequest extends AbstractRequest {
 		}
 		
 		@Override
-        public OffsetResetRequest build() {
-            return new OffsetResetRequest(offsetResetTimestamps, pollTimeoutMs);
-        }
+		public OffsetResetRequest build(short version) {
+			return new OffsetResetRequest(offsetResetTimestamps, pollTimeoutMs);
+		}
 		
 		@Override
         public String toString() {
@@ -41,10 +41,6 @@ public class OffsetResetRequest extends AbstractRequest {
             return bld.toString();
         }
 
-		@Override
-		public OffsetResetRequest build(short version) {
-			return build();
-		}
 	}
 	
 	private final Map<TopicPartition, Long> offsetResetTimestamps;

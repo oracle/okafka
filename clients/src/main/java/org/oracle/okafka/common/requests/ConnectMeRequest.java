@@ -24,20 +24,15 @@ public class ConnectMeRequest extends AbstractRequest  {
 			this.groupId = _groupId;
 		}
 		
-		public ConnectMeRequest build()
-		{
-			return new ConnectMeRequest(this.schemaName,this.topicName,this.groupId);
-		}
-
 		@Override
 		public ConnectMeRequest build(short version) {
-			return new ConnectMeRequest(this.schemaName,this.topicName,this.groupId);
+			return new ConnectMeRequest(this.schemaName,this.topicName,this.groupId, version);
 		}
 	}
 	
-	public ConnectMeRequest(String _schemaName , String _topicName, String _groupId)
+	public ConnectMeRequest(String _schemaName , String _topicName, String _groupId, short version)
 	{
-		super(ApiKeys.CONNECT_ME,(short)1);
+		super(ApiKeys.CONNECT_ME,version);
 		this.schemaName = _schemaName;
 		this.topicName = _topicName;
 		this.groupId = _groupId;

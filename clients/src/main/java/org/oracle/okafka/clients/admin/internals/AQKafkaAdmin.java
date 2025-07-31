@@ -23,6 +23,7 @@ import java.util.Set;
 
 import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
+import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.clients.admin.internals.AdminMetadataManager;
 import org.oracle.okafka.clients.NetworkClient;
 import org.oracle.okafka.clients.admin.AdminClientConfig;
@@ -31,6 +32,8 @@ import org.oracle.okafka.common.errors.ConnectionException;
 import org.oracle.okafka.common.errors.InvalidLoginCredentialsException;
 import org.oracle.okafka.common.network.AQClient;
 import org.oracle.okafka.common.protocol.ApiKeys;
+import org.oracle.okafka.common.requests.CreatePartitionsRequest;
+import org.oracle.okafka.common.requests.CreatePartitionsResponse;
 import org.oracle.okafka.common.requests.CreateTopicsRequest;
 import org.oracle.okafka.common.requests.CreateTopicsResponse;
 import org.oracle.okafka.common.requests.DeleteGroupsRequest;
@@ -50,6 +53,9 @@ import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.errors.DisconnectException;
 import org.apache.kafka.common.errors.GroupIdNotFoundException;
+import org.apache.kafka.common.errors.InvalidPartitionsException;
+import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
+import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.utils.LogContext;
 import org.apache.kafka.common.utils.Time;
 
@@ -104,6 +110,8 @@ public class AQKafkaAdmin extends AQClient{
 			return getConsumerGroups(request);
 		if(key == ApiKeys.DELETE_GROUPS)
 			return deleteConsumerGroups(request);
+		if(key == ApiKeys.CREATE_PARTITIONS)
+			return createPartitions(request);
 		return null;
 		
 	}
@@ -494,6 +502,83 @@ public class AQKafkaAdmin extends AQClient{
 		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
 				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null, deleteGroupsResponse);
 		
+	}
+	
+	private ClientResponse createPartitions(ClientRequest request) {
+		CreatePartitionsRequest.Builder builder = (CreatePartitionsRequest.Builder) request.requestBuilder();
+		CreatePartitionsRequest createPartitionsRequest = builder.build();
+		Map<String, NewPartitions> partitionsNewCount = createPartitionsRequest.partitionNewCounts();
+		Map<String, Exception> errors = new HashMap<>();
+
+		Node node = (org.oracle.okafka.common.Node) metadataManager.nodeById(Integer.parseInt(request.destination()));
+		
+		Connection jdbcConn = connections.get(node);
+		Exception exception = null;
+		boolean disconnected = false;
+		
+		String plsql = 
+			    "BEGIN " +
+			    "  DBMS_AQADM.ADD_EVENTSTREAM( ?, ? ); " +
+			    "END;";
+		CallableStatement cStmt = null;
+		try {
+			for (Map.Entry<String, NewPartitions> entry : partitionsNewCount.entrySet()) {
+				String topic = entry.getKey();
+				int newPartitionCount = entry.getValue().totalCount();
+				int currentPartitionCount;
+				try {
+					currentPartitionCount = getQueueParameter(SHARDNUM_PARAM, topic, jdbcConn);
+
+					if (currentPartitionCount < newPartitionCount) {
+						cStmt = jdbcConn.prepareCall(plsql);
+						cStmt.setString(1, topic);
+						cStmt.setInt(2, newPartitionCount - currentPartitionCount);
+						log.debug("Adding {} more partitions to the topic {}.", newPartitionCount - currentPartitionCount, topic);
+						cStmt.execute();
+						log.debug("Successfully added {} partitions to the topic {}.", newPartitionCount - currentPartitionCount, topic);
+						errors.put(topic, null);
+					} else if (currentPartitionCount > newPartitionCount)
+						errors.put(topic, new InvalidPartitionsException(String.format("Topic currently has %d partitions, which is higher than the requested %d.",
+										currentPartitionCount, newPartitionCount)));
+					else
+						errors.put(topic, new InvalidPartitionsException(String.format("Topic already has %d partitions.", currentPartitionCount)));
+				} catch (SQLException sqlE) {
+					int errorNo = sqlE.getErrorCode();
+					if (errorNo == 24010) 
+						errors.put(topic, new UnknownTopicOrPartitionException("Topic does not exist",sqlE));
+					else
+						throw sqlE;
+				}
+			}
+
+		} catch (SQLException sqlE) {
+			log.error("Unexpected error occured while creating Partitions", sqlE);
+			exception = sqlE;
+			int errorNo = sqlE.getErrorCode();
+			if (errorNo == 6550) {
+				if (sqlE.getMessage().contains("PLS-00302")) {
+					log.error("This version of database does not support adding more partitions after the topic is created.");
+					exception = new UnsupportedVersionException(
+							"This version of database does not support adding more partitions after the topic is created.");
+				} else
+					log.error("Please grant all the documented privileges to the database user.", sqlE.getMessage());
+			}
+			if (ConnectionUtils.isConnectionClosed(jdbcConn)) {
+				disconnected = true;
+				exception = new DisconnectException("Database Connection got severed while creating Partitions.", sqlE);
+			}
+		} finally {
+			try {
+				if (cStmt != null)
+					cStmt.close();
+			} catch (SQLException sqlE) {
+				// do nothing
+			}
+		}
+		CreatePartitionsResponse createPartitionsResponse = new CreatePartitionsResponse(errors);
+		createPartitionsResponse.setException(exception);
+		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
+				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null, createPartitionsResponse); 
 	}
 	
 	/**

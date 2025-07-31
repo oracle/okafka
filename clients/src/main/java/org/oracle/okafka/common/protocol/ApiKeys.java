@@ -53,7 +53,8 @@ public enum ApiKeys {
 	LIST_OFFSETS(12,"ListOffsets"),
 	OFFSET_FETCH(13,"FetchOffsets"),
 	LIST_GROUPS(14,"ListGroups"),
-	DELETE_GROUPS(15,"DeleteGroups");
+	DELETE_GROUPS(15,"DeleteGroups"),
+	CREATE_PARTITIONS(16,"CreatePartitions");
     private static final ApiKeys[] ID_TO_TYPE;
     private static final int MIN_API_KEY = 0;
     public static final int MAX_API_KEY;
@@ -157,6 +158,8 @@ public enum ApiKeys {
     		return org.apache.kafka.common.protocol.ApiKeys.LIST_GROUPS;
     	case DELETE_GROUPS:
     		return org.apache.kafka.common.protocol.ApiKeys.DELETE_GROUPS;
+    	case CREATE_PARTITIONS:
+    		return org.apache.kafka.common.protocol.ApiKeys.CREATE_PARTITIONS;
     	default: 
     		// Default to HEARTBEAT. No SUpport for HEARTBEAT for oKafka.
     		return org.apache.kafka.common.protocol.ApiKeys.HEARTBEAT;
@@ -202,6 +205,8 @@ public enum ApiKeys {
     		return LIST_GROUPS;
     	case DELETE_GROUPS:
     		return DELETE_GROUPS;
+    	case CREATE_PARTITIONS:
+    		return CREATE_PARTITIONS;
     	default: 
     		// Default to FETCH.
     		return FETCH;

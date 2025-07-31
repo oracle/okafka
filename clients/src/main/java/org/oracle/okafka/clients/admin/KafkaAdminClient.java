@@ -189,6 +189,8 @@ import org.apache.kafka.common.quota.ClientQuotaAlteration;
 import org.apache.kafka.common.quota.ClientQuotaFilter;
 import org.apache.kafka.common.requests.AbstractResponse;
 import org.oracle.okafka.common.requests.AbstractRequest;
+import org.oracle.okafka.common.requests.CreatePartitionsRequest;
+import org.oracle.okafka.common.requests.CreatePartitionsResponse;
 import org.oracle.okafka.common.requests.CreateTopicsRequest;
 import org.oracle.okafka.common.requests.CreateTopicsResponse;
 import org.oracle.okafka.common.requests.DeleteGroupsRequest;
@@ -1142,6 +1144,8 @@ public class KafkaAdminClient extends AdminClient {
 		private void handleResponse(long now, Call call, ClientResponse response) {
 
 			try {
+				List<Call> calls = callsInFlight.get(org.oracle.okafka.common.Node.NODE_ID_STRING_PREFIX + response.destination());
+				calls.remove(call);
 				if (response.wasDisconnected()) {
 					client.disconnected((org.oracle.okafka.common.Node) (metadataManager
 							.nodeById(Integer.parseInt(response.destination()))), now);
@@ -1183,7 +1187,7 @@ public class KafkaAdminClient extends AdminClient {
 						log.debug("Closing connection to {} to time out {}", nodeId, call);
 						call.aborted = true;
 						client.disconnect((org.oracle.okafka.common.Node) metadataManager
-								.nodeById(Integer.parseInt(nodeId.replace("INSTANCE_", ""))));
+								.nodeById(Integer.parseInt(nodeId.replace(org.oracle.okafka.common.Node.NODE_ID_STRING_PREFIX, ""))));
 						numTimedOut++;
 						// We don't remove anything from the callsInFlight data structure. Because the
 						// connection
@@ -2459,6 +2463,59 @@ public class KafkaAdminClient extends AdminClient {
 	 * This method is not yet supported.
 	 */
 	@Override
+	public CreatePartitionsResult createPartitions(Map<String, NewPartitions> newPartitions,
+			final CreatePartitionsOptions options) {
+		final Map<String, NewPartitions> newPartitionsRem = new HashMap<>(newPartitions);
+		final Map<String, KafkaFutureImpl<Void>> futures = new HashMap<>(newPartitions.size());
+		
+		for (String topic : newPartitions.keySet()) {
+			futures.put(topic, new KafkaFutureImpl<Void>());
+		}
+		final long now = time.milliseconds();
+		Call call = new Call("createPartitions", calcDeadlineMs(now, options.timeoutMs()), new LeastLoadedNodeProvider()) {
+
+			@Override
+			public AbstractRequest.Builder createRequest(int timeoutMs) {
+				return new CreatePartitionsRequest.Builder(newPartitionsRem);
+			}
+
+			@Override
+			public void handleResponse(org.apache.kafka.common.requests.AbstractResponse abstractResponse) {
+				CreatePartitionsResponse response = (CreatePartitionsResponse) abstractResponse;
+				Exception exception = response.getException();
+
+				if (exception == null || exception instanceof DisconnectException) {
+					for (Map.Entry<String, Exception> entry : response.getErrorsMap().entrySet()) {
+						KafkaFutureImpl<Void> future = futures.get(entry.getKey());
+						if (entry.getValue() == null)
+							future.complete(null);
+						else
+							future.completeExceptionally(entry.getValue());
+						newPartitionsRem.remove(entry.getKey());
+					}
+					if (exception instanceof DisconnectException)
+						this.fail(time.milliseconds(), exception);
+				} else
+					handleFailure(exception);
+			}
+
+			@Override
+			void handleFailure(Throwable throwable) {
+				completeAllExceptionally(futures.values(), throwable);
+			}
+		};
+		if (!newPartitions.isEmpty()) {
+			runnable.call(call, now);
+		}
+		CreatePartitionsResult result = ReflectionUtil.createInstance(CreatePartitionsResult.class,
+				new Class<?>[] { Map.class }, futures);
+		return result;
+	}
+	
+	/**
+	 * This method is not yet supported.
+	 */
+	@Override
 	public DescribeClusterResult describeCluster(DescribeClusterOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
@@ -2527,15 +2584,6 @@ public class KafkaAdminClient extends AdminClient {
 	@Override
 	public DescribeReplicaLogDirsResult describeReplicaLogDirs(Collection<TopicPartitionReplica> replicas,
 			DescribeReplicaLogDirsOptions options) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
-	}
-
-	/**
-	 * This method is not yet supported.
-	 */
-	@Override
-	public CreatePartitionsResult createPartitions(Map<String, NewPartitions> newPartitions,
-			final CreatePartitionsOptions options) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 

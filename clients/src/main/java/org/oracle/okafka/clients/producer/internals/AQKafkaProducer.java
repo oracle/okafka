@@ -776,7 +776,7 @@ public final class AQKafkaProducer extends AQClient {
 		msg.writeBytes(payload);
 		payload = null;
 		msg.setStringProperty("topic", topicPartition.topic());
-		msg.setStringProperty(AQClient.PARTITION_PROPERTY, Integer.toString(topicPartition.partition()*2));
+		msg.setLongProperty(PARTITION_PROPERTY, topicPartition.partition()*2);
 		msg.setIntProperty(MESSAGE_VERSION, 1);
 
 		return msg;
@@ -883,7 +883,7 @@ public final class AQKafkaProducer extends AQClient {
 		pBuffer.get(payload);
 		msg.writeBytes(payload);
 		payload = null;
-		msg.setStringProperty(PARTITION_PROPERTY, Integer.toString(topicPartition.partition()*2));
+		msg.setLongProperty(PARTITION_PROPERTY, topicPartition.partition()*2);
 		if(headers !=null)
 		{
 			msg.setIntProperty(HEADERCOUNT_PROPERTY, headers.length);
