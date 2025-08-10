@@ -1059,12 +1059,14 @@ public final class AQKafkaProducer extends AQClient {
 			}
 		}
 		try {
-			publishers.getSession().close();
+			if (publishers.getSession() != null)
+				publishers.getSession().close();
 		} catch(JMSException jms) {
 			log.error("failed to close session {} associated with connection {} and node {}  ",publishers.getSession(), publishers.getConnection(), node );
 		}
 		try {
-			publishers.getConnection().close();
+			if (publishers.getConnection() != null)
+				publishers.getConnection().close();
 			this.selectorMetrics.connectionClosed.record();
 		} catch(JMSException jms) {
 			log.error("failed to close connection {} associated with node {}  ",publishers.getConnection(), node );

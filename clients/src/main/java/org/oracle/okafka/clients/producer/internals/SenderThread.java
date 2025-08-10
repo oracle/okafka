@@ -282,7 +282,7 @@ public class SenderThread implements Runnable {
 		// List<ProducerBatch> expiredBatches =
 		// this.accumulator.expiredBatches(this.requestTimeoutMs, now);
 
-		List<ProducerBatch> expiredBatches = this.accumulator.expiredBatches(this.requestTimeoutMs);
+		List<ProducerBatch> expiredBatches = this.accumulator.expiredBatches(now);
 
 		// Reset the producer id if an expired batch has previously been sent to the
 		// broker. Also update the metrics
@@ -426,6 +426,7 @@ public class SenderThread implements Runnable {
 			} else if (producerException instanceof InvalidTopicException) {
 				log.info(producerException.getMessage());
 				completeResponse(response);
+				return;
 			} else {
 				log.info("Exception while sending batch for partiton " + batch.topicPartition + ". "
 						+ producerException);

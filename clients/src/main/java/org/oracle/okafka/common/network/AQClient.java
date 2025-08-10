@@ -219,8 +219,13 @@ public abstract class AQClient {
 			
 			topicParameterMap = new HashMap<String, TopicTeqParameters>(teqParaList.size());
 			for (String teqTopic : teqParaList) {
+				try {
 				TopicTeqParameters teqPara = fetchQueueParameters(teqTopic, con);
 				topicParameterMap.put(teqTopic, teqPara);
+				} catch (SQLException sqlE) {
+					if(sqlE.getErrorCode() != 24010)
+						throw sqlE;
+				}
 			}
 
 			if (topicIds != null) {

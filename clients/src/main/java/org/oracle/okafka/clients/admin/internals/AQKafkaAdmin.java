@@ -14,6 +14,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.SQLSyntaxErrorException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -594,22 +595,22 @@ public class AQKafkaAdmin extends AQClient{
 			ConnectionUtils.updateNodeInfo(node, newConn);
 
 			/*
-			 * Fetching the nodes and updating the metadataManager to ensure that Cluster
+			 * Updating the metadataManager to ensure that Cluster
 			 * have the correct mapping in the nodesById Map even when the bootstrap node
 			 * have been updated after the initial connection
 			 */
-			if(node.isBootstrap()){
-				List<Node> nodes = new ArrayList<>();
-				String clusterId = ((oracle.jdbc.internal.OracleConnection) newConn).getServerSessionInfo()
-						.getProperty("DATABASE_NAME");
-				this.getNodes(nodes, newConn, node, forceMetadata);
-				for(Node n: nodes) {
-					n.setBootstrapFlag(false);
+			if (node.isBootstrap()) {
+				String clusterId = null;
+				try {
+					clusterId = ((oracle.jdbc.internal.OracleConnection) newConn).getServerSessionInfo()
+							.getProperty("DATABASE_NAME");
+				} catch (SQLException sql) {
+					if (ConnectionUtils.isConnectionClosed(newConn))
+						throw new ConnectionException("Database connection to the node " + node + "got severed.", sql);
 				}
-				
-				Cluster newCluster = new Cluster(clusterId, NetworkClient.convertToKafkaNodes(nodes),
-						Collections.emptySet(), Collections.emptySet(), Collections.emptySet(),
-						nodes.size() > 0 ? nodes.get(0) : null);// , configs);
+				node.setBootstrapFlag(false);
+				Cluster newCluster = new Cluster(clusterId, NetworkClient.convertToKafkaNodes(Arrays.asList(node)),
+						Collections.emptySet(), Collections.emptySet(), Collections.emptySet(), node);
 				this.metadataManager.update(newCluster, System.currentTimeMillis());
 			}
 			connections.put(node, newConn);

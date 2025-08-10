@@ -54,7 +54,7 @@ public class CreateTopicsResponse extends AbstractResponse {
     }
     
     public void setResult(Exception ex) {
-    	if(requestResult != null) {
+    	if(requestResult == null) {
     		requestResult = ex;
     	}
     }
