@@ -141,7 +141,6 @@ project(':examples:consumer') {
         implementation project(':clients')
         implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '23.4.0.24.05'
         implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.7.1'
-        implementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.5.6'
     }
 
 
@@ -179,7 +178,6 @@ project(':examples:producer') {
         implementation project(':clients')
         implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '23.4.0.24.05'
         implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.7.1'
-        implementation group: 'ch.qos.logback', name: 'logback-classic', version: '1.5.6'
     }
 
     tasks.named('jar') {
