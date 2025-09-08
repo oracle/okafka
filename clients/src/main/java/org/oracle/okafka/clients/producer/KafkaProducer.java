@@ -53,6 +53,7 @@ import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.Uuid;
+import org.apache.kafka.common.compress.Compression;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.common.errors.ApiException;
 import org.apache.kafka.common.errors.AuthenticationException;
@@ -398,7 +399,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 	private final RecordAccumulator accumulator;
 	private final SenderThread sender;
 	private final Thread ioThread;
-	private final CompressionType compressionType;
+	private final Compression compression;
 	private final Sensor errors;
 	private final Time time;
 	private final Serializer<K> keySerializer;
@@ -677,8 +678,8 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 
 			this.maxRequestSize = config.getInt(ProducerConfig.MAX_REQUEST_SIZE_CONFIG);
 			this.totalMemorySize = config.getLong(ProducerConfig.BUFFER_MEMORY_CONFIG);
-			this.compressionType = CompressionType.forName(config.getString(ProducerConfig.COMPRESSION_TYPE_CONFIG));
-
+			this.compression = Compression.of(CompressionType.forName(config.getString(ProducerConfig.COMPRESSION_TYPE_CONFIG))).build();
+			
 			this.maxBlockTimeMs = config.getLong(ProducerConfig.MAX_BLOCK_MS_CONFIG);
 			int deliveryTimeoutMs = configureDeliveryTimeout(config, log);
 
@@ -689,7 +690,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 				this.accumulator = null;
 			} else {
 				this.accumulator = new RecordAccumulator(logContext, config.getInt(ProducerConfig.BATCH_SIZE_CONFIG),
-						this.compressionType, lingerMs(config), retryBackoffMs, deliveryTimeoutMs, metrics,
+						compression, lingerMs(config), retryBackoffMs, deliveryTimeoutMs, metrics,
 						PRODUCER_METRIC_GROUP_NAME, time, apiVersions, transactionManager,
 						new BufferPool(this.totalMemorySize, config.getInt(ProducerConfig.BATCH_SIZE_CONFIG), metrics,
 								time, PRODUCER_METRIC_GROUP_NAME));
@@ -1981,7 +1982,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 			Header[] headers = record.headers().toArray();
 
 			int serializedSize = AbstractRecords.estimateSizeInBytesUpperBound(apiVersions.maxUsableProduceMagic(),
-					compressionType, serializedKey, serializedValue, headers);
+					compression.type(), serializedKey, serializedValue, headers);
 
 			ensureValidRecordSize(serializedSize);
 

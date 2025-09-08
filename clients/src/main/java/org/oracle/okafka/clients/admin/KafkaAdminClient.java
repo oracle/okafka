@@ -36,6 +36,8 @@ import org.apache.kafka.clients.ClientUtils;
 import org.apache.kafka.clients.admin.AbortTransactionOptions;
 import org.apache.kafka.clients.admin.AbortTransactionResult;
 import org.apache.kafka.clients.admin.AbortTransactionSpec;
+import org.apache.kafka.clients.admin.AddRaftVoterOptions;
+import org.apache.kafka.clients.admin.AddRaftVoterResult;
 import org.apache.kafka.clients.admin.AlterClientQuotasOptions;
 import org.apache.kafka.clients.admin.AlterClientQuotasResult;
 import org.apache.kafka.clients.admin.AlterConfigOp;
@@ -123,9 +125,12 @@ import org.apache.kafka.clients.admin.NewPartitionReassignment;
 import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.admin.RaftVoterEndpoint;
 import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.admin.RemoveMembersFromConsumerGroupOptions;
 import org.apache.kafka.clients.admin.RemoveMembersFromConsumerGroupResult;
+import org.apache.kafka.clients.admin.RemoveRaftVoterOptions;
+import org.apache.kafka.clients.admin.RemoveRaftVoterResult;
 import org.apache.kafka.clients.admin.RenewDelegationTokenOptions;
 import org.apache.kafka.clients.admin.RenewDelegationTokenResult;
 import org.apache.kafka.clients.admin.TopicDescription;
@@ -2821,6 +2826,22 @@ public class KafkaAdminClient extends AdminClient {
 	 */
 	@Override
 	public ListClientMetricsResourcesResult listClientMetricsResources(ListClientMetricsResourcesOptions arg0) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
+
+	/**
+	 * This method is not yet supported.
+	 */
+	@Override
+	public AddRaftVoterResult addRaftVoter(int arg0, Uuid arg1, Set<RaftVoterEndpoint> arg2, AddRaftVoterOptions arg3) {
+		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+	}
+
+	/**
+	 * This method is not yet supported.
+	 */
+	@Override
+	public RemoveRaftVoterResult removeRaftVoter(int arg0, Uuid arg1, RemoveRaftVoterOptions arg2) {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
