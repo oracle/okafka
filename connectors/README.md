@@ -37,11 +37,12 @@ To run the Kafka Sink and Source Connector against Oracle Database, a database u
 
 ```roomsql
 create user <username> identified by <password>
-grant connect, resource to user
-grant execute on dbms_aqadm to use
-grant execute on dbms_aqin to user
-grant execute on dbms_aqjms to user
-grant select_catalog_role to user
+grant connect, resource to <username>
+grant execute on dbms_aqadm to <username>
+grant execute on dbms_aqin to <username>
+grant execute on dbms_aqjms to <username>
+grant select_catalog_role to <username>
+grant select on sys.V_$PARAMETER to <username>;
 ```
 
 Once user is created and above privileges are granted, connect to Oracle Database as this user and create a Transactional Event Queue using below PL/SQL script.
@@ -53,7 +54,7 @@ payload as a JMS_BYTES message.**
 ```roomsql
 exec sys.dbms_aqadm.create_transactional_event_queue(queue_name=>"TxEventQ", multiple_consumers => TRUE); 
 exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'SHARD_NUM', 1);
-exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'KEY_BASED_ENQUEUE', 2);
+exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'KEY_BASED_ENQUEUE', 1);
 exec sys.dbms_aqadm.start_queue('TxEventQ');
 exec sys.dbms_aqadm.add_subscriber('TxEventQ', SYS.AQ$_AGENT('SUB1', NULL, 0));
 ```
@@ -76,7 +77,7 @@ Here is the PL/SQL script to create the Transactional Event Queue that will be u
 exec sys.dbms_aqadm.create_transactional_event_queue(queue_name=>"TxEventQ", multiple_consumers => TRUE); 
 exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'SHARD_NUM', 1);
 exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'STICKY_DEQUEUE', 1);
-exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'KEY_BASED_ENQUEUE', 2);
+exec sys.dbms_aqadm.set_queue_parameter('TxEventQ', 'KEY_BASED_ENQUEUE', 1);
 exec sys.dbms_aqadm.start_queue('TxEventQ');
 exec sys.dbms_aqadm.add_subscriber('TxEventQ', SYS.AQ$_AGENT('SUB1', NULL, 0));
 ```
