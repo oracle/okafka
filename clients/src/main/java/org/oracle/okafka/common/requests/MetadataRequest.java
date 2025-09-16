@@ -35,7 +35,6 @@ import org.oracle.okafka.common.protocol.ApiKeys;
 import org.apache.kafka.common.Uuid;
 import org.apache.kafka.common.protocol.ApiMessage;
 import org.apache.kafka.common.requests.AbstractResponse;
-import org.apache.kafka.common.utils.Utils;
 
 public class MetadataRequest extends AbstractRequest {
 	public static class Builder extends AbstractRequest.Builder<MetadataRequest> {
@@ -106,12 +105,13 @@ public class MetadataRequest extends AbstractRequest {
 		}
 		
 		@Override
-		public String toString() {
-			StringBuilder bld = new StringBuilder();
-			bld.append("(type=metadataRequest").append(", topics=(")
-					.append((topics == null) ? "null" : Utils.join(topics, ", ")).append(")");
-			return bld.toString();
-		}
+        public String toString() {
+            StringBuilder bld = new StringBuilder();
+            bld.append("(type=metadataRequest").
+            append(", topics=(").append( (topics==null) ? "null" :  String.join(",",topics))
+            .append(")");
+            return bld.toString();
+        }
 
 	}
 

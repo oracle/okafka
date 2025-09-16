@@ -767,7 +767,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 					this.unsubscribe();
 				}
 
-				log.debug("Subscribed to topic(s): {}", Utils.join(topics, ", "));
+				log.debug("Subscribed to topic(s): {}", String.join(",",topics));
 				Set<String> subscribedTopicSet = new HashSet<>(topics);
 				this.subscriptions.subscribe(subscribedTopicSet, listener);
 				// metadata.setTopics(subscriptions.groupSubscription());

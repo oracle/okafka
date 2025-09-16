@@ -47,6 +47,7 @@ import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.compress.Compression;
 import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.metrics.Measurable;
@@ -79,7 +80,7 @@ public final class RecordAccumulator {
     private final AtomicInteger flushesInProgress;
     private final AtomicInteger appendsInProgress;
     private final int batchSize;
-    private final CompressionType compression;
+    private final Compression compression;
     private final int lingerMs;
     private final long retryBackoffMs;
     private final int deliveryTimeoutMs;
@@ -113,7 +114,7 @@ public final class RecordAccumulator {
      */
     public RecordAccumulator(LogContext logContext,
                              int batchSize,
-                             CompressionType compression,
+                             Compression compression,
                              int lingerMs,
                              long retryBackoffMs,
                              int deliveryTimeoutMs,
@@ -218,7 +219,7 @@ public final class RecordAccumulator {
             }
 
             byte maxUsableMagic = apiVersions.maxUsableProduceMagic();
-            int size = Math.max(this.batchSize, AbstractRecords.estimateSizeInBytesUpperBound(maxUsableMagic, compression, key, value, headers));
+            int size = Math.max(this.batchSize, AbstractRecords.estimateSizeInBytesUpperBound(maxUsableMagic, compression.type(), key, value, headers));
             log.trace("Allocating a new {} byte message buffer for topic {} partition {} with remaining timeout {}ms", size, tp.topic(), tp.partition(), maxTimeToBlock);
             buffer = free.allocate(size, maxTimeToBlock);
             
@@ -354,7 +355,7 @@ public final class RecordAccumulator {
         // Reset the estimated compression ratio to the initial value or the big batch compression ratio, whichever
         // is bigger. There are several different ways to do the reset. We chose the most conservative one to ensure
         // the split doesn't happen too often.
-        CompressionRatioEstimator.setEstimation(bigBatch.topicPartition.topic(), compression,
+        CompressionRatioEstimator.setEstimation(bigBatch.topicPartition.topic(), compression.type(),
                                                 Math.max(1.0f, (float) bigBatch.compressionRatio()));
         Deque<ProducerBatch> dq = bigBatch.split(this.batchSize);
         int numSplitBatches = dq.size();
