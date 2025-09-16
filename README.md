@@ -149,7 +149,7 @@ Mandatory jar files for this project to work.
 * `javax.jms-api-<version>.jar`
 * `jta-<version>.jar`
 * `slf4j-api-<version>.jar`
-* `kafka-clients-3.7.1.jar`
+* `kafka-clients-3.9.1.jar`
 
 All these jars are downloaded from Maven Repository during gradle build.
 

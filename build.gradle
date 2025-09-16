@@ -66,7 +66,7 @@ project(':clients') {
         implementation group: 'javax.jms', name: 'javax.jms-api', version: '2.0'
         implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '23.4.0.24.05'
         implementation group: 'org.slf4j', name: 'slf4j-api', version: '2.0.0-alpha0'
-        implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.7.1'     
+        implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.9.1'     
        
         // Test dependencies
         testImplementation group: 'org.easymock', name: 'easymock', version: '3.6'
@@ -140,7 +140,7 @@ project(':examples:consumer') {
         // These dependencies are used by the application.
         implementation project(':clients')
         implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '23.4.0.24.05'
-        implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.7.1'
+        implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.9.1'
     }
 
 
@@ -177,7 +177,7 @@ project(':examples:producer') {
         // These dependencies are used by the application.
         implementation project(':clients')
         implementation group: 'com.oracle.database.security', name: 'oraclepki', version: '23.4.0.24.05'
-        implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.7.1'
+        implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.9.1'
     }
 
     tasks.named('jar') {
