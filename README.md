@@ -7,7 +7,7 @@ This distribution contains Java source code to provide Kafka Java client compati
 
 You need to have [Gradle 7.3 or above](http://www.gradle.org/installation) and [Java](http://www.oracle.com/technetwork/java/javase/downloads/index.html) installed.
 
-This distribution contains version 23.4.0.0 of the `Kafka Java Client for Oracle Transactional Event Queues` project. It will be referred as OKafka-23.4.0.0 henceforth. This is tested with JDK 11.0.22, but we recommend using the latest version.
+This distribution contains version 23.8.0.0 of the `Kafka Java Client for Oracle Transactional Event Queues` project. It will be referred as OKafka-23.8.0.0 henceforth. This is tested with JDK 11.0.22, but we recommend using the latest version.
 
 The Kafka Java Client works with Oracle Database 23ai Free version as well as Oracle Database 23ai available on Oracle Autonomous Cloud platform.
 
@@ -135,7 +135,7 @@ This distribution contains gradle build files which will work for Gradle 7.3 or 
 ./gradle jar
 ```
 
-This generates `okafka-23.4.0.0.jar` in `okafka_source_dir/clients/build/libs`.
+This generates `okafka-23.8.0.0.jar` in `okafka_source_dir/clients/build/libs`.
 
 **Project Dependency:**
 
@@ -144,8 +144,6 @@ Mandatory jar files for this project to work.
 * `ojdbc11-<version>.jar`
 * `aqapi-<version>.jar`
 * `oraclepki-<version>.jar`
-* `osdt_core-<version>.jar`
-* `osdt_cert-<version>.jar`
 * `javax.jms-api-<version>.jar`
 * `jta-<version>.jar`
 * `slf4j-api-<version>.jar`
@@ -159,7 +157,7 @@ To build the `okafka.jar` file which includes all the dependent jar files in its
 ./gradle fullJar 
 ```
 
-This genddsferates `okafka-full-23.4.0.0.jar` in `okafka_source_dir/clients/build/libs`.
+This generates `okafka-full-23.8.0.0.jar` in `okafka_source_dir/clients/build/libs`.
 
 ## Build javadoc
 
