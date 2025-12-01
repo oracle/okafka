@@ -5,7 +5,7 @@ This guide covers the common installation and setup steps required for both the 
 * [TxEventQ Source Connector](TxEventQ-Source-Connector.md)
 * [Use Single Message Transforms with Connectors](connector-single-message-transform.md)
 
-For a complete connector demo setup using docker that also uses Prometheus, Grafana, and RedPanda, see:
+For a complete connector demo setup using docker that also uses Prometheus and Grafana see:
 * [Complete Connector Demo Setup Using Docker](connector-docker-demo-setup.md)
 
 ## Prerequisites
@@ -19,10 +19,9 @@ Before installing the connectors, ensure you have:
 * **Transactional Event Queue** - Must be created in Oracle Database before using the connectors (see [Create Transactional Event Queue](#create-transactional-event-queue))
 
 ## Install the Connector
+You can install the connector in two supported ways: build it from source, or download the pre-built JAR from a Maven repository.
 
-You can install the connector by building it from source or by downloading the JAR file from Maven repository.
-
-### Build the connector from source
+### Option A: Build the connector from source
 
 Clone the project from the repository and build it using Maven:
 
@@ -32,9 +31,12 @@ mvn clean package
 
 This will create the connector JAR file in the `target` directory.
 
+### Option B: Download the connector
+Download `txeventq-connector-<version>.jar` from the [Maven repository](https://mvnrepository.com/artifact/com.oracle.database.messaging/txeventq-connector)
+
 ### Install the connector manually
 
-1. **Download the connector JAR**: Download `txeventq-connector-<version>.jar` from the [Maven repository](https://mvnrepository.com/artifact/com.oracle.database.messaging/txeventq-connector) or build it from source using `mvn clean package`.
+1. Obtain the connector JAR file by performing [Option A](#option-a-build-the-connector-from-source) or [Option B](#option-b-download-the-connector).
 
 2. **Download dependencies**: Download the following required JAR files from Maven repositories:
    * `ojdbc11-<version>.jar` - Oracle JDBC driver
