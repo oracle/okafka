@@ -172,9 +172,6 @@ services:
     ports:
       - 9161:9161
     environment:
-    #   - DB_USERNAME=TXEVENTQ_ADMIN
-    #   - DB_PASSWORD=WElcomeHome123##
-    #   - DB_CONNECT_STRING=oracle23ai-db:1521/freepdb1
       - CUSTOM_METRICS=/exporter/txeventq-metrics.toml
     volumes:
       - ./oracle-exporter:/exporter

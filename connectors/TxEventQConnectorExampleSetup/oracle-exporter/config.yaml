@@ -12,7 +12,7 @@ databases:
     ## Database username
     username: TXEVENTQ_ADMIN
     ## Database password
-    password: WElcomeHome123##
+    password: <add valid password for specified username>
     ## Database connection url
     url: oracle23ai-db:1521/freepdb1
 

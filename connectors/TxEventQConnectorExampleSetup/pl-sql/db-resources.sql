@@ -1,8 +1,8 @@
 -- If you are using the free container
 ALTER SESSION SET CONTAINER = FREEPDB1;
 
---- User creation and permissions for TxEventQ
-CREATE USER TXEVENTQ_ADMIN IDENTIFIED BY WElcomeHome123##;
+--- User creation and permissions for TxEventQ. Add password to use.
+CREATE USER TXEVENTQ_ADMIN IDENTIFIED BY <add valid password for specified username>;
 
 -- Basic login permission
 GRANT CREATE SESSION TO TXEVENTQ_ADMIN;
@@ -35,8 +35,8 @@ ALTER USER TXEVENTQ_ADMIN QUOTA UNLIMITED ON USERS;
 -- or if you're using DATA tablespace
 -- ALTER USER TXEVENTQ_ADMIN QUOTA UNLIMITED ON DATA;
 
----------------------
-CONNECT TXEVENTQ_ADMIN/WElcomeHome123##@//localhost:1521/FREEPDB1;
+------Add the password specified for this user below.
+CONNECT TXEVENTQ_ADMIN/<add valid password for specified username>@//localhost:1521/FREEPDB1;
 
 -- This topic will be used for sink connector to consume messages from the Kafka topic
 -- and the source connector to produce messages to a Kafka topic.
