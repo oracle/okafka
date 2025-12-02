@@ -6,7 +6,7 @@ A complete Kafka Connect setup with automated JAR downloading, creation of Kafka
 
 ### Quick Start
  * Change your directory to the TxEventQConnectorExampleSetup directory where the docker compose file is located within this repository. Before running the docker compose to startup the containers check that the `TxEventQConnectorExampleSetup/scripts/download-jars.sh` line ending is Unix (LF). If the `TxEventQConnectorExampleSetup/scripts/download-jars.sh` script is not (LF), most code editors (VS Code, Notepad++, Sublime Text) have an option to change the End of Line (EOL) conversion.
- * Open the [TxEventQConnectorExampleSetup/pl-sql/db-resources.sql](TxEventQConnectorExampleSetup/pl-sql/db-resources.sql) file and search in the file for the text `<add valid password for specified username>` and replace with a password for the user.
+ * Open the [TxEventQConnectorExampleSetup/pl-sql/db-resources.sql](TxEventQConnectorExampleSetup/pl-sql/db-resources.sql) file and search in the file for the text `<add valid password for specified username>` and replace with the password `WElcomeHome123##` for the user if planning to use the wallet currently available in the TxEventQConnectorExampleSetup/plugins/wallets/freedb directory. If using your own generated wallet replace with the appropriate password.
  * Open the [TxEventQConnectorExampleSetup/oracle-exporter/config.yaml](TxEventQConnectorExampleSetup/oracle-exporter/config.yaml) file and search in the file for the text `<add valid password for specified username>` and replace with the password for the user that you created in file you modified above.
  
 Just run this one command:

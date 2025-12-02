@@ -29,27 +29,29 @@ Clone the project from the repository and build it using Maven:
 mvn clean package
 ```
 
-This will create the connector JAR file in the `target` directory.
+This will create the connector JAR file in the `target` directory. All the connector's dependent jar files will also be placed in the `target/libs` directory.
 
 ### Option B: Download the connector
 Download `txeventq-connector-<version>.jar` from the [Maven repository](https://mvnrepository.com/artifact/com.oracle.database.messaging/txeventq-connector)
 
 ### Install the connector manually
 
-1. Obtain the connector JAR file by performing [Option A](#option-a-build-the-connector-from-source) or [Option B](#option-b-download-the-connector).
+1. Obtain the connector JAR file by performing either [Option A](#option-a-build-the-connector-from-source) or [Option B](#option-b-download-the-connector).
 
-2. **Download dependencies**: Download the following required JAR files from Maven repositories:
-   * `ojdbc11-<version>.jar` - Oracle JDBC driver
-   * `oraclepki-<version>.jar` - Oracle PKI library
-   * `osdt_core-<version>.jar` - Oracle Security Developer Tools core
-   * `osdt_cert-<version>.jar` - Oracle Security Developer Tools certificate
-   * `aqapi-<version>.jar` - Oracle Advanced Queuing API
-   * `javax.jms-api-<version>.jar` - JMS API (version 2.0.1 or higher)
-   * `jta-<version>.jar` - Java Transaction API (version 1.1 or higher)
+2. If [Option A](#option-a-build-the-connector-from-source) was performed to get the connector jar then all the required dependencies can be grabbed from the `target/libs` directory.
+3. If [Option B](#option-b-download-the-connector) was performed to get the connector jar then all the required dependencies below will need to be downloaded from the Maven repositories:
+	* `ojdbc11-<version>.jar` - [Oracle JDBC driver](https://mvnrepository.com/artifact/com.oracle.database.jdbc/ojdbc11)
+	* `oraclepki-<version>.jar` - [Oracle PKI library](https://mvnrepository.com/artifact/com.oracle.database.security/oraclepki)
+	* `oraclepki-<version>.jar` - [Oracle PKI library](https://mvnrepository.com/artifact/com.oracle.database.security/oraclepki)
+	* `osdt_core-<version>.jar` - [Oracle Security Developer Tools core](https://mvnrepository.com/artifact/com.oracle.database.security/osdt_core)
+	* `osdt_cert-<version>.jar` - [Oracle Security Developer Tools certificate](https://mvnrepository.com/artifact/com.oracle.database.security/osdt_cert)
+	* `aqapi-<version>.jar` - [Oracle Advanced Queuing API](https://mvnrepository.com/artifact/com.oracle.database.messaging/aqapi)
+	* `javax.jms-api-<version>.jar` - [JMS API (version 2.0.1 or higher)](https://mvnrepository.com/artifact/javax.jms/javax.jms-api)
+	* `jta-<version>.jar` - [Java Transaction API (version 1.1 or higher)](https://mvnrepository.com/artifact/javax.transaction/jta)
+	
+4. **Create plugin directory**: Create a directory with a descriptive name (e.g., `txeventq-connector-23.26.0.25.12`) and place all JAR files in this directory.
 
-3. **Create plugin directory**: Create a directory with a descriptive name (e.g., `txeventq-connector-23.26.0.25.12`) and place all JAR files in this directory.
-
-4. **Configure plugin path**: In your Kafka Connect worker configuration file (`connect-distributed.properties` or `connect-standalone.properties`), set the `plugin.path` property to point to the parent directory containing the connector folder:
+5. **Configure plugin path**: In your Kafka Connect worker configuration file (`connect-distributed.properties` or `connect-standalone.properties`), set the `plugin.path` property to point to the parent directory containing the connector folder:
 
 ```properties
 plugin.path=/usr/local/share/kafka/plugins/
