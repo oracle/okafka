@@ -16,18 +16,15 @@ GRANT EXECUTE ON DBMS_AQ TO TXEVENTQ_ADMIN;
 GRANT EXECUTE ON DBMS_AQADM TO TXEVENTQ_ADMIN;
 GRANT EXECUTE ON DBMS_AQIN TO TXEVENTQ_ADMIN;
 GRANT EXECUTE ON DBMS_AQJMS TO TXEVENTQ_ADMIN;
-GRANT EXECUTE ON DBMS_AQJMS_INTERNAL TO TXEVENTQ_ADMIN;
-GRANT EXECUTE ON DBMS_TEQK TO TXEVENTQ_ADMIN;
-GRANT EXECUTE ON DBMS_RESOURCE_MANAGER TO TXEVENTQ_ADMIN;
-GRANT SELECT ON sys.V_$PARAMETER TO TXEVENTQ_ADMIN;
-GRANT SELECT ON sys.aq$_queue_shards TO TXEVENTQ_ADMIN;
-GRANT SELECT ON sys.v_$diag_alert_ext TO TXEVENTQ_ADMIN;
-GRANT SELECT ON user_queue_partition_assignment_table TO TXEVENTQ_ADMIN;
-GRANT ENQUEUE ANY QUEUE TO TXEVENTQ_ADMIN;
-GRANT DEQUEUE ANY QUEUE TO TXEVENTQ_ADMIN;
 
--- Access to performance views (optional, for diagnostics)
-GRANT SELECT_CATALOG_ROLE TO TXEVENTQ_ADMIN;
+-- Uncomment the GRANT statement below if working with onprem or local database
+--GRANT SELECT ON sys.V_$PARAMETER TO TXEVENTQ_ADMIN;
+
+-- Uncomment the GRANT statement below if working with an autonomous cloud database
+--GRANT SELECT ON sys.V$PARAMETER TO TXEVENTQ_ADMIN;
+
+-- Uncomment the GRANT below if you want to have access to performance views (optional, for diagnostics). In this particular example the information will be used by Promethus and Grafana.
+--GRANT SELECT_CATALOG_ROLE TO TXEVENTQ_ADMIN;
 
 -- Give quota on tablespace (adjust if needed)
 ALTER USER TXEVENTQ_ADMIN QUOTA UNLIMITED ON USERS;

@@ -98,16 +98,21 @@ GRANT EXECUTE ON dbms_aqadm TO txeventq_user;
 GRANT EXECUTE ON dbms_aqin TO txeventq_user;
 GRANT EXECUTE ON dbms_aqjms TO txeventq_user;
 
--- Grant privileges for monitoring and catalog access
+-- GRANT this privilege if working with onprem or local database
+GRANT SELECT ON sys.V_$PARAMETER TO TXEVENTQ_ADMIN;
+
+-- GRANT this privilege if working with an autonomous cloud database
+GRANT SELECT ON sys.V$PARAMETER TO TXEVENTQ_ADMIN;
+
+-- Grant privileges for monitoring and catalog access. This is granted if you want to gather diagnostics that can be used by Prometheus and Grafana.
 GRANT SELECT_CATALOG_ROLE TO txeventq_user;
-GRANT SELECT ON sys.V_$PARAMETER TO txeventq_user;
 ```
 
 **Note**: Replace `txeventq_user` and `<secure_password>` with your desired username and a strong password. Store credentials securely using your organization's credential management solution (see [Database Authentication](#database-authentication)).
 
 ### Create Transactional Event Queue
 
-The Transactional Event Queue must be created before using the connectors. The queue should be created with appropriate parameters based on your use case.
+The Transactional Event Queue must be created before using the connectors. To use Transactional Event Queue (TxEQ) for Source and Sink Connector, certain Queue Level Parameters need to be set using dbms_aqadm.set_queue_parameter procedure. There are 3 primary Queue level parameters, SHARD_NUM, KEY_BASED_ENQUEUE and STICKY_DEQUEUE'. These are explained below.
 
 **Important considerations:**
 
@@ -117,21 +122,24 @@ The Transactional Event Queue must be created before using the connectors. The q
 
 #### KEY_BASED_ENQUEUE and SHARD_NUM parameters
 
-The `KEY_BASED_ENQUEUE` parameter determines which shard a message is enqueued to. The table below describes the different `KEY_BASED_ENQUEUE` values and what is required for `SHARD_NUM`:
+A transactional event queue is divided into multiple event-streams similar to how Kafka topic is divided into multiple partitions.
+The `KEY_BASED_ENQUEUE` parameter determines which event-streams messages are enqueued to. The table below describes the different `KEY_BASED_ENQUEUE` values and what is required for `SHARD_NUM`:
 
 | KEY_BASED_ENQUEUE | SHARD_NUM | Description |
 |-------------------|-----------|-------------|
-| 0 (default) | >= 1 | A key is not used during the enqueue. A session is bound to a shard at the time of first enqueue to the queue. All messages enqueued by the session will go to the same shard to which the session is bound. |
-| 1 | >= 1 | The database correlation value will be used as the key. The correlation value will be used to determine which shard the messages will be enqueued to. The key is limited to 128 bytes. The TxEventQ sink connector will truncate the key if it is greater than the maximum length. |
-| 2 | >= the number of Kafka partitions | Messages from a Kafka topic partition will be mapped to its respective shard by specifying the shard number in the `AQINTERNAL_PARTITION` property. In this case, the `SHARD_NUM` value for the queue will need to be greater than or equal to the number of Kafka partitions for the topic that the TxEventQ sink connector will be consuming from. |
+| 0 (default) | Not Applicable | Default behaviour of Transactional Event Queue where a database session is bound to an event stream when the first time a a message is enqueued into the TxEQ. All messages enqueued by this database session will go to the same event-stream. New Event_Streams gets created internally as and when needed.|
+| 1 | >= 1 | The TxEQ will be created with fixed number of event-streams which is set by 'SHARD_NUM' parameter. When messages are enqueued, Event-Streams are chosen based on the Correlation Id of the messages. TxEQ messaging platform internally maps Correlation ID of the messages to an Event-Stream. For TxEQ, correlation id can have length of 128 characters only. Refer to section ["Data Restrictions"](data-restrictions) for details.|
+| 2 | >= 1 | A TxEQ is created with a fixed number of Event-Streams which is set by SHARD_NUM parameter. This is only relevant for a JMS Type TxEQ. When a JMS Message is enqueued, TxEQ platform reads the Event-Stream number from "AQINTERNAL_PARTITION" property of the message. To use this type of TxEQ for TxEventQ Sink connector, the number of Event-Streams should match the number of partitions of the Kafka topic. |
 
 #### STICKY_DEQUEUE parameter
 
-The `STICKY_DEQUEUE` parameter controls how messages are distributed across shards when dequeuing. When set to 1, it ensures that a dequeue session sticks to a specific shard in the queue. A session is bound to a shard on the first dequeue operation, and all subsequent messages dequeued by that session come from the same shard.
+The `STICKY_DEQUEUE` parameter controls how event-streams of TxEventQ are distributed across alive consumer sessions.
+With default value of 0, all alive consumer sessions can consume messages from all the TxEventQ event-streams. TxEventQ platform will internally distribute the event-stream to provide optimal performance. With default mode, one event-stream can be consumed by multiple consumer sessions at the same time.
+When STICKY_DEQUEUE is set to 1, TxEventQ engine will distribute the event-streams among alive consumer sessions so that an event-stream is consumed by only one consumer session at a time. This is very similar to how messages are consumed from Kafka cluster using a consumer group. Here, TxEventQ engine internally decides how to distributed the event-streams and avoids any Consumer-Group rebalancing.
 
 **When to use STICKY_DEQUEUE=1**:
-* You need to maintain message ordering within shards
-* You want to map shards to Kafka partitions for ordering guarantees (Source Connector)
+* You need to maintain message ordering within event-streams.
+* You want to map event-streams to Kafka partitions for ordering guarantees (Source Connector)
 * You're using the Source Connector with `txeventq.map.shard.to.kafka_partition=true`
 
 **Important**: 
@@ -159,15 +167,15 @@ EXEC sys.dbms_aqadm.add_subscriber('TxEventQ', SYS.AQ$_AGENT('SUB1', NULL, 0));
 If using the TxEventQ Sink or Source Connector on an Okafka topic it is important to understand what parameters the Okafka topic will have and what needs to be set.
 |KEY_BASED_ENQUEUE| partition_num                   |Description|
 |-----------------|---------------------------------|-----------|
-|2 (always)       | >= the number of Kafka partitons|In this case messages from a Kafka topic partition will be mapped to its respective shard by specifying the shard number in the AQINTERNAL_PARTITION property. In this case the partition_num parameter value for the Okafka topic will need to be greater than or equal to the number of Kafka partitions for the topic that the TxEventQ sink connector will be consuming from.  
-
+|2 (always)       | >= 1|A TxEQ is created with a fixed number of Event-Streams which is set by partition_num parameter. This is only relevant for a JMS Type TxEQ. When a JMS Message is enqueued, TxEQ platform reads the Event-Stream number from "AQINTERNAL_PARTITION" property of the message. To use this type of TxEQ for TxEventQ Sink connector, the number of Event-Streams should match the number of partitions of the Kafka topic.
  
 If attempting to use the TxEventQ Source Connector on an Okafka topic the `partition_assignment_mode` will need to be set to 1 as shown below. Setting `partition_assignment_mode` to 1 means setting `STICKY_DEQUEUE` to 1.
 
 |partition_assignment_mode| Description                     |
 |-------------------------|---------------------------------|
-|0                        | **Currently setting sticky dequeue to 0 for an Okafka topic is not allowed, but will be available soon.** When this property value is allowed which indicates no sticky dequeue is set, which means messages dequeued by a session can spread across multiple shards of the queue.
-|1                        | Sticky dequeue is set and dequeue session sticks to a shard in the queue. A session is bound to a shard on first dequeue from the queue. All messages dequeued by the session come from the same shard to which it is bound.
+|0                        |**Currently setting sticky dequeue to 0 for an Okafka topic is not allowed, but will be available soon.** When this property value is allowed which indicates no sticky dequeue is set, which means messages dequeued by a session can spread across multiple event-streams of the queue.|
+|1                        |When partition_assignment_mode is set to 1, TxEventQ engine will distribute the event-streams among alive consumer sessions such that an event-stream is consumed by only one consumer session at a time. This is very similar to how messages are consumed from Kafka cluster using a consumer group. Here, TxEventQ engine internally decides how to distributed the event-streams and avoids all Consumer-Group rebalancing overhead.|
+|2                        |Default value for partition_assignment_mode is 2. This should not be set for TxEventQ Source Connector as it forces the connector to follow Rebalancing Protocol which is not supported yet. |
 
 ```roomsql
 exec sys.dbms_aqadm.create_database_kafka_topic( topicname=> 'TxEventQ', partition_num=>1, retentiontime => 7*24*3600, partition_assignment_mode => 1);
@@ -257,20 +265,20 @@ It is recommended that the database be configured to allow automatic memory mana
 
 ### Transactional Event Queue Configuration
 
-* **Plan queue parameters before creation**: The `KEY_BASED_ENQUEUE` and `STICKY_DEQUEUE` parameters cannot be changed after queue creation. Carefully plan your sharding strategy and ordering requirements before creating the queue.
+* **Plan queue parameters before creation**: The `KEY_BASED_ENQUEUE` and `STICKY_DEQUEUE` parameters cannot be changed after queue creation. Carefully plan your event-streaming strategy and ordering requirements before creating the queue.
 
 * **Choose KEY_BASED_ENQUEUE strategy wisely**:
-  * Use `KEY_BASED_ENQUEUE=0` (default) for simple scenarios where session-based sharding is sufficient
-  * Use `KEY_BASED_ENQUEUE=1` when you need to route messages to specific shards based on correlation ID (Kafka key). Remember that keys are limited to 128 bytes and will be truncated if longer
-  * Use `KEY_BASED_ENQUEUE=2` when you need to map Kafka topic partitions to TxEventQ shards. Ensure `SHARD_NUM` is greater than or equal to the number of Kafka topic partitions
+  * Use `KEY_BASED_ENQUEUE=0` (default) for simple scenarios where session-based event-streaming is sufficient
+  * Use `KEY_BASED_ENQUEUE=1` when you need to route messages to specific event-streams based on correlation ID (Kafka key). Remember that keys are limited to 128 bytes and will be truncated if longer
+  * Use `KEY_BASED_ENQUEUE=2` when you need to map Kafka topic partitions to TxEventQ event-streams. Ensure `SHARD_NUM` is greater than or equal to the number of Kafka topic partitions
 
-* **Set SHARD_NUM appropriately**: The number of shards determines parallelism. More shards allow more parallel processing but may increase database overhead. Consider your throughput requirements and database capacity.
+* **Set SHARD_NUM appropriately**: The number of event-streams determines parallelism. More event-streams allow more parallel processing but may increase database overhead. Consider your throughput requirements and database capacity.
 
 * **Use multiple consumers for flexibility**: Create the queue with `multiple_consumers => TRUE` if you plan to use multiple source connectors or other consumers. This allows multiple subscribers to consume from the same queue independently.
 
 * **Start queue after configuration**: Always ensure the queue is started using `dbms_aqadm.start_queue()` after setting all parameters. Verify queue status before using the connectors.
 
-* **Set STICKY_DEQUEUE for ordering**: If you need to maintain message ordering within shards, set `STICKY_DEQUEUE=1` when creating the queue. This ensures that a dequeue session sticks to a specific shard, maintaining order within that shard. Remember that this parameter cannot be changed after queue creation.
+* **Set STICKY_DEQUEUE for ordering**: If you need to maintain message ordering within event-streams, set `STICKY_DEQUEUE=1` when creating the queue. This ensures that a dequeue session sticks to a specific event-stream, maintaining order within that event-stream. Remember that this parameter cannot be changed after queue creation.
 
 ### Oracle Database Considerations
 
