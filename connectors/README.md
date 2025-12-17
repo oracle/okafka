@@ -46,8 +46,8 @@ Download `txeventq-connector-<version>.jar` from the [Maven repository](https://
 	* `osdt_core-<version>.jar` - [Oracle Security Developer Tools core](https://mvnrepository.com/artifact/com.oracle.database.security/osdt_core)
 	* `osdt_cert-<version>.jar` - [Oracle Security Developer Tools certificate](https://mvnrepository.com/artifact/com.oracle.database.security/osdt_cert)
 	* `aqapi-<version>.jar` - [Oracle Advanced Queuing API](https://mvnrepository.com/artifact/com.oracle.database.messaging/aqapi)
-	* `javax.jms-api-<version>.jar` - [JMS API (version 2.0.1 or higher)](https://mvnrepository.com/artifact/javax.jms/javax.jms-api)
-	* `jta-<version>.jar` - [Java Transaction API (version 1.1 or higher)](https://mvnrepository.com/artifact/javax.transaction/jta)
+	* `javax.jms-api-2.0.1.jar` - [JMS API (version 2.0.1)](https://mvnrepository.com/artifact/javax.jms/javax.jms-api/2.0.1)
+	* `jta-1.1.jar` - [Java Transaction API (version 1.1)](https://mvnrepository.com/artifact/javax.transaction/jta/1.1)
 	
 4. **Create plugin directory**: Create a directory with a descriptive name (e.g., `txeventq-connector-23.26.0.25.12`) and place all JAR files in this directory.
 
