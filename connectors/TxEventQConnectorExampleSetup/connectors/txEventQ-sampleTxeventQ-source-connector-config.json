@@ -8,7 +8,6 @@
     "tnsnames.path": "/etc/kafka-connect/custom-plugins/wallets",
     "db_tns_alias": "FREEPDB1",
     "txeventq.queue.name": "TXEVENTQ_FOR_CONNECTORS",
-    "txeventq.queue.schema": "TXEVENTQ_ADMIN",
     "txeventq.subscriber": "TXEVENTQFORCONNECTOR_SUBSCRIBER_LOCAL",
     "key.converter": "org.apache.kafka.connect.storage.StringConverter",
     "value.converter": "org.apache.kafka.connect.converters.ByteArrayConverter",
