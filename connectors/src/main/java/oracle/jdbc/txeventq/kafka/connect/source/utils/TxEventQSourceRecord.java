@@ -1,7 +1,7 @@
 /*
 ** Kafka Connect for TxEventQ.
 **
-** Copyright (c) 2023, 2024 Oracle and/or its affiliates.
+** Copyright (c) 2024, 2025 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -27,6 +27,7 @@ package oracle.jdbc.txeventq.kafka.connect.source.utils;
 import java.util.Map;
 
 import org.apache.kafka.connect.data.Schema;
+import org.apache.kafka.connect.header.Header;
 import org.apache.kafka.connect.source.SourceRecord;
 
 /**
@@ -75,6 +76,16 @@ public class TxEventQSourceRecord extends SourceRecord {
             String topic, Schema keySchema, java.lang.Object key, Schema valueSchema, Object value,
             PayloadType type, byte[] msgId) {
         super(sourcePartition, sourceOffset, topic, keySchema, key, valueSchema, value);
+        this.payloadType = type;
+        this.messageId = msgId;
+    }
+
+    public TxEventQSourceRecord(Map<String, ?> sourcePartition, Map<String, ?> sourceOffset,
+            String topic, Integer partition, Schema keySchema, Object key, Schema valueSchema,
+            Object value, Long timestamp, Iterable<Header> headers, PayloadType type,
+            byte[] msgId) {
+        super(sourcePartition, sourceOffset, topic, partition, keySchema, key, valueSchema, value,
+                timestamp, headers);
         this.payloadType = type;
         this.messageId = msgId;
     }

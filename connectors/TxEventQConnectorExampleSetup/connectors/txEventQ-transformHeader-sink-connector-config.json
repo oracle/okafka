@@ -1,0 +1,21 @@
+{
+  "name": "txeventq-transformExample-sink",
+  "config": {
+    "connector.class": "oracle.jdbc.txeventq.kafka.connect.sink.TxEventQSinkConnector",
+    "tasks.max": "3",
+    "topics": "transformHeaderToTEQ",
+    "wallet.path": "/etc/kafka-connect/custom-plugins/wallets/freedb",
+    "tnsnames.path": "/etc/kafka-connect/custom-plugins/wallets",
+    "db_tns_alias": "FREEPDB1",
+    "txeventq.queue.name": "HEADER_TRANSFORM_TEQ",
+    "txeventq.queue.schema": "TXEVENTQ_ADMIN",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "bootstrap.servers": "kafka:9092",
+    "txeventq.jms.bytes.include.kafka.headers": true,
+    "txeventq.jms.bytes.include.kafka.metadata": true,
+    "transforms": "headerToKey",
+    "transforms.headerToKey.type": "oracle.jdbc.txeventq.kafka.connect.transforms.HeaderToKey",
+    "transforms.headerToKey.set.header.to.key": "animal"
+  }
+}

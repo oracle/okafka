@@ -4,3 +4,8 @@ target/
 .project
 ../.metadata/
 /.metadata/
+
+# JAR files (downloaded automatically)
+TxEventQConnectorExampleSetup/plugins/txeventq-connector/*.jar
+TxEventQConnectorExampleSetup/plugins/txeventq-connector/libs/*.jar
+TxEventQConnectorExampleSetup/Prometheus/*.jar

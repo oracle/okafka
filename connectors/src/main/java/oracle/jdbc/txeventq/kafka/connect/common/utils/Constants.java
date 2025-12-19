@@ -33,6 +33,15 @@ public final class Constants {
     }
 
     /**
+     * Header Keys
+     */
+
+    public static final String KAFKA_TOPIC_NAME = "KAFKA_TOPIC";
+    public static final String KAFKA_PARTITION = "KAFKA_PARTITION";
+    public static final String KAFKA_OFFSET = "KAFKA_OFFSET";
+    public static final String KAFKA_TIMESTAMP = "KAFKA_TIMESTAMP";
+
+    /**
      * Retriable Ora Errors
      */
     // Timeout or End-of-Fetch Error When Dequeuing Messages

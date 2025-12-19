@@ -1,0 +1,252 @@
+services:
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    hostname: kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_KRAFT_MODE: "true"  # This enables KRaft mode in Kafka.
+      KAFKA_PROCESS_ROLES: controller,broker  # Kafka acts as both broker and controller.
+      KAFKA_NODE_ID: 1  # A unique ID for this Kafka instance.
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@localhost:29092"  # Defines the controller voters.
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LOG_DIRS: /var/lib/kafka/data  # Where Kafka stores its logs.
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1  # Since we’re running one broker, one replica is enough.
+      KAFKA_LOG_RETENTION_HOURS: 168  # Keep logs for 7 days.
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0  # No delay for consumer rebalancing.
+      CLUSTER_ID: "Mk3OEYBSD34fcwNTJENDM2Qk"  # A unique ID for the Kafka cluster.
+      # Disable auto-creation for explicit control
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    volumes:
+       - ./addRecords:/tmp/addRecords
+    command: |
+      bash -c '
+      # Start Kafka in the background
+      /etc/confluent/docker/run &
+      
+      # Wait for Kafka to be ready
+      echo "Waiting for Kafka to be ready..."
+      until kafka-topics --bootstrap-server localhost:9092 --list > /dev/null 2>&1; do
+        echo "Kafka not ready yet, waiting..."
+        sleep 2
+      done
+      
+      # Create topics
+      echo "Creating Kafka topics..."
+      kafka-topics --create --topic OrdersToOracleKafkaTopic --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1 --if-not-exists
+      kafka-topics --create --topic OrdersFromOracleKafkaTopic --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1 --if-not-exists
+      kafka-topics --create --topic SampleTxEventQForSink --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1 --if-not-exists
+      kafka-topics --create --topic SampleTxEventQForSource --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1 --if-not-exists
+      kafka-topics --create --topic transformHeaderToTEQ --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1 --if-not-exists
+      kafka-topics --create --topic sourceFromTransformSinkedTEQ --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1 --if-not-exists
+      kafka-topics --create --topic sourceWithTransformFromTEQ --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1 --if-not-exists
+      echo "Topics created successfully!"
+      
+      echo "Add records to topic transformHeaderToTEQ..."
+      cat /tmp/addRecords/kafka_formatted_key_objects.txt | kafka-console-producer --bootstrap-server localhost:9092 --topic transformHeaderToTEQ --property "parse.headers=true" --property "headers.delimiter=|" --property "headers.key.separator=:" --property "parse.key=true" --property "key.separator=="
+      # Keep Kafka running
+      wait
+      '
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Init container to download JAR files
+  jar-downloader:
+    image: alpine:latest
+    container_name: jar-downloader
+    volumes:
+      - ./scripts:/scripts
+      - ./plugins:/shared
+      - ./Prometheus:/Prometheus
+    command:
+        [
+            "/bin/sh",
+            "-c",
+            "apk add --no-cache curl && cp /scripts/download-jars.sh /tmp/download-jars.sh && chmod +x /tmp/download-jars.sh && /tmp/download-jars.sh",
+        ]
+    restart: "no"
+
+  connect:
+    image: confluentinc/cp-kafka-connect:7.5.0
+    container_name: kafka-connect
+    depends_on:
+      kafka:
+        condition: service_healthy
+      jar-downloader:
+        condition: service_completed_successfully
+      oracle23ai-db:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+      - "5083:5083"
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka:9092
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: "connect-cluster"
+      CONNECT_CONFIG_STORAGE_TOPIC: "connect-configs"
+      CONNECT_OFFSET_STORAGE_TOPIC: "connect-offsets"
+      CONNECT_STATUS_STORAGE_TOPIC: "connect-status"
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      CONNECT_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_INTERNAL_KEY_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_INTERNAL_VALUE_CONVERTER: "org.apache.kafka.connect.json.JsonConverter"
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/etc/kafka-connect/custom-plugins"
+      CONNECT_REST_ADVERTISED_HOST_NAME: connect
+      CONNECT_LOG4J_ROOT_LOGLEVEL: INFO
+      KAFKA_OPTS: "-javaagent:/opt/prometheus-jmx-exporter/jmx_prometheus_javaagent-1.0.1.jar=5083:/opt/prometheus-jmx-exporter/kafka-connect.yml"      
+      KAFKA_JMX_OPTS: "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=localhost -Dcom.sun.management.jmxremote.host=localhost -Dcom.sun.management.jmxremote.port=5084 -Dcom.sun.management.jmxremote.rmi.port=5084 -Dcom.sun.management.jmxremote.local.only=false"
+  
+    volumes:
+      - ./plugins:/etc/kafka-connect/custom-plugins
+      - ./Prometheus:/opt/prometheus-jmx-exporter
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/connectors"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+  
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    depends_on:
+      - connector-deployer
+    ports:
+      - 9090:9090
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'  
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle' # This flag enables the lifecycle endpoints
+      - '--web.external-url=http://localhost:9090'     
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prom_data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
+      interval: 10s       # How often to run the check
+      timeout: 5s         # Maximum time for the command to complete
+      retries: 5         # Number of consecutive failures before marking as 'unhealthy'
+      start_period: 60s   # Grace period for the service to start before checks begin
+  
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    ports:
+      - 3000:3000/tcp
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=grafana
+    volumes:
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-data:/var/lib/grafana
+      
+  oracledb-exporter:
+    image: container-registry.oracle.com/database/observability-exporter:2.2.0
+    container_name: oracledb-exporter
+    depends_on:
+      oracle23ai-db:
+        condition: service_healthy
+    command:
+      - '--config.file=/exporter/config.yaml'
+      # - '--log.level=debug'
+      # - '--database.maxIdleConns=10'
+      # - '--database.maxOpenConns=10'
+    ports:
+      - 9161:9161
+    environment:
+      - CUSTOM_METRICS=/exporter/txeventq-metrics.toml
+    volumes:
+      - ./oracle-exporter:/exporter
+      
+  # Deploy connectors
+  connector-deployer:
+    image: curlimages/curl:latest
+    container_name: connector-deployer
+    depends_on:
+      connect:
+        condition: service_healthy
+    command: |
+      sh -c '
+      echo "Deploying connectors..."
+      curl -X POST http://connect:8083/connectors -H "Content-Type: application/json" --data @/connectors/txEventQ-ordersToKafka-source-connector-config.json
+      curl -X POST http://connect:8083/connectors -H "Content-Type: application/json" --data @/connectors/txEventQ-OrdersToOracleKafkaTopic-sink-connector-config.json
+      curl -X POST http://connect:8083/connectors -H "Content-Type: application/json" --data @/connectors/txEventQ-sampleTxeventQ-source-connector-config.json
+      curl -X POST http://connect:8083/connectors -H "Content-Type: application/json" --data @/connectors/txEventQ-sampleTxeventQ-sink-connector-config.json
+      curl -X POST http://connect:8083/connectors -H "Content-Type: application/json" --data @/connectors/txEventQ-transformHeader-sink-connector-config.json
+      curl -X POST http://connect:8083/connectors -H "Content-Type: application/json" --data @/connectors/txEventQ-transformHeader-source-connector-config.json
+      curl -X POST http://connect:8083/connectors -H "Content-Type: application/json" --data @/connectors/txEventQ-transformHeader1-source-connector-config.json
+      echo "Connectors deployed successfully!"
+      '
+    volumes:
+      - ./connectors:/connectors:ro
+    healthcheck:
+            test: ["CMD", "curl", "-f", "http://localhost:8083/connectors"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 60s
+    restart: "no"
+
+  console:
+    container_name: redpanda-console
+    image: docker.redpanda.com/redpandadata/console:latest
+    depends_on:
+      - kafka
+    ports:
+      - 8080:8080
+      - 9644:9644
+    entrypoint: /bin/sh
+    command: -c 'echo "$$CONSOLE_CONFIG_FILE" > /tmp/config.yml; /app/console'
+    environment:
+      CONFIG_FILEPATH: /tmp/config.yml
+      CONSOLE_CONFIG_FILE: |
+        kafka:
+          brokers: ["kafka:9092"]
+        kafkaConnect:
+          enabled: true
+          clusters:
+            - name: local-connect-cluster
+              url: http://connect:8083
+
+  # Oracle database is optional if you are using ADB or another database
+  oracle23ai-db:
+    image: container-registry.oracle.com/database/free:latest
+    container_name: oracle23ai-db
+    ports:
+      - "1521:1521"
+    environment:
+      - ORACLE_PWD=Oracle123
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      - ./plugins/wallets:/opt/oracle/oradata/wallets
+      - ./pl-sql:/opt/oracle/scripts/startup # This will store the sql script to create the users and tables when the database starts up.
+   
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | sqlplus -s system/Oracle123@localhost:1521/FREE"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+   
+volumes:
+  oracle_data:
+  prom_data:
+  grafana-data:

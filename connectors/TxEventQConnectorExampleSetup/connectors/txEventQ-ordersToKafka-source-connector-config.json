@@ -1,0 +1,18 @@
+{
+  "name": "txeventq-ordersToKafka-source",
+  "config": {
+    "connector.class": "oracle.jdbc.txeventq.kafka.connect.source.TxEventQSourceConnector",
+    "tasks.max": "3",
+    "kafka.topic": "OrdersFromOracleKafkaTopic",
+    "wallet.path": "/etc/kafka-connect/custom-plugins/wallets/freedb",
+    "tnsnames.path": "/etc/kafka-connect/custom-plugins/wallets",
+    "db_tns_alias": "FREEPDB1",
+    "txeventq.queue.name": "ORDERS_ORACLE_KAFKA_TOPIC",
+    "txeventq.subscriber": "OrdersKafka_SUBSCRIBER_LOCAL",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.converters.ByteArrayConverter",
+    "bootstrap.servers": "kafka:9092"
+  }
+}
+
+

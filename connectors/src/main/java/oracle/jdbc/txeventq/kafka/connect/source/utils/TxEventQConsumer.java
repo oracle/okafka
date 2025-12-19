@@ -1,7 +1,7 @@
 /*
 ** Kafka Connect for TxEventQ.
 **
-** Copyright (c) 2023, 2024 Oracle and/or its affiliates.
+** Copyright (c) 2024, 2025 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -26,6 +26,8 @@ package oracle.jdbc.txeventq.kafka.connect.source.utils;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.sql.CallableStatement;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
@@ -35,6 +37,7 @@ import java.sql.SQLException;
 import java.sql.SQLRecoverableException;
 import java.sql.Types;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -55,6 +58,7 @@ import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.errors.RetriableException;
+import org.apache.kafka.connect.header.Headers;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,12 +68,14 @@ import oracle.jdbc.OracleConnection;
 import oracle.jdbc.aq.AQDequeueOptions;
 import oracle.jdbc.aq.AQMessage;
 import oracle.jdbc.txeventq.kafka.connect.common.utils.Constants;
+import oracle.jdbc.txeventq.kafka.connect.common.utils.MessageUtils;
 import oracle.jdbc.txeventq.kafka.connect.schema.JmsMessage;
 import oracle.jdbc.txeventq.kafka.connect.schema.Key;
 import oracle.jms.AQjmsBytesMessage;
 import oracle.jms.AQjmsConsumer;
 import oracle.jms.AQjmsFactory;
 import oracle.jms.AQjmsMapMessage;
+import oracle.jms.AQjmsMessage;
 import oracle.jms.AQjmsSession;
 import oracle.jms.AQjmsTextMessage;
 import oracle.sql.RAW;
@@ -91,6 +97,7 @@ public class TxEventQConsumer implements Closeable {
     private long reconnectDelayMillis = reconnectDelayMillisMin;
     private static long reconnectDelayMillisMin = 64L;
     private static long reconnectDelayMillisMax = 8192L;
+    private static final int DLENGTH_SIZE = 4;
 
     private TxEventQConnectorConfig config = null;
     private OracleConnection conn;
@@ -104,9 +111,11 @@ public class TxEventQConsumer implements Closeable {
     private boolean useSchemaForJmsMsg;
     private boolean mapShardToKafkaPartition;
 
-    private static final int MINIMUM_VERSION = 21;
+    private static final int MINIMUM_VERSION = 23;
     private int databaseMajorVersion = 0;
     private int databaseMinorVersion = 0;
+    private List<String> denylistedHeaders;
+    private List<String> allowlistedJmsHeaders;
 
     public TxEventQConsumer(TxEventQConnectorConfig config) {
         this.config = config;
@@ -148,6 +157,12 @@ public class TxEventQConsumer implements Closeable {
             this.useSchemaForJmsMsg = this.config
                     .getBoolean(TxEventQConnectorConfig.USE_SCHEMA_FOR_JMS_MESSAGES_CONFIG);
 
+            this.denylistedHeaders = this.config
+                    .getList(TxEventQConnectorConfig.KAFKA_HEADER_DENYLIST_CONFIG);
+
+            this.allowlistedJmsHeaders = this.config
+                    .getList(TxEventQConnectorConfig.KAFKA_HEADER_JMS_ALLOWLIST_CONFIG);
+
             this.mapShardToKafkaPartition = this.config.getBoolean(
                     TxEventQConnectorConfig.TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_CONFIG);
 
@@ -162,10 +177,10 @@ public class TxEventQConsumer implements Closeable {
     }
 
     /**
-     * Check whether the database version is 21 or later
+     * Check whether the database version is 23 or later
      * 
      * @throws ConnectException If we cannot get the database metadata or if the database version is
-     *                          less than 21
+     *                          less than 23
      */
     private void versionCheck() {
         DatabaseMetaData md = null;
@@ -182,8 +197,7 @@ public class TxEventQConsumer implements Closeable {
         }
 
         if (this.databaseMajorVersion < MINIMUM_VERSION) {
-            throw new ConnectException(
-                    "TxEventQ Connector requires Oracle Database 21c or greater");
+            throw new ConnectException("TxEventQ Connector requires Oracle Database 23 or greater");
         }
     }
 
@@ -306,6 +320,12 @@ public class TxEventQConsumer implements Closeable {
 
             this.useSchemaForJmsMsg = this.config
                     .getBoolean(TxEventQConnectorConfig.USE_SCHEMA_FOR_JMS_MESSAGES_CONFIG);
+
+            this.denylistedHeaders = this.config
+                    .getList(TxEventQConnectorConfig.KAFKA_HEADER_DENYLIST_CONFIG);
+
+            this.allowlistedJmsHeaders = this.config
+                    .getList(TxEventQConnectorConfig.KAFKA_HEADER_JMS_ALLOWLIST_CONFIG);
 
             this.mapShardToKafkaPartition = this.config.getBoolean(
                     TxEventQConnectorConfig.TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_CONFIG);
@@ -583,22 +603,314 @@ public class TxEventQConsumer implements Closeable {
         }
 
         String kafkaTopic = this.config.getString(TxEventQConnectorConfig.KAFKA_TOPIC);
-        String msgIdStr = msg.getJMSMessageID();
         String correlationId = msg.getJMSCorrelationID();
         Key correlationKey = new Key(correlationId);
-        int shardNum = getShardId(msgIdStr);
+        int shardNum = getShardId(msg.getJMSMessageID());
+
+        log.trace("[{}] Exit {}.processJmsMessage", this.conn, this.getClass().getName());
 
         if (msg instanceof AQjmsBytesMessage) {
+            return processJmsBytesMessage(msgId, msg, kafkaTopic, correlationId, correlationKey,
+                    shardNum);
+        } else if (msg instanceof AQjmsTextMessage) {
+            return processJmsTextMessage(msgId, msg, kafkaTopic, correlationId, correlationKey,
+                    shardNum);
+        } else if (msg instanceof AQjmsMapMessage) {
+            return processJmsMapMessage(msgId, msg, kafkaTopic, correlationId, correlationKey,
+                    shardNum);
+        }
 
-            AQjmsBytesMessage byteMessage = (AQjmsBytesMessage) msg;
+        return null;
+    }
 
-            JmsMessage jmsMsg = new JmsMessage(byteMessage);
+    /**
+     * Process JmsMapMessage received from Oracle Transactional Event Queue into a
+     * TxEventQSourceRecord that will be sent to the specified Kafka topic.
+     * 
+     * @param msgId          The message Id of the message that was dequeued.
+     * @param msg            The message that was dequeued.
+     * @param kafkaTopic     The Kafka topic to put the message in.
+     * @param correlationId  The correlation key from the message.
+     * @param correlationKey A Key object that is used to create a schema for the correlation id
+     *                       value.
+     * @param shardNum       The shard number that the message is stored in the TxEventQ.
+     * @return A TxEventQSourceRecord containing the JmsMapMessage message information, Kafka topic,
+     *         key if available in message, and partition location for Kafka to store the message
+     *         at.
+     * @throws JMSException
+     * @throws SQLException
+     */
+    private TxEventQSourceRecord processJmsMapMessage(String msgId, Message msg, String kafkaTopic,
+            String correlationId, Key correlationKey, int shardNum)
+            throws JMSException, SQLException {
+        log.trace("[{}] Entry {}.processJmsMapMessage", this.conn, this.getClass().getName());
+        AQjmsMapMessage mapMsg = (AQjmsMapMessage) msg;
+        JmsMessage jmsMsg = new JmsMessage(mapMsg, 1, null);
+        Headers header = new org.apache.kafka.connect.header.ConnectHeaders();
+        addJMSMessagePropertyToKafkaHeader(mapMsg, jmsMsg, header);
 
-            log.debug(
-                    "[{}] Processing JMS Bytes message:[msgIdStr: {}, shardNum: {}, correlationId: {}]",
-                    this.conn, msgIdStr, shardNum, correlationId);
+        log.debug("[{}] Processing JMS Map message:[msgIdStr: {}, shardNum: {}, correlationId: {}]",
+                this.conn, msgId, shardNum, correlationId);
 
-            log.trace("[{}] Exit {}.processJmsMessage", this.conn, this.getClass().getName());
+        log.trace("[{}] Exit {}.processJmsMapMessage", this.conn, this.getClass().getName());
+
+        return new TxEventQSourceRecord(null, null, kafkaTopic,
+                this.mapShardToKafkaPartition ? shardNum / 2 : null,
+                this.useSchemaForJmsMsg && correlationId != null ? Key.SCHEMA_KEY_V1 : null,
+                this.useSchemaForJmsMsg && correlationId != null ? correlationKey.toKeyStructV1()
+                        : correlationId,
+                this.useSchemaForJmsMsg ? JmsMessage.SCHEMA_JMSMESSAGE_V1 : null,
+                this.useSchemaForJmsMsg ? jmsMsg.toJmsMessageStructV1() : mapMsg.getMapNames(),
+                null, header, TxEventQSourceRecord.PayloadType.JMS_MAP,
+                mapMsg.getJMSMessageIDAsBytes());
+    }
+
+    /**
+     * Process JmsTextMessage received from Oracle Transactional Event Queue into a
+     * TxEventQSourceRecord that will be sent to the specified Kafka topic.
+     * 
+     * @param msgId          The message Id of the message that was dequeued.
+     * @param msg            The message that was dequeued.
+     * @param kafkaTopic     The Kafka topic to put the message in.
+     * @param correlationId  The correlation key from the message.
+     * @param correlationKey A Key object that is used to create a schema for the correlation id
+     *                       value.
+     * @param shardNum       The shard number that the message is stored in the TxEventQ.
+     * @return A TxEventQSourceRecord containing the JmsTextMessage message information, Kafka
+     *         topic, key if available in message, and partition location for Kafka to store the
+     *         message at.
+     * @throws JMSException
+     * @throws SQLException
+     */
+    private TxEventQSourceRecord processJmsTextMessage(String msgId, Message msg, String kafkaTopic,
+            String correlationId, Key correlationKey, int shardNum)
+            throws JMSException, SQLException {
+        log.trace("[{}] Entry {}.processJmsTextMessage", this.conn, this.getClass().getName());
+        AQjmsTextMessage textMsg = (AQjmsTextMessage) msg;
+        JmsMessage jmsMsg = new JmsMessage(textMsg, 1, null);
+        Headers header = new org.apache.kafka.connect.header.ConnectHeaders();
+        addJMSMessagePropertyToKafkaHeader(textMsg, jmsMsg, header);
+
+        log.debug(
+                "[{}] Processing JMS Text message:[msgIdStr: {}, shardNum: {}, correlationId: {}]",
+                this.conn, msgId, shardNum, correlationId);
+
+        log.trace("[{}] Exit {}.processJmsTextMessage", this.conn, this.getClass().getName());
+
+        return new TxEventQSourceRecord(null, null, kafkaTopic,
+                this.mapShardToKafkaPartition ? shardNum / 2 : null,
+                this.useSchemaForJmsMsg && correlationId != null ? Key.SCHEMA_KEY_V1 : null,
+                this.useSchemaForJmsMsg && correlationId != null ? correlationKey.toKeyStructV1()
+                        : correlationId,
+                this.useSchemaForJmsMsg ? JmsMessage.SCHEMA_JMSMESSAGE_V1 : null,
+                this.useSchemaForJmsMsg ? jmsMsg.toJmsMessageStructV1() : textMsg.getText(), null,
+                header, TxEventQSourceRecord.PayloadType.JMS_TEXT,
+                textMsg.getJMSMessageIDAsBytes());
+
+    }
+
+    /**
+     * Add the JMS Message properties to the Kafka header if the JMS Message property is listed in
+     * the source connector configuration property "header.jms.allowlist" and the
+     * "use.schema.for.jms.msgs" configuration property is set to false. If
+     * "use.schema.for.jms.msgs" property is set to true all the JMS Message properties will be
+     * stored as a JSON schema as part of the Kafka message payload.
+     * 
+     * @param aqJmsMsg     The JMS message that has been consumed from TxEventQ.
+     * @param jmsMsgSchema The JMS message schema that will be used to store the JMS message
+     *                     property information.
+     * @param header       The Kafka header object to store the header information to.
+     * @return The header information to store in the Kafka Header one the SourceRecord is created.
+     * @throws JMSException
+     */
+    private Headers addJMSMessagePropertyToKafkaHeader(AQjmsMessage aqJmsMsg,
+            JmsMessage jmsMsgSchema, Headers header) throws JMSException {
+        if (!this.allowlistedJmsHeaders.isEmpty() && !this.useSchemaForJmsMsg) {
+            for (String jmsMsgProp : this.allowlistedJmsHeaders) {
+                if (header.lastWithName(jmsMsgProp) == null) {
+                    switch (jmsMsgProp) {
+                    case "jmsMessageType":
+                    case "jmsMessageId":
+                    case "jmsCorrelationId":
+                        header.addBytes(jmsMsgProp, jmsMsgSchema.toJmsMessageStructV1()
+                                .getString(jmsMsgProp).getBytes());
+                        break;
+                    case "jmsDestination":
+                        header.addBytes(jmsMsgProp,
+                                aqJmsMsg.getJMSDestination() != null
+                                        ? jmsMsgSchema.toJmsMessageStructV1().getStruct(jmsMsgProp)
+                                                .toString().getBytes()
+                                        : null);
+                        break;
+                    case "jmsReplyTo":
+                        header.addBytes(jmsMsgProp,
+                                aqJmsMsg.getJMSReplyTo() != null
+                                        ? jmsMsgSchema.toJmsMessageStructV1().getStruct(jmsMsgProp)
+                                                .toString().getBytes()
+                                        : null);
+
+                        break;
+                    case "jmsPriority":
+                    case "jmsDeliveryMode":
+                    case "jmsRetry_count":
+                        header.addBytes(jmsMsgProp, jmsMsgSchema.toJmsMessageStructV1()
+                                .getInt32(jmsMsgProp).toString().getBytes());
+                        break;
+                    case "jmsExpiration":
+                    case "jmsTimestamp":
+                        header.addBytes(jmsMsgProp, jmsMsgSchema.toJmsMessageStructV1()
+                                .getInt64(jmsMsgProp).toString().getBytes());
+                        break;
+                    case "jmsType":
+                        header.addBytes(jmsMsgProp,
+                                aqJmsMsg.getJMSType() != null
+                                        ? jmsMsgSchema.toJmsMessageStructV1().getString(jmsMsgProp)
+                                                .getBytes()
+                                        : null);
+                        break;
+                    case "jmsRedelivered":
+                        header.addBytes(jmsMsgProp, jmsMsgSchema.toJmsMessageStructV1()
+                                .getBoolean(jmsMsgProp).toString().getBytes());
+                        break;
+                    case "jmsProperties":
+                        header.addBytes(jmsMsgProp,
+                                JmsMessage.propertiesMap(aqJmsMsg).toString().getBytes());
+                        break;
+                    default:
+                        log.warn("Invalid JMS Message Property: {}", jmsMsgProp);
+                        break;
+                    }
+                }
+            }
+        }
+        return header;
+    }
+
+    /**
+     * Process JmsBytesMessage by first determining if the MessageVersion is version 2 which means
+     * that header information can possibly be stored in the payload. If dealing with a message with
+     * a version of 2 the header information from the payload will be extracted and stored in the
+     * TxEventQSourceRecord as header values. If the message is not a version 2 message then only
+     * the message and if correlation key is specified will be placed into the TxEventQSourceRecord.
+     * 
+     * @param msgId          The message Id of the message that was dequeued.
+     * @param msg            The message that was dequeued.
+     * @param kafkaTopic     The Kafka topic to put the message in.
+     * @param correlationId  The correlation key from the message.
+     * @param correlationKey A Key object that is used to create a schema for the correlation id
+     *                       value.
+     * @param shardNum       The shard number that the message is stored in the TxEventQ.
+     * @return A TxEventQSourceRecord containing the JmsBytesMessage message information, Kafka
+     *         topic, key if available in message, headers if available in message, and partition
+     *         location for Kafka to store the message at.
+     * @throws JMSException
+     * @throws SQLException
+     */
+    private TxEventQSourceRecord processJmsBytesMessage(String msgId, Message msg,
+            String kafkaTopic, String correlationId, Key correlationKey, int shardNum)
+            throws JMSException, SQLException {
+        log.trace("[{}] Entry {}.processJmsBytesMessage", this.conn, this.getClass().getName());
+
+        int messageVersion = 1;
+        byte[] keyArray = null;
+        byte[] valueArray = null;
+        int keyLen = 0;
+        int valueLen = 0;
+        Headers header = new org.apache.kafka.connect.header.ConnectHeaders();
+        AQjmsBytesMessage byteMessage = (AQjmsBytesMessage) msg;
+
+        /*
+         * Attempts to get the MESSAGEVERSION. If the MESSAGEVERSION is not set it will be assumed
+         * that the MESSAGEVERSION is 1 and no header information has been stored. If the
+         * MESSAGEVERSION is 2 then header information maybe available in the payload.
+         */
+        try {
+            messageVersion = byteMessage.getIntProperty("AQINTERNAL_MESSAGEVERSION");
+        } catch (Exception e) {
+            messageVersion = 1;
+        }
+
+        /*
+         * Received Byte Payload in below format: | KEY LENGTH (4 Bytes Fixed) | KEY | | VALUE
+         * LENGTH (4 BYTES FIXED) | VALUE | | HEADER NAME LENGTH(4 BYTES FIXED) | HEADER NAME | |
+         * HEADER VALUE LENGTH (4 BYTES FIXED) | HEADER VALUE | | HEADER NAME LENGTH(4 BYTES FIXED)
+         * | HEADER NAME | | HEADER VALUE LENGTH (4 BYTES FIXED) | HEADER VALUE |
+         * 
+         * For records with null key , KEY LENGTH is set to 0. For records with null value, VALUE
+         * LENGTH is set to 0. Number of headers are set in property "AQINTERNAL_HEADERCOUNT"
+         * 
+         */
+        if (messageVersion == 2) {
+            byte[] payloadArray = byteMessage.getBytesData();
+            byte[] bLength = new byte[DLENGTH_SIZE];
+
+            // Read Key First
+            ByteBuffer pBuffer = ByteBuffer.wrap(payloadArray);
+            pBuffer.get(bLength, 0, DLENGTH_SIZE);
+            keyLen = MessageUtils.convertToInt(bLength);
+            keyArray = new byte[keyLen];
+            pBuffer.get(keyArray, 0, keyLen);
+
+            log.debug("KeyArray value: {}", Arrays.toString(keyArray));
+            // Get Actual Payload
+            pBuffer.get(bLength, 0, DLENGTH_SIZE);
+            valueLen = MessageUtils.convertToInt(bLength);
+
+            valueArray = new byte[valueLen];
+            pBuffer.get(valueArray, 0, valueLen);
+
+            int hCount = 0;
+            try {
+                hCount = byteMessage.getIntProperty("AQINTERNAL_HEADERCOUNT");
+            } catch (Exception e) {
+                hCount = 0;
+            }
+            int hKeyLen = 0;
+            int hValueLen = 0;
+
+            for (int i = 0; i < hCount; i++) {
+                pBuffer.get(bLength, 0, DLENGTH_SIZE);
+                hKeyLen = MessageUtils.convertToInt(bLength);
+                if (hKeyLen > 0) {
+                    byte[] hKeyArray = new byte[hKeyLen];
+                    pBuffer.get(hKeyArray, 0, hKeyLen);
+                    String hKey = new String(hKeyArray);
+                    pBuffer.get(bLength, 0, DLENGTH_SIZE);
+                    hValueLen = MessageUtils.convertToInt(bLength);
+                    byte[] hValueArray = new byte[hValueLen];
+                    pBuffer.get(hValueArray, 0, hValueLen);
+
+                    // Add the header if it is not on the deny list.
+                    if (this.denylistedHeaders.isEmpty()
+                            || !this.denylistedHeaders.contains(hKey)) {
+                        header.addBytes(hKey, hValueArray);
+                    }
+                }
+            }
+        }
+
+        JmsMessage jmsMsg = new JmsMessage(byteMessage, messageVersion,
+                valueLen != 0 ? valueArray : null);
+
+        addJMSMessagePropertyToKafkaHeader(byteMessage, jmsMsg, header);
+
+        log.debug("[{}] Processing JMS Bytes message:[msgId: {}, shardNum: {}, correlationId: {}]",
+                this.conn, msgId, shardNum, correlationId);
+
+        log.trace("[{}] Exit {}.processJmsBytesMessage", this.conn, this.getClass().getName());
+        if (messageVersion == 2) {
+            Key msgV2CorrelationKey = new Key(new String(keyArray, StandardCharsets.UTF_8));
+            return new TxEventQSourceRecord(null, null, kafkaTopic,
+                    this.mapShardToKafkaPartition ? shardNum / 2 : null,
+                    this.useSchemaForJmsMsg && keyLen != 0 ? Key.SCHEMA_KEY_V1 : null,
+                    this.useSchemaForJmsMsg && keyLen != 0 ? msgV2CorrelationKey.toKeyStructV1()
+                            : keyLen != 0 ? keyArray : null,
+                    this.useSchemaForJmsMsg ? JmsMessage.SCHEMA_JMSMESSAGE_V1 : null,
+                    this.useSchemaForJmsMsg ? jmsMsg.toJmsMessageStructV1()
+                            : valueLen != 0 ? valueArray : null,
+                    null, header, TxEventQSourceRecord.PayloadType.JMS_BYTES,
+                    byteMessage.getJMSMessageIDAsBytes());
+        } else {
             return new TxEventQSourceRecord(null, null, kafkaTopic,
                     this.mapShardToKafkaPartition ? shardNum / 2 : null,
                     this.useSchemaForJmsMsg && correlationId != null ? Key.SCHEMA_KEY_V1 : null,
@@ -608,49 +920,9 @@ public class TxEventQConsumer implements Closeable {
                     this.useSchemaForJmsMsg ? JmsMessage.SCHEMA_JMSMESSAGE_V1 : null,
                     this.useSchemaForJmsMsg ? jmsMsg.toJmsMessageStructV1()
                             : byteMessage.getBytesData(),
-                    TxEventQSourceRecord.PayloadType.JMS_BYTES,
+                    null, header, TxEventQSourceRecord.PayloadType.JMS_BYTES,
                     byteMessage.getJMSMessageIDAsBytes());
-        } else if (msg instanceof AQjmsTextMessage) {
-            AQjmsTextMessage textMsg = (AQjmsTextMessage) msg;
-            JmsMessage jmsMsg = new JmsMessage(textMsg);
-
-            log.debug(
-                    "[{}] Processing JMS Text message:[msgIdStr: {}, shardNum: {}, correlationId: {}]",
-                    this.conn, msgIdStr, shardNum, correlationId);
-
-            log.trace("[{}] Exit {}.processJmsMessage", this.conn, this.getClass().getName());
-
-            return new TxEventQSourceRecord(null, null, kafkaTopic,
-                    this.mapShardToKafkaPartition ? shardNum / 2 : null,
-                    this.useSchemaForJmsMsg && correlationId != null ? Key.SCHEMA_KEY_V1 : null,
-                    this.useSchemaForJmsMsg && correlationId != null
-                            ? correlationKey.toKeyStructV1()
-                            : correlationId,
-                    this.useSchemaForJmsMsg ? JmsMessage.SCHEMA_JMSMESSAGE_V1 : null,
-                    this.useSchemaForJmsMsg ? jmsMsg.toJmsMessageStructV1() : textMsg.getText(),
-                    TxEventQSourceRecord.PayloadType.JMS_TEXT, textMsg.getJMSMessageIDAsBytes());
-        } else if (msg instanceof AQjmsMapMessage) {
-            AQjmsMapMessage mapMsg = (AQjmsMapMessage) msg;
-            JmsMessage jmsMsg = new JmsMessage(mapMsg);
-
-            log.debug(
-                    "[{}] Processing JMS Map message:[msgIdStr: {}, shardNum: {}, correlationId: {}]",
-                    this.conn, msgIdStr, shardNum, correlationId);
-
-            log.trace("[{}] Exit {}.processJmsMessage", this.conn, this.getClass().getName());
-
-            return new TxEventQSourceRecord(null, null, kafkaTopic,
-                    this.mapShardToKafkaPartition ? shardNum / 2 : null,
-                    this.useSchemaForJmsMsg && correlationId != null ? Key.SCHEMA_KEY_V1 : null,
-                    this.useSchemaForJmsMsg && correlationId != null
-                            ? correlationKey.toKeyStructV1()
-                            : correlationId,
-                    this.useSchemaForJmsMsg ? JmsMessage.SCHEMA_JMSMESSAGE_V1 : null,
-                    this.useSchemaForJmsMsg ? jmsMsg.toJmsMessageStructV1() : mapMsg.getMapNames(),
-                    TxEventQSourceRecord.PayloadType.JMS_MAP, mapMsg.getJMSMessageIDAsBytes());
         }
-
-        return null;
     }
 
     /**

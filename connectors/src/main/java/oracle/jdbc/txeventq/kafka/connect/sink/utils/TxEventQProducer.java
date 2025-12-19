@@ -26,6 +26,7 @@ package oracle.jdbc.txeventq.kafka.connect.sink.utils;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.sql.CallableStatement;
 import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
@@ -63,20 +64,19 @@ import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.errors.RetriableException;
+import org.apache.kafka.connect.header.Header;
+import org.apache.kafka.connect.header.Headers;
 import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import oracle.AQ.AQOracleSQLException;
 import oracle.jdbc.OracleConnection;
-import oracle.jdbc.aq.AQFactory;
-import oracle.jdbc.aq.AQMessageProperties;
-import oracle.jdbc.internal.JMSEnqueueOptions;
 import oracle.jdbc.internal.JMSFactory;
-import oracle.jdbc.internal.JMSMessage;
 import oracle.jdbc.internal.JMSMessageProperties;
 import oracle.jdbc.pool.OracleDataSource;
 import oracle.jdbc.txeventq.kafka.connect.common.utils.Constants;
+import oracle.jdbc.txeventq.kafka.connect.common.utils.MessageUtils;
 import oracle.jdbc.txeventq.kafka.connect.common.utils.Node;
 import oracle.jms.AQjmsBytesMessage;
 import oracle.jms.AQjmsFactory;
@@ -91,10 +91,14 @@ public class TxEventQProducer implements Closeable {
     private String jmsDeliveryModeStr = "JMSDeliveryMode";
     private String persistentStr = "PERSISTENT";
     private String aqInternalPartitionStr = "AQINTERNAL_PARTITION";
+    private String aqInternalMessageVersion = "AQINTERNAL_MESSAGEVERSION";
+    private String aqInternalHeaderCount = "AQINTERNAL_HEADERCOUNT";
 
     private int numberOfProperties = 1;
     private int stringPropertyValueType = 27;
     private int numberPropertyValueType = 24;
+    private static final int DLENGTH_SIZE = 4;
+    private static final int MAX_CORRELATION_KEY_LENGTH = 128;
 
     private String partialUserPropertiesStr = numberOfProperties + ","
             + aqInternalPartitionStr.length() + "," + aqInternalPartitionStr + ","
@@ -132,10 +136,13 @@ public class TxEventQProducer implements Closeable {
     private static final long RECONNECT_DELAY_MILLIS_MAX = 8192L;
 
     private static final String TXEVENTQ$_TRACK_OFFSETS = "TXEVENTQ$_TRACK_OFFSETS";
-    private static final int MINIMUM_VERSION = 21;
+    private static final int MINIMUM_VERSION = 23;
     private boolean errorInSessCommitProcess = false;
     private boolean isClusterDatabase = false;
     private String userName;
+    private boolean includeKafkaHeaders = false;
+    private boolean includeKafkaMetadata = false;
+    private int keyBasedEnqueueVal;
 
     public TxEventQProducer(TxEventQSinkConfig config) {
         this.config = config;
@@ -199,7 +206,12 @@ public class TxEventQProducer implements Closeable {
             this.connected = true;
 
             this.isClusterDatabase = isClusterDatabase();
-
+            this.includeKafkaHeaders = this.config
+                    .getBoolean(TxEventQSinkConfig.TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_HEADERS);
+            this.includeKafkaMetadata = this.config
+                    .getBoolean(TxEventQSinkConfig.TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_METADATA);
+            this.keyBasedEnqueueVal = this.getKeyBasedEnqueueValue(
+                    this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME).toUpperCase());
             log.debug("[{}:{}] Oracle TxEventQ connection opened!", Thread.currentThread().getId(),
                     this.conn);
         } catch (SQLException | JMSException ex) {
@@ -340,6 +352,12 @@ public class TxEventQProducer implements Closeable {
             this.connected = true;
 
             this.isClusterDatabase = isClusterDatabase();
+            this.includeKafkaHeaders = this.config
+                    .getBoolean(TxEventQSinkConfig.TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_HEADERS);
+            this.includeKafkaMetadata = this.config
+                    .getBoolean(TxEventQSinkConfig.TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_METADATA);
+            this.keyBasedEnqueueVal = this.getKeyBasedEnqueueValue(
+                    this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME).toUpperCase());
 
             log.debug("[{}:{}] Oracle TxEventQ connection opened!", Thread.currentThread().getId(),
                     this.conn);
@@ -502,10 +520,10 @@ public class TxEventQProducer implements Closeable {
     }
 
     /**
-     * Check whether the database is version 21 or later
+     * Check whether the database is version 23 or later
      * 
      * @throws ConnectException If we cannot get the database metadata or if the database version is
-     *                          less than 21
+     *                          less than 23
      */
     private void versionCheck() {
         DatabaseMetaData md = null;
@@ -520,8 +538,7 @@ public class TxEventQProducer implements Closeable {
         }
 
         if (version < MINIMUM_VERSION) {
-            throw new ConnectException(
-                    "TxEventQ Connector requires Oracle Database 21c or greater");
+            throw new ConnectException("TxEventQ Connector requires Oracle Database 23 or greater");
         }
     }
 
@@ -624,6 +641,47 @@ public class TxEventQProducer implements Closeable {
     }
 
     /**
+     * Gets the KEY_BASED_ENQUEUE value that is set for the specified queue.
+     * 
+     * @param queue The queue to get the KEY_BASED_ENQUEUE value for.
+     * @return A numeric value of 0, 1, or 2 should be returned for the different available
+     *         KEY_BASED_ENQUEUE options that can be used.
+     */
+    private int getKeyBasedEnqueueValue(String queue) {
+        log.trace("[{}] Entry {}.getKeyBasedEnqueueValue", this.conn, this.getClass().getName());
+
+        int keyBasedEnqueue;
+        try (CallableStatement getKeyBasedEnqueueStmt = this.conn
+                .prepareCall("{call dbms_aqadm.get_queue_parameter(?,?,?)}")) {
+            getKeyBasedEnqueueStmt.setString(1, queue);
+            getKeyBasedEnqueueStmt.setString(2, "KEY_BASED_ENQUEUE");
+            getKeyBasedEnqueueStmt.registerOutParameter(3, Types.INTEGER);
+            getKeyBasedEnqueueStmt.execute();
+            keyBasedEnqueue = getKeyBasedEnqueueStmt.getInt(3);
+        } catch (SQLException e) {
+            throw new ConnectException(
+                    "Error attempting to get KEY_BASED_ENQUEUE value for the specified queue: "
+                            + e.getMessage());
+        }
+
+        log.debug("KEY_BASED_ENQUEUE for {}: {}", queue, keyBasedEnqueue);
+        log.trace("[{}] Exit {}.getKeyBasedEnqueueValue", this.conn, this.getClass().getName());
+
+        return keyBasedEnqueue;
+    }
+
+    /**
+     * Gets the stored KEY_BASED_ENQUEUE value that was returned from the
+     * getKeyBasedEnqueueValue(String queue) function.
+     * 
+     * @return A numeric value of 0, 1, or 2 should be returned for the different available
+     *         KEY_BASED_ENQUEUE options that can be used.
+     */
+    public int getStoredKeyBasedEnqueueValue() {
+        return this.keyBasedEnqueueVal;
+    }
+
+    /**
      * Query the database to check if it is a cluster database or not.
      * 
      * @return True if cluster database, false otherwise.
@@ -705,52 +763,6 @@ public class TxEventQProducer implements Closeable {
     }
 
     /**
-     * Enqueues the message from the SinkRecord into the specified TxEventQ.
-     * 
-     * @param queueName  The name of the TxEventQ to enqueue message to.
-     * @param sinkRecord The message to be enqueued.
-     * @throws SQLException
-     */
-    public void enqueueMessage(String queueName, SinkRecord sinkRecord) throws SQLException {
-
-        log.trace("[{}] Entry {}.enqueueMessage,", this.conn, this.getClass().getName());
-
-        if (sinkRecord.kafkaPartition() != null) {
-            String id = "" + 2 * sinkRecord.kafkaPartition();
-            jmsMesgProp.setUserProperties(
-                    partialUserPropertiesStr + id.length() + "," + 2 * sinkRecord.kafkaPartition());
-        }
-
-        JMSMessage mesg = JMSFactory.createJMSMessage(jmsMesgProp);
-
-        byte[] nullPayload = null;
-
-        if (sinkRecord.value() != null) {
-            mesg.setPayload((sinkRecord.value().toString()).getBytes());
-        } else {
-            mesg.setPayload(nullPayload);
-        }
-
-        // We want to retrieve the message id after enqueue.
-        JMSEnqueueOptions opt = new JMSEnqueueOptions();
-        opt.setRetrieveMessageId(true);
-        opt.setVisibility(JMSEnqueueOptions.VisibilityOption.ON_COMMIT);
-        opt.setDeliveryMode(oracle.jdbc.internal.JMSEnqueueOptions.DeliveryMode.PERSISTENT);
-        AQMessageProperties aqProp = AQFactory.createAQMessageProperties();
-        aqProp.setPriority(4);
-        // TODO: check the length
-        if (sinkRecord.key() != null)
-            aqProp.setCorrelation(sinkRecord.key().toString());
-        mesg.setAQMessageProperties(aqProp);
-
-        // execute the actual enqueue operation
-        ((oracle.jdbc.internal.OracleConnection) this.conn).jmsEnqueue(queueName, opt, mesg,
-                aqProp);
-
-        log.trace("[{}] Exit {}.enqueueMessage,", this.conn, this.getClass().getName());
-    }
-
-    /**
      * Enqueues an array of messages from the SinkRecord into the specified TxEventQ.
      *
      * @param queueName   The name of the TxEventQ to enqueue message to.
@@ -781,6 +793,12 @@ public class TxEventQProducer implements Closeable {
 
             msg.setJMSDeliveryMode(DeliveryMode.PERSISTENT);
             msg.setJMSPriority(4);
+
+            if (this.keyBasedEnqueueVal == 2) {
+                log.debug("setting aqinternal partition for topic: {} with partition: {}",
+                        sr.topic(), sr.kafkaPartition());
+                msg.setLongProperty("AQINTERNAL_PARTITION", sr.kafkaPartition() * 2L);
+            }
             deliveryMode[i] = msg.getJMSDeliveryMode();
             priorities[i] = msg.getJMSPriority();
 
@@ -796,32 +814,240 @@ public class TxEventQProducer implements Closeable {
     }
 
     /**
-     * Creates AQjmsBytesMessage from ByteBuffer's key, value and headers.
+     * Prepare the message from Kafka to be sent to TxEventQ without any Kafka headers. When Kafka
+     * headers are not being processed the AQINTERNAL_MESSAGEVERSION is not set and will be inferred
+     * to be 1 which indicates that headers will not be processed.
      * 
      * @param session The topic session.
-     * @param sinkRec The message.
+     * @param sinkRec The Kafka message.
+     * @return The AQjmsBytesMessage message without any headers.
+     * @throws JMSException
+     */
+    private AQjmsBytesMessage prepareMessageWithoutHeaders(TopicSession session, SinkRecord sinkRec)
+            throws JMSException {
+        log.trace("[{}] Entry {}.prepareMessageWithoutHeaders,", this.conn,
+                this.getClass().getName());
+        AQjmsBytesMessage msg = null;
+        msg = (AQjmsBytesMessage) (session.createBytesMessage());
+
+        if (sinkRec.value() != null) {
+            msg.writeBytes((sinkRec.value().toString()).getBytes());
+        }
+
+        if (sinkRec.key() != null) {
+            if (sinkRec.key().toString().length() <= MAX_CORRELATION_KEY_LENGTH) {
+                msg.setJMSCorrelationID(sinkRec.key().toString());
+            } else {
+                log.warn(
+                        "The correlation key with length of {} has exceeded the maximum length of {} and will be truncated.",
+                        sinkRec.key().toString().length(), MAX_CORRELATION_KEY_LENGTH);
+
+                msg.setJMSCorrelationID(
+                        sinkRec.key().toString().substring(0, MAX_CORRELATION_KEY_LENGTH));
+            }
+        }
+
+        log.trace("[{}] Exit {}.prepareMessageWithoutHeaders,", this.conn,
+                this.getClass().getName());
+        return msg;
+    }
+
+    /**
+     * Prepare the message from Kafka to be sent to TxEventQ with any Kafka headers specified. When
+     * Kafka headers are being processed the AQINTERNAL_MESSAGEVERSION property will be set to a
+     * value of 2 and the header information will be stored in the message payload. The payload will
+     * have the following format: | KEY LENGTH (4 Bytes Fixed) | KEY | | VALUE LENGTH (4 BYTES
+     * FIXED) | VALUE | | HEADER NAME LENGTH(4 BYTES FIXED) | HEADER NAME | HEADER VALUE LENGTH (4
+     * BYTES FIXED) | HEADER VALUE | | HEADER NAME LENGTH(4 BYTES FIXED) | HEADER NAME | | HEADER
+     * VALUE LENGTH (4 BYTES FIXED) | HEADER VALUE |
+     * 
+     * For records with null key , KEY LENGTH is set to 0. For records with null value, VALUE LENGTH
+     * is set to 0. Number of headers are set in property "AQINTERNAL_HEADERCOUNT"
+     * 
+     * @param session The topic session.
+     * @param sinkRec The Kafka message.
+     * @return The AQjmsBytesMessage message with headers if specified in the Kafka message.
+     * @throws JMSException
+     */
+    private AQjmsBytesMessage prepareMessageWithHeaders(TopicSession session, SinkRecord sinkRec)
+            throws JMSException {
+        log.trace("[{}] Entry {}.prepareMessageWithHeaders,", this.conn, this.getClass().getName());
+        AQjmsBytesMessage msg = null;
+        msg = (AQjmsBytesMessage) (session.createBytesMessage());
+
+        ByteBuffer key = sinkRec.key() != null
+                ? ByteBuffer.wrap(sinkRec.key().toString().getBytes())
+                : null;
+        ByteBuffer value = sinkRec.value() != null
+                ? ByteBuffer.wrap(sinkRec.value().toString().getBytes())
+                : null;
+
+        int keyLen = 0;
+        int valueLen = 0;
+
+        int[] hKeysLen = null;
+        int[] hValuesLen = null;
+
+        byte[] keyByteArray = null;
+        byte[] valueByteArray = null;
+
+        Headers headers = this.includeKafkaHeaders ? sinkRec.headers() : sinkRec.headers().clear();
+
+        if (headers != null) {
+            /**
+             * If any of these JMS Message properties are found in the headers it will be removed
+             * because we don't want to save this information as part of the message header. This
+             * information can be provided if the Source connector is used with the required
+             * configuration properties set.
+             */
+            headers.remove("jmsMessageType");
+            headers.remove("jmsMessageId");
+            headers.remove("jmsCorrelationId");
+            headers.remove("jmsDestination");
+            headers.remove("jmsReplyTo");
+            headers.remove("jmsPriority");
+            headers.remove("jmsDeliveryMode");
+            headers.remove("jmsRetry_count");
+            headers.remove("jmsExpiration");
+            headers.remove("jmsTimestamp");
+            headers.remove("jmsType");
+            headers.remove("jmsRedelivered");
+            headers.remove("jmsProperties");
+
+            /**
+             * Check if the header has old metadata information for the KAFKA_TOPIC,
+             * KAFKA_PARTITION, KAFKA_OFFSET, and KAFKA_TIMESTAMP. If it does we want to remove it
+             * and update it with the new information.
+             */
+            headers.remove(Constants.KAFKA_TOPIC_NAME);
+            headers.remove(Constants.KAFKA_PARTITION);
+            headers.remove(Constants.KAFKA_OFFSET);
+            headers.remove(Constants.KAFKA_TIMESTAMP);
+
+            if (this.includeKafkaMetadata) {
+                headers.addString(Constants.KAFKA_TOPIC_NAME, sinkRec.topic());
+                headers.addInt(Constants.KAFKA_PARTITION, sinkRec.kafkaPartition());
+                headers.addLong(Constants.KAFKA_OFFSET, sinkRec.kafkaOffset());
+                headers.addLong(Constants.KAFKA_TIMESTAMP, sinkRec.timestamp());
+            }
+
+            hKeysLen = new int[headers.size()];
+            hValuesLen = new int[headers.size()];
+
+        }
+
+        int totalSize = 0;
+        if (key != null) {
+            keyByteArray = new byte[key.limit()];
+            key.get(keyByteArray);
+            keyLen = keyByteArray.length;
+        }
+
+        totalSize += (keyLen + DLENGTH_SIZE);
+
+        if (value != null) {
+            valueByteArray = new byte[value.limit()];
+            value.get(valueByteArray);
+            valueLen = valueByteArray.length;
+        }
+
+        totalSize += (valueLen + DLENGTH_SIZE);
+
+        if (headers != null) {
+            int hIndex = 0;
+            for (Header h : headers) {
+                int hKeyLen = h.key().getBytes().length;
+                totalSize += (hKeyLen + DLENGTH_SIZE);
+                hKeysLen[hIndex] = hKeyLen;
+                int hValueLength = h.value().toString().getBytes().length;
+                totalSize += (hValueLength + DLENGTH_SIZE);
+                hValuesLen[hIndex++] = hValueLength;
+            }
+        }
+
+        ByteBuffer pBuffer = ByteBuffer.allocate(totalSize);
+        // If Key is null Put Length = 0
+        pBuffer.put(MessageUtils.convertTo4Byte(keyLen));
+
+        if (keyLen > 0) {
+            pBuffer.put(keyByteArray);
+            msg.setJMSCorrelationID(new String(
+                    truncateByteArrayForCorrelationKey(keyByteArray, MAX_CORRELATION_KEY_LENGTH)));
+        }
+
+        // If Value is null then put length = 0
+        pBuffer.put(MessageUtils.convertTo4Byte(valueLen));
+        if (valueLen > 0) {
+            pBuffer.put(valueByteArray);
+        }
+
+        if (headers != null) {
+            int hIndex = 0;
+            for (Header h : headers) {
+                pBuffer.put(MessageUtils.convertTo4Byte(hKeysLen[hIndex]));
+                pBuffer.put(h.key().getBytes());
+                pBuffer.put(MessageUtils.convertTo4Byte(hValuesLen[hIndex++]));
+                pBuffer.put(h.value().toString().getBytes());
+            }
+        }
+
+        pBuffer.rewind();
+        byte[] payload = new byte[pBuffer.limit()];
+        pBuffer.get(payload);
+        msg.writeBytes(payload);
+        if (headers != null) {
+            msg.setIntProperty(aqInternalHeaderCount, headers.size());
+        }
+
+        msg.setIntProperty(aqInternalMessageVersion, 2);
+
+        log.trace("[{}] Exit {}.prepareMessageWithHeaders,", this.conn, this.getClass().getName());
+        return msg;
+    }
+
+    /**
+     * Checks the correlation key length and truncates the key if the size exceeds the maximum
+     * length.
+     * 
+     * @param originalArray A byte array storing the correlation key value.
+     * @param maxLength     The maximum length allowed for the correlation key.
+     * @return A valid correlation key.
+     */
+    public byte[] truncateByteArrayForCorrelationKey(byte[] originalArray, int maxLength) {
+        if (originalArray == null) {
+            return null;
+        }
+        if (originalArray.length <= maxLength) {
+            // No truncation needed, return the original array
+            return originalArray;
+        } else {
+            log.warn(
+                    "The correlation key with length of {} has exceeded the maximum length of {} and will be truncated.",
+                    originalArray.length, maxLength);
+            // Create a new array of the specified maximum length
+            byte[] truncatedArray = new byte[maxLength];
+            // Copy elements from the original array to the new array
+            System.arraycopy(originalArray, 0, truncatedArray, 0, maxLength);
+            return truncatedArray;
+        }
+    }
+
+    /**
+     * Creates AQjmsBytesMessage from ByteBuffer's key, value, and headers.
+     * 
+     * @param session The topic session.
+     * @param sinkRec The Kafka message.
      */
     private AQjmsBytesMessage createBytesMessage(TopicSession session, SinkRecord sinkRec)
             throws JMSException {
         log.trace("[{}] Entry {}.createBytesMessage,", this.conn, this.getClass().getName());
 
-        AQjmsBytesMessage msg = null;
-        msg = (AQjmsBytesMessage) (session.createBytesMessage());
-        byte[] nullPayload = null;
-
-        if (sinkRec.value() != null) {
-            msg.writeBytes((sinkRec.value().toString()).getBytes());
-        } else {
-            msg.writeBytes(nullPayload);
-        }
-
-        if (sinkRec.key() != null) {
-            msg.setJMSCorrelationID(sinkRec.key().toString());
-        }
-        msg.setIntProperty("AQINTERNAL_PARTITION", sinkRec.kafkaPartition() * 2);
-
         log.trace("[{}] Exit {}.createBytesMessage,", this.conn, this.getClass().getName());
-        return msg;
+        if (this.includeKafkaHeaders || this.includeKafkaMetadata) {
+            return prepareMessageWithHeaders(session, sinkRec);
+        } else {
+            return prepareMessageWithoutHeaders(session, sinkRec);
+        }
     }
 
     /**

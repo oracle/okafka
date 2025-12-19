@@ -76,15 +76,15 @@ public class ConsumerOfJmsSchema {
 				
 				System.out.println("");
 				
-				String messageId = jsonObject.getString("messageId");
-				System.out.println("messageId = " + messageId);
+				String messageId = jsonObject.getString("jmsMessageId");
+				System.out.println("jmsMessageId = " + messageId);
 				 
-				String messageType = jsonObject.getString("messageType");
-				System.out.println("messageType = " + messageType);
+				String messageType = jsonObject.getString("jmsMessageType");
+				System.out.println("jmsMessageType = " + messageType);
 				 
-				if (!jsonObject.get("correlationId").equals(null)) {
-					String correlationId = jsonObject.getString("correlationId");
-					System.out.println("correlationId = " + correlationId);
+				if (!jsonObject.get("jmsCorrelationId").equals(null)) {
+					String correlationId = jsonObject.getString("jmsCorrelationId");
+					System.out.println("jmsCorrelationId = " + correlationId);
 				}
 				
 				// Gets the payloadBytes property and decodes the message.
@@ -116,7 +116,7 @@ public class ConsumerOfJmsSchema {
 				/* Gets the different values from the properties schema. */
 				/*********************************************************/
 				  
-				JSONObject propertiesJsonObject  =  jsonObject.getJSONObject("properties");
+				JSONObject propertiesJsonObject  =  jsonObject.getJSONObject("jmsProperties");
 				System.out.println("********Gets the different values from the properties schema.********");
 				
 				// Since the propertyType for JMSXRcvTimestamp property is a long use the getLong to get the value.			 
@@ -140,7 +140,7 @@ public class ConsumerOfJmsSchema {
 				/* Gets the different values from the destination schema. */
 				/*********************************************************/
 				  
-				JSONObject destinationJsonObject  =  jsonObject.getJSONObject("destination");
+				JSONObject destinationJsonObject  =  jsonObject.getJSONObject("jmsDestination");
 				System.out.println("********Gets the different values from the Destination schema.********");
 				String destinationType = destinationJsonObject.getString("type");
 				System.out.println("type= " + destinationType);

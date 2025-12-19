@@ -1,0 +1,18 @@
+{
+	"name": "TxEventQ-sink",
+	"config": {
+        		"connector.class": "oracle.jdbc.txeventq.kafka.connect.sink.TxEventQSinkConnector",
+        		"tasks.max": "1",
+        		"topics": "<kafka topic>",
+        		"key.converter": "org.apache.kafka.connect.storage.StringConverter",
+        		"value.converter": "org.apache.kafka.connect.storage.StringConverter",
+        		"db_tns_alias": "<TNS alias name for the database to connect>",
+        		"wallet.path": "<path to the Oracle wallet>",
+        		"tnsnames.path": "<path to the tnsnames.ora>",
+        		"txeventq.queue.name": "<name of TxEventQ to put Kafka data into>",
+        		"txeventq.queue.schema": "<name of the schema for the TxEventQ>",
+        		"txeventq.jms.bytes.include.kafka.headers": "false",
+        		"txeventq.jms.bytes.include.kafka.metadata": "false",
+        	    "bootstrap.servers": "localhost:9092"
+	}
+}

@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
@@ -46,6 +47,7 @@ public class TxEventQSinkTask extends SinkTask {
     private static final Logger log = LoggerFactory.getLogger(TxEventQSinkTask.class);
     private TxEventQSinkConfig config;
     private TxEventQProducer producer;
+    private List<String> listOfTopics;
 
     @Override
     public String version() {
@@ -61,10 +63,12 @@ public class TxEventQSinkTask extends SinkTask {
         config = new TxEventQSinkConfig(properties);
         producer = new TxEventQProducer(config);
         this.producer.connect();
-
-        if (!producer.kafkaTopicExists(this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC))) {
-            throw new ConnectException("The Kafka topic "
-                    + this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC) + " does not exist.");
+        this.listOfTopics = this.config.getList(TxEventQSinkConfig.KAFKA_TOPIC);
+        log.debug("List of kafka topics: {}", this.listOfTopics);
+        for (String kafkaTopic : this.listOfTopics) {
+            if (!producer.kafkaTopicExists(kafkaTopic)) {
+                throw new ConnectException("The Kafka topic " + kafkaTopic + " does not exist.");
+            }
         }
 
         try {
@@ -80,14 +84,19 @@ public class TxEventQSinkTask extends SinkTask {
                             + e1.getMessage());
         }
 
-        int kafkaPartitionNum = producer
-                .getKafkaTopicPartitionSize(this.config.getString(TxEventQSinkConfig.KAFKA_TOPIC));
-        int txEventQShardNum = producer.getNumOfShardsForQueue(
-                this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME));
-        if (kafkaPartitionNum > txEventQShardNum) {
-            throw new ConnectException("The number of Kafka partitions " + kafkaPartitionNum
-                    + " must be less than or equal the number TxEventQ event stream "
-                    + txEventQShardNum);
+        for (String kafkaTopic : this.listOfTopics) {
+            if (this.producer.getStoredKeyBasedEnqueueValue() == 2) {
+                log.debug("Checking partition and shard numbers when key based is set to 2");
+                int kafkaPartitionNum = producer.getKafkaTopicPartitionSize(kafkaTopic);
+                int txEventQShardNum = producer.getNumOfShardsForQueue(
+                        this.config.getString(TxEventQSinkConfig.TXEVENTQ_QUEUE_NAME));
+                if (kafkaPartitionNum > txEventQShardNum) {
+                    throw new ConnectException("The number of Kafka partitions " + kafkaPartitionNum
+                            + " must be less than or equal the number of TxEventQ event stream "
+                            + txEventQShardNum
+                            + " when KEY_BASED_ENQUEUE property is set to value of 2.");
+                }
+            }
         }
 
         if (!this.producer.createOffsetInfoTable()) {

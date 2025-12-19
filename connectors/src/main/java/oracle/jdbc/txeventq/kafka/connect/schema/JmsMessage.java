@@ -41,22 +41,24 @@ import org.apache.kafka.connect.data.Struct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import oracle.jms.AQjmsBytesMessage;
 import oracle.jms.AQjmsMessage;
 
 public class JmsMessage {
     protected static final Logger log = LoggerFactory.getLogger(JmsMessage.class);
     public static final Schema SCHEMA_JMSMESSAGE_V1 = SchemaBuilder.struct().name("JMSMessage")
-            .version(1).field("messageType", Schema.STRING_SCHEMA)
-            .field("messageId", Schema.STRING_SCHEMA).field("timestamp", Schema.INT64_SCHEMA)
-            .field("deliveryMode", Schema.INT32_SCHEMA)
-            .field("correlationId", Schema.OPTIONAL_STRING_SCHEMA)
-            .field("replyTo", JmsDestination.SCHEMA_JMSDESTINATION_V1)
-            .field("destination", JmsDestination.SCHEMA_JMSDESTINATION_V1)
-            .field("redelivered", Schema.BOOLEAN_SCHEMA)
-            .field("priority", Schema.OPTIONAL_INT32_SCHEMA)
-            .field("expiration", Schema.OPTIONAL_INT64_SCHEMA)
-            .field("type", Schema.OPTIONAL_STRING_SCHEMA).field("retry_count", Schema.INT32_SCHEMA)
-            .field("properties",
+            .version(1).field("jmsMessageType", Schema.STRING_SCHEMA)
+            .field("jmsMessageId", Schema.STRING_SCHEMA).field("jmsTimestamp", Schema.INT64_SCHEMA)
+            .field("jmsDeliveryMode", Schema.INT32_SCHEMA)
+            .field("jmsCorrelationId", Schema.OPTIONAL_STRING_SCHEMA)
+            .field("jmsReplyTo", JmsDestination.SCHEMA_JMSDESTINATION_V1)
+            .field("jmsDestination", JmsDestination.SCHEMA_JMSDESTINATION_V1)
+            .field("jmsRedelivered", Schema.BOOLEAN_SCHEMA)
+            .field("jmsPriority", Schema.OPTIONAL_INT32_SCHEMA)
+            .field("jmsExpiration", Schema.OPTIONAL_INT64_SCHEMA)
+            .field("jmsType", Schema.OPTIONAL_STRING_SCHEMA)
+            .field("jmsRetry_count", Schema.INT32_SCHEMA)
+            .field("jmsProperties",
                     SchemaBuilder.map(Schema.STRING_SCHEMA, PropertyValue.SCHEMA_PROPERTYVALUE_V1))
             .required().field("payloadText", Schema.OPTIONAL_STRING_SCHEMA)
             .field("payloadMap",
@@ -86,11 +88,19 @@ public class JmsMessage {
     /**
      * Creates a JmsMessage with the specified Message properties.
      * 
-     * @param jms The Message object
+     * @param jms            The Message object
+     * @param messageVersion Indicates if the AQINTERNAL_MESSAGEVERSION property is a value of 1 or
+     *                       2.
+     * @param jmsBytesValue  If the AQINTERNAL_MESSAGEVERSION is a value of 2 then this will contain
+     *                       the message value that is stored in the payload. Since the payload of a
+     *                       message with AQINTERNAL_MESSAGEVERSION value of 2 will contain more
+     *                       information than just the message value. The message value has to be
+     *                       parsed from the payload.
      * @throws JMSException
      * @throws SQLException
      */
-    public JmsMessage(Message jms) throws JMSException, SQLException {
+    public JmsMessage(Message jms, int messageVersion, byte[] jmsBytesValue)
+            throws JMSException, SQLException {
         log.trace("Entry {}.JmsMessage", this.getClass().getName());
 
         this.messageId = jms.getJMSMessageID();
@@ -111,15 +121,38 @@ public class JmsMessage {
         this.retryCount = ((AQjmsMessage) jms).getAttempts();
 
         if (jms instanceof BytesMessage) {
-            this.messageType = "bytes";
-            final BytesMessage bytesMessage = (BytesMessage) jms;
-            final byte[] bytes = new byte[(int) bytesMessage.getBodyLength()];
 
-            bytesMessage.reset();
-            bytesMessage.readBytes(bytes);
+            this.messageType = "bytes";
+            final AQjmsBytesMessage bytesMessage = (AQjmsBytesMessage) jms;
+
+            /*
+             * If the message type is a Jms Bytes Message type and the AQINTERNAL_MESSAGEVERSION
+             * property value is 2 then use the jmsBytesValue passed into the method as the payload
+             * value. This is required because the received byte payload is being sent in the format
+             * shown below and we only need the value for the message that is stored into Kafka: |
+             * KEY LENGTH (4 Bytes Fixed) | KEY | | VALUE LENGTH (4 BYTES FIXED) | VALUE | | HEADER
+             * NAME LENGTH(4 BYTES FIXED) | HEADER NAME | | HEADER VALUE LENGTH (4 BYTES FIXED) |
+             * HEADER VALUE | | HEADER NAME LENGTH(4 BYTES FIXED) | HEADER NAME | | HEADER VALUE
+             * LENGTH (4 BYTES FIXED) | HEADER VALUE |
+             * 
+             * For records with null key , KEY LENGTH is set to 0. For records with null value,
+             * VALUE LENGTH is set to 0. Number of headers are set in property
+             * "AQINTERNAL_HEADERCOUNT"
+             * 
+             */
+            if (messageVersion == 2) {
+                this.payloadBytes = jmsBytesValue;
+            } else {
+                final byte[] bytes = new byte[(int) bytesMessage.getBodyLength()];
+
+                bytesMessage.reset();
+                bytesMessage.readBytes(bytes);
+                this.payloadBytes = bytes;
+            }
+
             this.payloadText = null;
             this.payloadMap = null;
-            this.payloadBytes = bytes;
+
         } else if (jms instanceof TextMessage) {
             this.messageType = "text";
             final TextMessage textMessage = (TextMessage) jms;
@@ -155,7 +188,7 @@ public class JmsMessage {
      * @return A Map for the properties in the specified Message.
      * @throws JMSException
      */
-    private static Map<String, Struct> propertiesMap(Message jms) throws JMSException {
+    public static Map<String, Struct> propertiesMap(Message jms) throws JMSException {
         log.trace("Entry {}.propertiesMap", JmsMessage.class.getName());
         final Map<String, Struct> result = new HashMap<>();
         final Enumeration<?> names = jms.getPropertyNames();
@@ -180,12 +213,13 @@ public class JmsMessage {
      */
     public Struct toJmsMessageStructV1() {
         log.trace("Entry {}.toJmsMessageStructV1", this.getClass().getName());
-        final Struct result = new Struct(SCHEMA_JMSMESSAGE_V1).put("messageType", this.messageType)
-                .put("messageId", this.messageId).put("correlationId", this.correlationId)
-                .put("priority", this.priority).put("expiration", this.expiration)
-                .put("timestamp", this.timestamp).put("redelivered", this.redelivered)
-                .put("properties", this.properties).put("deliveryMode", this.deliveryMode)
-                .put("type", this.type).put("retry_count", this.retryCount);
+        final Struct result = new Struct(SCHEMA_JMSMESSAGE_V1)
+                .put("jmsMessageType", this.messageType).put("jmsMessageId", this.messageId)
+                .put("jmsCorrelationId", this.correlationId).put("jmsPriority", this.priority)
+                .put("jmsExpiration", this.expiration).put("jmsTimestamp", this.timestamp)
+                .put("jmsRedelivered", this.redelivered).put("jmsProperties", this.properties)
+                .put("jmsDeliveryMode", this.deliveryMode).put("jmsType", this.type)
+                .put("jmsRetry_count", this.retryCount);
         if (payloadText != null) {
             result.put("payloadText", payloadText);
         }
@@ -196,10 +230,10 @@ public class JmsMessage {
             result.put("payloadBytes", payloadBytes);
         }
         if (destination != null) {
-            result.put("destination", destination.toJmsDestinationStructV1());
+            result.put("jmsDestination", destination.toJmsDestinationStructV1());
         }
         if (replyTo != null) {
-            result.put("replyTo", replyTo.toJmsDestinationStructV1());
+            result.put("jmsReplyTo", replyTo.toJmsDestinationStructV1());
         }
         log.trace("[{}] Exit {}.toJmsMessageStructV1", Thread.currentThread().getId(),
                 this.getClass().getName());

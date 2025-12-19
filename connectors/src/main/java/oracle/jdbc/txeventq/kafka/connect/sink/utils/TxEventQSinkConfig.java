@@ -46,12 +46,22 @@ public class TxEventQSinkConfig extends AbstractConfig {
     private static final String DATABASE_TNSNAMES_DISPLAY = "tnsnames.path";
 
     public static final String TXEVENTQ_QUEUE_NAME = "txeventq.queue.name";
-    public static final String TXEVENTQ_QUEUE_NAME_DOC = "The name of the TxEventQ queue where the connector writes all records that are read from the Kafka broker.";
-    public static final String TXEVENTQ_QUEUE_NAME_DISPLAY = "txeventq.queue.name";
+    private static final String TXEVENTQ_QUEUE_NAME_DOC = "The name of the TxEventQ queue where the connector writes all records that are read from the Kafka broker.";
+    private static final String TXEVENTQ_QUEUE_NAME_DISPLAY = "txeventq.queue.name";
 
     public static final String TXEVENTQ_QUEUE_SCHEMA = "txeventq.queue.schema";
-    public static final String TXEVENTQ_QUEUE_SCHEMA_DOC = "The name of the schema for the TxEventQ queue.";
-    public static final String TXEVENTQ_QUEUE_SCHEMA_DISPLAY = "txeventq.queue.schema";
+    private static final String TXEVENTQ_QUEUE_SCHEMA_DOC = "The name of the schema for the TxEventQ queue.";
+    private static final String TXEVENTQ_QUEUE_SCHEMA_DISPLAY = "txeventq.queue.schema";
+
+    public static final String TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_HEADERS = "txeventq.jms.bytes.include.kafka.headers";
+    private static final String TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_HEADERS_DOC = "Indicates if the JMS Bytes message should process headers from Kafka. The default value will be false and headers will not be processed.";
+    private static final String TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_HEADERS_DISPLAY = "txeventq.jms.bytes.include.kafka.headers";
+    public static final boolean TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_HEADERS_DEFAULT = false;
+
+    public static final String TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_METADATA = "txeventq.jms.bytes.include.kafka.metadata";
+    private static final String TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_METADATA_DOC = "Indicates if the JMS Bytes message should process Kafka metadata Kafka topic name, Kafka partition, Kafka offset, and Kafka timestamp. The default value will be false.";
+    private static final String TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_METADATA_DISPLAY = "txeventq.jms.bytes.include.kafka.metadata";
+    public static final boolean TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_METADATA_DEFAULT = false;
 
     // Kafka Configuration
     public static final String KAFKA_TOPIC = "topics";
@@ -102,11 +112,21 @@ public class TxEventQSinkConfig extends AbstractConfig {
                 TXEVENTQ_QUEUE_NAME_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM,
                 TXEVENTQ_QUEUE_NAME_DISPLAY);
 
+        configDef.define(TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_HEADERS, ConfigDef.Type.BOOLEAN,
+                TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_HEADERS_DEFAULT, ConfigDef.Importance.LOW,
+                TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_HEADERS_DOC, groupName, ++orderInGroup,
+                ConfigDef.Width.MEDIUM, TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_HEADERS_DISPLAY);
+
+        configDef.define(TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_METADATA, ConfigDef.Type.BOOLEAN,
+                TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_METADATA_DEFAULT, ConfigDef.Importance.LOW,
+                TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_METADATA_DOC, groupName, ++orderInGroup,
+                ConfigDef.Width.MEDIUM, TXEVENTQ_QUEUE_JMS_BYTES_INCLUDE_KAFKA_METADATA_DISPLAY);
+
         // KAFKA Group Configurations
         groupName = "kafka";
         orderInGroup = 0;
 
-        configDef.define(KAFKA_TOPIC, ConfigDef.Type.STRING, "", ConfigDef.Importance.HIGH,
+        configDef.define(KAFKA_TOPIC, ConfigDef.Type.LIST, "", ConfigDef.Importance.HIGH,
                 KAFKA_TOPIC_DOC, groupName, ++orderInGroup, ConfigDef.Width.LONG,
                 KAFKA_TOPIC_DISPLAY);
         configDef.define(KAFKA_CONNECT_NAME, ConfigDef.Type.STRING, "", ConfigDef.Importance.HIGH,

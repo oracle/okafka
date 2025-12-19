@@ -1,0 +1,2 @@
+WALLET_LOCATION = (SOURCE = (METHOD = FILE) (METHOD_DATA = (DIRECTORY = /etc/kafka-connect/custom-plugins/wallets)))
+NAMES.DIRECTORY_PATH = (TNSNAMES)

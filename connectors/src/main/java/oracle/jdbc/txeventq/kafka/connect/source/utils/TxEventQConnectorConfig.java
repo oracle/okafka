@@ -1,7 +1,7 @@
 /*
 ** Kafka Connect for TxEventQ.
 **
-** Copyright (c) 2023, 2024 Oracle and/or its affiliates.
+** Copyright (c) 2024, 2025 Oracle and/or its affiliates.
 ** Licensed under the Universal Permissive License v 1.0 as shown at https://oss.oracle.com/licenses/upl.
 */
 
@@ -85,6 +85,14 @@ public class TxEventQConnectorConfig extends AbstractConfig {
     private static final String KAFKA_CONNECT_TASK_ID_DOC = "";
     private static final String KAFKA_CONNECT_TASK_ID_DISPLAY = "";
 
+    public static final String KAFKA_HEADER_DENYLIST_CONFIG = "header.denylist";
+    private static final String KAFKA_HEADER_DENYLIST_DISPLAY = "Header Deny List";
+    private static final String KAFKA_HEADER_DENYLIST_DOC = "List of Header values to exclude when consuming messages from TxEventQ into Kafka topic.";
+
+    public static final String KAFKA_HEADER_JMS_ALLOWLIST_CONFIG = "header.jms.allowlist";
+    private static final String KAFKA_HEADER_JMS_ALLOWLIST_DISPLAY = "Header JMS Allow List";
+    private static final String KAFKA_HEADER_JMS_ALLOWLIST_DOC = "List of JMS Message properties to add to the Kafka Header values when consuming messages from TxEventQ into Kafka topic.";
+
     public static final String TASK_MAX_CONFIG = "tasks.max";
     private static final String TASK_MAX_DISPLAY = "Tasks Max";
     private static final String TASK_MAX_DOC = "Maximum number of tasks to use for this connector.";
@@ -152,13 +160,13 @@ public class TxEventQConnectorConfig extends AbstractConfig {
                 ConfigDef.Width.MEDIUM, TXEVENTQ_SUBSCRIBER_DISPLAY);
 
         configDef.define(TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_CONFIG, ConfigDef.Type.BOOLEAN,
-                TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_DEFAULT, ConfigDef.Importance.MEDIUM,
+                TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_DEFAULT, ConfigDef.Importance.LOW,
                 TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_DOC, groupName, ++orderInGroup,
                 ConfigDef.Width.MEDIUM, TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_DISPLAY);
 
         configDef.define(TXEVENTQ_BATCH_SIZE_CONFIG, ConfigDef.Type.INT,
                 TXEVENTQ_BATCH_SIZE_DEFAULT, ConfigDef.Range.atLeast(TXEVENTQ_BATCH_SIZE_MINIMUM),
-                ConfigDef.Importance.MEDIUM, TXEVENTQ_BATCH_SIZE_DOC, groupName, ++orderInGroup,
+                ConfigDef.Importance.LOW, TXEVENTQ_BATCH_SIZE_DOC, groupName, ++orderInGroup,
                 ConfigDef.Width.MEDIUM, TXEVENTQ_BATCH_SIZE_DISPLAY);
 
         // KAFKA Group Configurations
@@ -194,6 +202,14 @@ public class TxEventQConnectorConfig extends AbstractConfig {
                 USE_SCHEMA_FOR_JMS_MESSAGES_DEFAULT, ConfigDef.Importance.LOW,
                 USE_SCHEMA_FOR_JMS_MESSAGES_DOC, groupName, ++orderInGroup, ConfigDef.Width.MEDIUM,
                 USE_SCHEMA_FOR_JMS_MESSAGES_DISPLAY);
+
+        configDef.define(KAFKA_HEADER_DENYLIST_CONFIG, ConfigDef.Type.LIST, "",
+                ConfigDef.Importance.LOW, KAFKA_HEADER_DENYLIST_DOC, groupName, ++orderInGroup,
+                ConfigDef.Width.LONG, KAFKA_HEADER_DENYLIST_DISPLAY);
+
+        configDef.define(KAFKA_HEADER_JMS_ALLOWLIST_CONFIG, ConfigDef.Type.LIST, "",
+                ConfigDef.Importance.LOW, KAFKA_HEADER_JMS_ALLOWLIST_DOC, groupName, ++orderInGroup,
+                ConfigDef.Width.LONG, KAFKA_HEADER_JMS_ALLOWLIST_DISPLAY);
 
         return configDef;
     }

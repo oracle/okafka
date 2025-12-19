@@ -1,0 +1,16 @@
+{
+  "name": "txeventq-sampleTxeventQ-sink",
+  "config": {
+    "connector.class": "oracle.jdbc.txeventq.kafka.connect.sink.TxEventQSinkConnector",
+    "tasks.max": "3",
+    "topics": "SampleTxEventQForSink",
+    "wallet.path": "/etc/kafka-connect/custom-plugins/wallets/freedb",
+    "tnsnames.path": "/etc/kafka-connect/custom-plugins/wallets",
+    "db_tns_alias": "FREEPDB1",
+    "txeventq.queue.name": "TXEVENTQ_FOR_CONNECTORS",
+    "txeventq.queue.schema": "TXEVENTQ_ADMIN",
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "bootstrap.servers": "kafka:9092"
+  }
+}

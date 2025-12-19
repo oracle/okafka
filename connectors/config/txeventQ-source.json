@@ -1,0 +1,19 @@
+{
+	"name": "TxEventQ-source",
+	"config": {
+        		"connector.class": "oracle.jdbc.txeventq.kafka.connect.source.TxEventQSourceConnector",
+        		"tasks.max": "1",
+        		"kafka.topic": "<name of kafka topic>",
+        		"value.converter": "org.apache.kafka.connect.json.JsonConverter",
+        		"key.converter": "org.apache.kafka.connect.json.JsonConverter",
+        		"key.converter.schemas.enable": false,
+        		"value.converter.schemas.enable": false,
+        		"db_tns_alias": "<TNS alias name for the database to connect>",
+        		"wallet.path": "<path to the Oracle wallet>",
+        		"tnsnames.path": "<path to the tnsnames.ora>",
+        		"txeventq.queue.name": "<name of TxEventQ to consume data from>",
+        		"txeventq.subscriber": "<subscriber for the TxEventQ>",
+        		"bootstrap.servers": "localhost:9092",
+        		"batch.size": "10"
+	}
+ }
