@@ -6,7 +6,7 @@
 
     <groupId>com.oracle.database.messaging</groupId>
     <artifactId>txeventq-connector</artifactId>
-    <version>23.26.0.25.12</version>
+    <version>23.26.1.26.01</version>
 
     <packaging>jar</packaging>
 
@@ -49,8 +49,8 @@
         <logback.version>1.4.14</logback.version>
         <oracle-db-messaging.version>23.8.0.0</oracle-db-messaging.version>
         <oracle-jdbc.version>23.26.0.0.0</oracle-jdbc.version>
-        <oracle.database.security.version>21.20.0.0</oracle.database.security.version>
-        <jms.version>2.0.1</jms.version>
+        <oracle.database.security.version>23.26.0.0.0</oracle.database.security.version>
+        <jms.version>3.1.0</jms.version>
         <kafka.version>4.1.0</kafka.version>
     </properties>
 
@@ -77,32 +77,22 @@
         <dependency>
             <groupId>com.oracle.database.security</groupId>
             <artifactId>oraclepki</artifactId>
-            <version>23.26.0.0.0</version>
-        </dependency>
-        <dependency>
-            <groupId>com.oracle.database.security</groupId>
-            <artifactId>osdt_core</artifactId>
-            <version>${oracle.database.security.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.oracle.database.security</groupId>
-            <artifactId>osdt_cert</artifactId>
             <version>${oracle.database.security.version}</version>
         </dependency>
         <dependency>
     	    <groupId>com.oracle.database.messaging</groupId>
-    	    <artifactId>aqapi</artifactId>
+    	    <artifactId>aqapi-jakarta</artifactId>
     	    <version>${oracle-db-messaging.version}</version>
-	</dependency>
+		</dependency>
         <dependency>
-            <groupId>javax.jms</groupId>
-            <artifactId>javax.jms-api</artifactId>
-            <version>${jms.version}</version>
+            <groupId>jakarta.jms</groupId>
+    	    <artifactId>jakarta.jms-api</artifactId>
+    	    <version>${jms.version}</version>
         </dependency>
         <dependency>
-            <groupId>javax.transaction</groupId>
-            <artifactId>jta</artifactId>
-            <version>1.1</version>
+            <groupId>jakarta.transaction</groupId>
+    		<artifactId>jakarta.transaction-api</artifactId>
+    		<version>2.0.1</version>
         </dependency>
     </dependencies>
 
@@ -146,7 +136,7 @@
                         </goals>
                         <configuration>
                      <includeGroupIds>
-                     com.oracle.database.jdbc, com.oracle.database.security,javax.jms, javax.transaction, com.oracle.database.messaging,ch.qos.logback 
+                     com.oracle.database.jdbc, com.oracle.database.security,jakarta.jms, jakarta.transaction, com.oracle.database.messaging,ch.qos.logback 
                      </includeGroupIds>
                             <outputDirectory>${project.build.directory}/libs</outputDirectory>
                             <overWriteReleases>false</overWriteReleases>

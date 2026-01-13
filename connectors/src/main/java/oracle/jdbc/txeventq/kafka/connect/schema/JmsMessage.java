@@ -29,20 +29,19 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.jms.BytesMessage;
-import javax.jms.JMSException;
-import javax.jms.MapMessage;
-import javax.jms.Message;
-import javax.jms.TextMessage;
-
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import oracle.jms.AQjmsBytesMessage;
-import oracle.jms.AQjmsMessage;
+import jakarta.jms.BytesMessage;
+import jakarta.jms.JMSException;
+import jakarta.jms.MapMessage;
+import jakarta.jms.Message;
+import jakarta.jms.TextMessage;
+import oracle.jakarta.jms.AQjmsBytesMessage;
+import oracle.jakarta.jms.AQjmsMessage;
 
 public class JmsMessage {
     protected static final Logger log = LoggerFactory.getLogger(JmsMessage.class);

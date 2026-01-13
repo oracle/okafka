@@ -106,16 +106,22 @@ public class TxEventQSourceTask extends SourceTask {
 
         this.consumer.connect();
 
-        int kafkaPartitionNum = this.consumer.getKafkaTopicPartitionSize(
-                this.config.getString(TxEventQConnectorConfig.KAFKA_TOPIC));
-        int txEventQShardNum = this.consumer.getNumOfShardsForQueue(
-                this.config.getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME));
+        if (Boolean.TRUE.equals(this.config.getBoolean(
+                TxEventQConnectorConfig.TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_CONFIG))) {
+            int kafkaPartitionNum = this.consumer.getKafkaTopicPartitionSize(
+                    this.config.getString(TxEventQConnectorConfig.KAFKA_TOPIC), properties);
+            int txEventQShardNum = this.consumer.getNumOfShardsForQueue(
+                    this.config.getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME));
 
-        if (this.config
-                .getBoolean(TxEventQConnectorConfig.TXEVENTQ_MAP_SHARD_TO_KAFKA_PARTITION_CONFIG)
-                && kafkaPartitionNum < txEventQShardNum) {
-            throw new ConnectException("The number of Kafka partitions " + kafkaPartitionNum
-                    + " must be greater than or equal to " + txEventQShardNum);
+            if (kafkaPartitionNum < txEventQShardNum) {
+                throw new ConnectException("Kafka partition for Kafka topic "
+                        + this.config.getString(TxEventQConnectorConfig.KAFKA_TOPIC)
+                        + " with current patition size of " + kafkaPartitionNum
+                        + " must be greater than or equal to transactional event stream size of "
+                        + txEventQShardNum + " for queue "
+                        + this.config.getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME));
+
+            }
         }
 
         log.trace("[{}] Exit {}.start", this.consumer.getDatabaseConnection(),

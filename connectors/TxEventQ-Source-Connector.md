@@ -34,9 +34,9 @@ The connector supports multiple JMS message types including `BytesMessage`, `Tex
 
 The connector can use built-in schemas for JMS messages, providing structured data representation in JSON format. This enables better integration with schema-aware systems and tools.
 
-### Shard to partition mapping
+### Event-Stream to partition mapping
 
-The connector can map messages from TxEventQ shards to respective Kafka partitions, maintaining ordering within shards when required.
+The connector can map messages from TxEventQ event-streams to respective Kafka partitions, maintaining ordering within event-streams when required.
 
 ## Installation and Setup
 
@@ -99,6 +99,63 @@ A list of host/port pairs used to establish the initial connection to the Kafka 
 * Type: list
 * Importance: high
 
+`sasl.jaas.config`
+
+JAAS login context parameters for SASL connections in the format used by JAAS configuration files. JAAS configuration file format is described [here](https://docs.oracle.com/javase/8/docs/technotes/guides/security/jgss/tutorials/LoginConfigFile.html). The format for the value is: loginModuleClass controlFlag (optionName=optionValue)*;. For brokers, the config must be prefixed with listener prefix and SASL mechanism name in lower-case. For example, listener.name.sasl_ssl.scram-sha-256.sasl.jaas.config=com.example.ScramLoginModule required;
+
+* Type: password
+* Default: null
+* Importance: medium
+
+`sasl.mechanism`
+
+SASL mechanism used for client connections. This may be any mechanism for which a security provider is available. GSSAPI is the default mechanism.
+
+* Type: string
+* Default: GSSAPI
+* Importance: medium
+
+`security.protocol`
+
+Protocol used to communicate with brokers.
+
+* Type: string
+* Default: PLAINTEXT
+* Valid Values: (case insensitive) [SASL_SSL, PLAINTEXT, SSL, SASL_PLAINTEXT]
+* Importance: medium
+
+`ssl.keystore.location`
+
+The location of the key store file. This is optional for client and can be used for two-way authentication for client.
+
+* Type: string
+* Default: null
+* Importance: high
+
+`ssl.keystore.password`
+
+The store password for the key store file. This is optional for client and only needed if ‘ssl.keystore.location’ is configured. Key store password is not supported for PEM format.
+
+* Type: password
+* Default: null
+* Importance: high
+
+`ssl.truststore.location`
+
+The location of the trust store file.
+
+* Type: string
+* Default: null
+* Importance: high
+
+`ssl.truststore.password`
+
+The password for the trust store file. If a password is not set, trust store file configured will still be used, but integrity checking is disabled. Trust store password is not supported for PEM format.
+
+* Type: password
+* Default: null
+* Importance: high
+
 ## Oracle Database Connection
 
 `wallet.path`
@@ -149,7 +206,7 @@ The maximum number of records to dequeue from the Oracle Transactional Event Que
 
 `txeventq.map.shard.to.kafka_partition`
 
-If `true`, maps each TxEventQ shard to a corresponding Kafka partition, preserving ordering within shards. Requires `STICKY_DEQUEUE=1` on the queue and Kafka topic partitions >= queue shards. If `false`, partition assignment uses message key or round-robin.
+If `true`, maps each TxEventQ event-stream to a corresponding Kafka partition, preserving ordering within event-streams. Requires `STICKY_DEQUEUE=1` on the queue and Kafka topic partitions >= queue event-streams. If `false`, partition assignment uses message key or sticky partitioning.
 
 * Type: boolean
 * Default: false
@@ -306,8 +363,8 @@ For general best practices on queue configuration, Oracle Database setup, and pe
 ### Source Connector-Specific Best Practices
 
 * **Configure tasks.max based on database version and STICKY_DEQUEUE**:
-  * For Oracle Database 23.4+: You can set `tasks.max` flexibly based on throughput requirements and number of shards
-  * For Oracle Database < 23.4 with `STICKY_DEQUEUE=1`: You must set `tasks.max` equal to `SHARD_NUM` to ensure all shards are processed. If `tasks.max` is not equal to `SHARD_NUM`, some shards will not be dequeued.
+  * For Oracle Database 23.4+: You can set `tasks.max` flexibly based on throughput requirements and number of event-streams
+  * For Oracle Database < 23.4 with `STICKY_DEQUEUE=1`: You must set `tasks.max` equal to `SHARD_NUM` to ensure all event-streams are processed. If `tasks.max` is not equal to `SHARD_NUM`, some event-streams will not be dequeued.
 
 * **Configure subscriber correctly**: Ensure the subscriber specified in `txeventq.subscriber` exists and is properly configured for the queue. The subscriber must be added using `dbms_aqadm.add_subscriber()` before the connector can dequeue messages.
 
@@ -317,7 +374,7 @@ For general best practices on queue configuration, Oracle Database setup, and pe
 
 * **Use header denylist to filter metadata**: If the Sink Connector was used with `txeventq.jms.bytes.include.kafka.metadata=true`, Kafka metadata (KAFKA_TOPIC, KAFKA_PARTITION, KAFKA_OFFSET, KAFKA_TIMESTAMP) will be in the headers. Use `header.denylist` to exclude these if not needed.
 
-* **Enable shard-to-partition mapping for ordering**: Set `txeventq.map.shard.to.kafka_partition=true` when you need to maintain ordering within shards. This maps each TxEventQ shard to a corresponding Kafka partition, preserving order within each shard. Requires `STICKY_DEQUEUE=1` on the queue and Kafka topic partitions >= queue shards.
+* **Enable event-stream-to-partition mapping for ordering**: Set `txeventq.map.shard.to.kafka_partition=true` when you need to maintain ordering within event-streams. This maps each TxEventQ event-stream to a corresponding Kafka partition, preserving order within each event-stream. Requires `STICKY_DEQUEUE=1` on the queue and Kafka topic partitions >= queue event-streams.
 
 * **Configure batch size appropriately**: The default `txeventq.batch.size` of 250 is a good starting point. Increase for higher throughput (if the database can handle it), decrease for lower latency. Larger batches improve throughput but increase memory usage and latency.
 
@@ -437,7 +494,7 @@ For common setup issues (installation, database connection, queue setup), see th
 * Verify user has `EXECUTE` on `dbms_aqjms`
 * Check `txeventq.queue.name` and `txeventq.subscriber` values
 
-**Not all shards being processed (Database < 23.4)**
+**Not all event-streams being processed (Database < 23.4)**
 * When `STICKY_DEQUEUE=1`, set `tasks.max` equal to `SHARD_NUM`
 
 **Messages not appearing in Kafka topic**

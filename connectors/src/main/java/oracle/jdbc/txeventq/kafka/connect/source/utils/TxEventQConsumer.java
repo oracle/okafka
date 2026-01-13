@@ -44,15 +44,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.Session;
-import javax.jms.Topic;
-import javax.jms.TopicConnection;
-import javax.jms.TopicConnectionFactory;
-import javax.jms.TopicSession;
-import javax.jms.TopicSubscriber;
-
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.TopicDescription;
@@ -63,7 +54,24 @@ import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import oracle.AQ.AQOracleSQLException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import jakarta.jms.JMSException;
+import jakarta.jms.Message;
+import jakarta.jms.Session;
+import jakarta.jms.Topic;
+import jakarta.jms.TopicConnection;
+import jakarta.jms.TopicConnectionFactory;
+import jakarta.jms.TopicSession;
+import jakarta.jms.TopicSubscriber;
+import oracle.jakarta.AQ.AQOracleSQLException;
+import oracle.jakarta.jms.AQjmsBytesMessage;
+import oracle.jakarta.jms.AQjmsConsumer;
+import oracle.jakarta.jms.AQjmsFactory;
+import oracle.jakarta.jms.AQjmsMapMessage;
+import oracle.jakarta.jms.AQjmsMessage;
+import oracle.jakarta.jms.AQjmsSession;
+import oracle.jakarta.jms.AQjmsTextMessage;
 import oracle.jdbc.OracleConnection;
 import oracle.jdbc.aq.AQDequeueOptions;
 import oracle.jdbc.aq.AQMessage;
@@ -71,13 +79,6 @@ import oracle.jdbc.txeventq.kafka.connect.common.utils.Constants;
 import oracle.jdbc.txeventq.kafka.connect.common.utils.MessageUtils;
 import oracle.jdbc.txeventq.kafka.connect.schema.JmsMessage;
 import oracle.jdbc.txeventq.kafka.connect.schema.Key;
-import oracle.jms.AQjmsBytesMessage;
-import oracle.jms.AQjmsConsumer;
-import oracle.jms.AQjmsFactory;
-import oracle.jms.AQjmsMapMessage;
-import oracle.jms.AQjmsMessage;
-import oracle.jms.AQjmsSession;
-import oracle.jms.AQjmsTextMessage;
 import oracle.sql.RAW;
 import oracle.sql.json.OracleJsonDatum;
 
@@ -116,6 +117,7 @@ public class TxEventQConsumer implements Closeable {
     private int databaseMinorVersion = 0;
     private List<String> denylistedHeaders;
     private List<String> allowlistedJmsHeaders;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     public TxEventQConsumer(TxEventQConnectorConfig config) {
         this.config = config;
@@ -405,7 +407,25 @@ public class TxEventQConsumer implements Closeable {
             throw new SQLException("Message Id for JSON message is null.");
         }
 
+        // Get the Oracle binary datum
         OracleJsonDatum jsonPayload = msg.getJSONPayload();
+
+        // Use toJdbc() to get the standard Java representation (String or Map)
+        // In 23ai/26, this typically returns the JSON text String or an OracleJsonObject
+        Object jdbcValue = jsonPayload.toJdbc();
+        String jsonString = (jdbcValue != null) ? jdbcValue.toString() : "{}";
+
+        log.debug("The processed Json Payload value: {}", jsonString);
+
+        // Deserialize to Map for a clean JSON Object in Kafka
+        Object finalValue;
+        try {
+            finalValue = OBJECT_MAPPER.readValue(jsonString, Map.class);
+        } catch (Exception e) {
+            log.error("Failed to parse Oracle JSON datum to Map: {}", e.getMessage());
+            finalValue = jsonString; // Fallback to string if parsing fails
+        }
+
         String msgIdStr = byteArrayToHex(msgId);
         String correlationId = msg.getMessageProperties().getCorrelation();
         int shardNum = getShardId(msgIdStr);
@@ -415,9 +435,10 @@ public class TxEventQConsumer implements Closeable {
                 msgIdStr, shardNum);
 
         log.trace("[{}] Exit {}.processJsonPayload", this.conn, this.getClass().getName());
+
         return new TxEventQSourceRecord(null, null, kafkaTopic,
                 this.mapShardToKafkaPartition ? shardNum / 2 : null, null, correlationId, null,
-                jsonPayload.getBytes(), TxEventQSourceRecord.PayloadType.JSON, msgId);
+                finalValue, TxEventQSourceRecord.PayloadType.JSON, msgId);
     }
 
     /**
@@ -529,7 +550,6 @@ public class TxEventQConsumer implements Closeable {
     public List<SourceRecord> receiveJsonAQMessages(String queueType, int batchSize) {
         log.trace("[{}]  Entry {}.receiveJsonAQMessage", this.conn, this.getClass().getName());
         AQDequeueOptions deqopt = new AQDequeueOptions();
-        int msgCount = 0;
 
         deqopt.setRetrieveMessageId(true);
         try {
@@ -545,7 +565,7 @@ public class TxEventQConsumer implements Closeable {
             return Collections.emptyList();
         }
 
-        AQMessage msg = null;
+        AQMessage[] msg = null;
         byte[] msgId = new byte[0];
         List<SourceRecord> records = new ArrayList<>();
         SourceRecord sr = null;
@@ -553,22 +573,20 @@ public class TxEventQConsumer implements Closeable {
         try {
             String txEventQTopic = this.config
                     .getString(TxEventQConnectorConfig.TXEVENTQ_QUEUE_NAME);
-            do {
-                if (this.conn != null) {
-                    msg = this.conn.dequeue(txEventQTopic, deqopt, queueType);
 
-                    if (msg != null) {
-                        inflight = true;
+            if (this.conn != null) {
+                msg = this.conn.dequeue(txEventQTopic, deqopt, queueType, batchSize);
 
-                        msgId = msg.getMessageId();
-                        sr = processJsonPayload(msgId, msg);
+                if (msg != null && msg.length != 0) {
+                    inflight = true;
+                    for (int i = 0; i < msg.length; i++) {
+
+                        msgId = msg[i].getMessageId();
+                        sr = processJsonPayload(msgId, msg[i]);
                         records.add(sr);
-                        msgCount++;
-
                     }
                 }
-            } while (msg != null && msgCount < batchSize);
-
+            }
         } catch (SQLException ex) {
             handleException(ex);
             records.clear();
@@ -1013,13 +1031,53 @@ public class TxEventQConsumer implements Closeable {
      * Gets the partition size for the specified Kafka topic.
      * 
      * @param topic The Kafka topic to get the partition size for.
+     * @param props configuration properties
      * @return The size of the partition for the specified topic.
      */
-    public int getKafkaTopicPartitionSize(String topic) {
+    public int getKafkaTopicPartitionSize(String topic, Map<String, String> props) {
         log.trace("[{}] Entry {}.getKafkaTopicPartitionSize", this.conn, this.getClass().getName());
+        log.debug(
+                "Getting partition size for Kafka topic {} and configuration properties specified: {}",
+                topic, props);
         Properties properties = new Properties();
         properties.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
                 this.config.getList(TxEventQConnectorConfig.BOOTSTRAP_SERVERS_CONFIG));
+
+        if (props.get("security.protocol") != null) {
+            log.debug("Adding property:security.protocol");
+            properties.put("security.protocol", props.get("security.protocol"));
+        }
+
+        if (props.get("sasl.mechanism") != null) {
+            log.debug("Adding property: sasl.mechanism");
+            properties.put("sasl.mechanism", props.get("sasl.mechanism"));
+        }
+
+        if (props.get("sasl.jaas.config") != null) {
+            log.debug("Adding property:sasl.jaas.config");
+            properties.put("sasl.jaas.config", props.get("sasl.jaas.config"));
+        }
+
+        if (props.get("ssl.keystore.location") != null) {
+            log.debug("Adding property:ssl.keystore.location");
+            properties.put("ssl.keystore.location", props.get("ssl.keystore.location"));
+        }
+
+        if (props.get("ssl.keystore.password") != null) {
+            log.debug("Adding property:ssl.keystore.password");
+            properties.put("ssl.keystore.location", props.get("ssl.keystore.password"));
+        }
+
+        if (props.get("ssl.truststore.location") != null) {
+            log.debug("Adding property:ssl.truststore.location");
+            properties.put("ssl.keystore.location", props.get("ssl.truststore.location"));
+        }
+
+        if (props.get("ssl.truststore.password") != null) {
+            log.debug("Adding property:ssl.truststore.password");
+            properties.put("ssl.keystore.location", props.get("ssl.truststore.password"));
+        }
+
         Map<String, TopicDescription> kafkaTopic;
         int partitionSize = 0;
         try (AdminClient adminClient = AdminClient.create(properties);) {

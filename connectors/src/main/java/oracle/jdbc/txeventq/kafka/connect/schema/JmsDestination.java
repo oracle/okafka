@@ -26,15 +26,14 @@ package oracle.jdbc.txeventq.kafka.connect.schema;
 
 import java.sql.SQLException;
 
-import javax.jms.Destination;
-import javax.jms.JMSException;
-
 import org.apache.kafka.connect.data.Schema;
 import org.apache.kafka.connect.data.SchemaBuilder;
 import org.apache.kafka.connect.data.Struct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jakarta.jms.Destination;
+import jakarta.jms.JMSException;
 import oracle.jdbc.txeventq.kafka.connect.common.utils.JmsUtils;
 
 public class JmsDestination {
