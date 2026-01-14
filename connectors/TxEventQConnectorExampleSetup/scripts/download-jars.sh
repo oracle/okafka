@@ -12,11 +12,11 @@ set -e
 # Just change the version number - everything else is automatic!
 
 # Standard Maven Central JARs
-JAVAX_JMS_VERSION="3.1.0"
-JTA_VERSION="2.0.1"
+JAKARTA_JMS_VERSION="3.1.0"
+JAKARTA_TRANSACTION_VERSION="2.0.1"
 
 # Oracle JARs (available on Maven Central)
-AQAPI_VERSION="23.8.0.0"
+AQAPI_JAKARTA_VERSION="23.8.0.0"
 OJDBC_VERSION="23.26.0.0.0"
 ORACLEPKI_VERSION="23.26.0.0.0"
 
@@ -32,15 +32,15 @@ PROMETHEUS_JMX_EXPORTER_VERSION="1.0.1"
 # JAR definitions with group/artifact info (rarely changes)
 
 # Standard Maven Central JARs
-JAVAX_JMS_GROUP="jakarta.jms"
-JAVAX_JMS_ARTIFACT="jakarta.jms-api"
+JAKARTA_JMS_GROUP="jakarta.jms"
+JAKARTA_JMS_ARTIFACT="jakarta.jms-api"
 
-JTA_GROUP="jakarta.transaction"
-JTA_ARTIFACT="jakarta.transaction-api"
+JAKARTA_TRANSACTION_GROUP="jakarta.transaction"
+JAKARTA_TRANSACTION_ARTIFACT="jakarta.transaction-api"
 
 # Oracle JARs (available on Maven Central)
-AQAPI_GROUP="com.oracle.database.messaging"
-AQAPI_ARTIFACT="aqapi-jakarta"
+AQAPI_JAKARTA_GROUP="com.oracle.database.messaging"
+AQAPI_JAKARTA_ARTIFACT="aqapi-jakarta"
 
 OJDBC_GROUP="com.oracle.database.jdbc"
 OJDBC_ARTIFACT="ojdbc11"
@@ -155,18 +155,18 @@ check_and_download() {
 # Download JARs using configuration variables
 echo "Starting JAR download process..."
 echo "Configuration loaded:"
-echo "  - JMS API: $JAVAX_JMS_VERSION"
-echo "  - JTA: $JTA_VERSION"
-echo "  - AQAPI: $AQAPI_VERSION"
+echo "  - Jakarta JMS API: $JAKARTA_JMS_VERSION"
+echo "  - Jakarta Transaction: $JAKARTA_TRANSACTION_VERSION"
+echo "  - AQAPI Jakarta: $AQAPI_JAKARTA_VERSION"
 echo "  - OJDBC: $OJDBC_VERSION"
 echo "  - Oracle PKI: $ORACLEPKI_VERSION"
 echo "  - TX EventQ Connector: $TXEVENTQ_CONNECTOR_VERSION"
 echo ""
 
 # Generate filenames automatically
-JAVAX_JMS_FILENAME=$(generate_filename "$JAVAX_JMS_ARTIFACT" "$JAVAX_JMS_VERSION")
-JTA_FILENAME=$(generate_filename "$JTA_ARTIFACT" "$JTA_VERSION")
-AQAPI_FILENAME=$(generate_filename "$AQAPI_ARTIFACT" "$AQAPI_VERSION")
+JAKARTA_JMS_FILENAME=$(generate_filename "$JAKARTA_JMS_ARTIFACT" "$JAKARTA_JMS_VERSION")
+JAKARTA_TRANSACTION_FILENAME=$(generate_filename "$JAKARTA_TRANSACTION_ARTIFACT" "$JAKARTA_TRANSACTION_VERSION")
+AQAPI_FILENAME=$(generate_filename "$AQAPI_JAKARTA_ARTIFACT" "$AQAPI_JAKARTA_VERSION")
 OJDBC_FILENAME=$(generate_filename "$OJDBC_ARTIFACT" "$OJDBC_VERSION")
 ORACLEPKI_FILENAME=$(generate_filename "$ORACLEPKI_ARTIFACT" "$ORACLEPKI_VERSION")
 TXEVENTQ_CONNECTOR_FILENAME=$(generate_filename "$TXEVENTQ_CONNECTOR_ARTIFACT" "$TXEVENTQ_CONNECTOR_VERSION")
@@ -178,9 +178,9 @@ check_and_download "shared/txeventq-connector/$TXEVENTQ_CONNECTOR_FILENAME" down
 
 # Download dependency JARs to libs folder
 echo "Downloading dependency JARs..."
-check_and_download "/shared/txeventq-connector/libs/$JAVAX_JMS_FILENAME" download_jar "$JAVAX_JMS_GROUP" "$JAVAX_JMS_ARTIFACT" "$JAVAX_JMS_VERSION" "/shared/txeventq-connector/libs/$JAVAX_JMS_FILENAME"
-check_and_download "/shared/txeventq-connector/libs/$JTA_FILENAME" download_jar "$JTA_GROUP" "$JTA_ARTIFACT" "$JTA_VERSION" "/shared/txeventq-connector/libs/$JTA_FILENAME"
-check_and_download "/shared/txeventq-connector/libs/$AQAPI_FILENAME" download_oracle_jar "$AQAPI_GROUP" "$AQAPI_ARTIFACT" "$AQAPI_VERSION" "/shared/txeventq-connector/libs/$AQAPI_FILENAME"
+check_and_download "/shared/txeventq-connector/libs/$JAKARTA_JMS_FILENAME" download_jar "$JAKARTA_JMS_GROUP" "$JAKARTA_JMS_ARTIFACT" "$JAKARTA_JMS_VERSION" "/shared/txeventq-connector/libs/$JAKARTA_JMS_FILENAME"
+check_and_download "/shared/txeventq-connector/libs/$JAKARTA_TRANSACTION_FILENAME" download_jar "$JAKARTA_TRANSACTION_GROUP" "$JAKARTA_TRANSACTION_ARTIFACT" "$JAKARTA_TRANSACTION_VERSION" "/shared/txeventq-connector/libs/$JAKARTA_TRANSACTION_FILENAME"
+check_and_download "/shared/txeventq-connector/libs/$AQAPI_FILENAME" download_oracle_jar "$AQAPI_JAKARTA_GROUP" "$AQAPI_JAKARTA_ARTIFACT" "$AQAPI_JAKARTA_VERSION" "/shared/txeventq-connector/libs/$AQAPI_FILENAME"
 check_and_download "/shared/txeventq-connector/libs/$OJDBC_FILENAME" download_oracle_jar "$OJDBC_GROUP" "$OJDBC_ARTIFACT" "$OJDBC_VERSION" "/shared/txeventq-connector/libs/$OJDBC_FILENAME"
 check_and_download "/shared/txeventq-connector/libs/$ORACLEPKI_FILENAME" download_oracle_jar "$ORACLEPKI_GROUP" "$ORACLEPKI_ARTIFACT" "$ORACLEPKI_VERSION" "/shared/txeventq-connector/libs/$ORACLEPKI_FILENAME"
 
@@ -210,7 +210,7 @@ else
 fi
 
 # Check dependency JARs
-for jar in "$JAVAX_JMS_FILENAME" "$JTA_FILENAME" "$AQAPI_FILENAME" "$OJDBC_FILENAME" "$ORACLEPKI_FILENAME"; do
+for jar in "$JAKARTA_JMS_FILENAME" "$JAKARTA_TRANSACTION_FILENAME" "$AQAPI_FILENAME" "$OJDBC_FILENAME" "$ORACLEPKI_FILENAME"; do
     if [ -f "/shared/txeventq-connector/libs/$jar" ]; then
         echo "✓ libs/$jar"
     else
