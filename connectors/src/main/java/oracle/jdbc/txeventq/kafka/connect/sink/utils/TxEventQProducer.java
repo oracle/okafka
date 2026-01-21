@@ -48,15 +48,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 
-import javax.jms.DeliveryMode;
-import javax.jms.JMSException;
-import javax.jms.MessageProducer;
-import javax.jms.Session;
-import javax.jms.Topic;
-import javax.jms.TopicConnection;
-import javax.jms.TopicConnectionFactory;
-import javax.jms.TopicSession;
-
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.ListTopicsOptions;
@@ -70,7 +61,19 @@ import org.apache.kafka.connect.sink.SinkRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import oracle.AQ.AQOracleSQLException;
+import jakarta.jms.DeliveryMode;
+import jakarta.jms.JMSException;
+import jakarta.jms.MessageProducer;
+import jakarta.jms.Session;
+import jakarta.jms.Topic;
+import jakarta.jms.TopicConnection;
+import jakarta.jms.TopicConnectionFactory;
+import jakarta.jms.TopicSession;
+import oracle.jakarta.AQ.AQOracleSQLException;
+import oracle.jakarta.jms.AQjmsBytesMessage;
+import oracle.jakarta.jms.AQjmsFactory;
+import oracle.jakarta.jms.AQjmsProducer;
+import oracle.jakarta.jms.AQjmsSession;
 import oracle.jdbc.OracleConnection;
 import oracle.jdbc.internal.JMSFactory;
 import oracle.jdbc.internal.JMSMessageProperties;
@@ -78,10 +81,6 @@ import oracle.jdbc.pool.OracleDataSource;
 import oracle.jdbc.txeventq.kafka.connect.common.utils.Constants;
 import oracle.jdbc.txeventq.kafka.connect.common.utils.MessageUtils;
 import oracle.jdbc.txeventq.kafka.connect.common.utils.Node;
-import oracle.jms.AQjmsBytesMessage;
-import oracle.jms.AQjmsFactory;
-import oracle.jms.AQjmsProducer;
-import oracle.jms.AQjmsSession;
 
 public class TxEventQProducer implements Closeable {
     protected static final Logger log = LoggerFactory.getLogger(TxEventQProducer.class);

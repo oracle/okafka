@@ -42,14 +42,11 @@ Download `txeventq-connector-<version>.jar` from the [Maven repository](https://
 3. If [Option B](#option-b-download-the-connector) was performed to get the connector jar then all the required dependencies below will need to be downloaded from the Maven repositories:
 	* `ojdbc11-<version>.jar` - [Oracle JDBC driver](https://mvnrepository.com/artifact/com.oracle.database.jdbc/ojdbc11)
 	* `oraclepki-<version>.jar` - [Oracle PKI library](https://mvnrepository.com/artifact/com.oracle.database.security/oraclepki)
-	* `oraclepki-<version>.jar` - [Oracle PKI library](https://mvnrepository.com/artifact/com.oracle.database.security/oraclepki)
-	* `osdt_core-<version>.jar` - [Oracle Security Developer Tools core](https://mvnrepository.com/artifact/com.oracle.database.security/osdt_core)
-	* `osdt_cert-<version>.jar` - [Oracle Security Developer Tools certificate](https://mvnrepository.com/artifact/com.oracle.database.security/osdt_cert)
-	* `aqapi-<version>.jar` - [Oracle Advanced Queuing API](https://mvnrepository.com/artifact/com.oracle.database.messaging/aqapi)
-	* `javax.jms-api-2.0.1.jar` - [JMS API (version 2.0.1)](https://mvnrepository.com/artifact/javax.jms/javax.jms-api/2.0.1)
-	* `jta-1.1.jar` - [Java Transaction API (version 1.1)](https://mvnrepository.com/artifact/javax.transaction/jta/1.1)
+	* `aqapi-jakarta-<version>.jar` - [Oracle Advanced Queuing API](https://mvnrepository.com/artifact/com.oracle.database.messaging/aqapi-jakarta)
+	* `jakarta.jms-api-<version>.jar` - [Jakarta Messaging API](https://mvnrepository.com/artifact/jakarta.jms/jakarta.jms-api)
+	* `jakarta.transaction-api-<version>.jar` - [Jakarta Transaction API](https://mvnrepository.com/artifact/jakarta.transaction/jakarta.transaction-api)
 	
-4. **Create plugin directory**: Create a directory with a descriptive name (e.g., `txeventq-connector-23.26.0.25.12`) and place all JAR files in this directory.
+4. **Create plugin directory**: Create a directory with a descriptive name (e.g., `txeventq-connector-23.26.1.26.01`) and place all JAR files in this directory.
 
 5. **Configure plugin path**: In your Kafka Connect worker configuration file (`connect-distributed.properties` or `connect-standalone.properties`), set the `plugin.path` property to point to the parent directory containing the connector folder:
 
@@ -63,15 +60,14 @@ Below is an example file structure for a directory-based plugin:
 
 ```text
 /usr/local/share/kafka/plugins/
-└── txeventq-connector-23.26.0.25.12/
-    ├── txeventq-connector-23.26.0.25.12.jar
-    ├── aqapi-23.8.0.0.jar
-    ├── javax.jms-api-2.0.1.jar
-    ├── jta-1.1.jar
+└── txeventq-connector-23.26.1.26.01/
+    ├── txeventq-connector-23.26.1.26.01.jar
+    ├── aqapi-jakarta-23.8.0.0.jar
+    ├── jakarta.jms-api-3.1.0.jar
+    ├── jakarta.transaction-api-2.0.1.jar
     ├── ojdbc11-23.26.0.0.0.jar
     ├── oraclepki-23.26.0.0.0.jar
-    ├── osdt_cert-21.20.0.0.jar
-    └── osdt_core-21.20.0.0.jar
+    
 ```
 
 **Note:** The TxEventQ Connector JAR file can be downloaded from the [Maven repository](https://mvnrepository.com/artifact/com.oracle.database.messaging/txeventq-connector) if you don't want to build the JAR. You will still need to get the additional JAR files mentioned above and place them in the same directory as the TxEventQ Connector JAR. The JAR files listed above can also be downloaded from Maven.

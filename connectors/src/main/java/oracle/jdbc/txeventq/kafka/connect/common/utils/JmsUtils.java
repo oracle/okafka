@@ -26,13 +26,12 @@ package oracle.jdbc.txeventq.kafka.connect.common.utils;
 
 import java.sql.SQLException;
 
-import javax.jms.Destination;
-import javax.jms.JMSException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import oracle.jms.AQjmsDestination;
+import jakarta.jms.Destination;
+import jakarta.jms.JMSException;
+import oracle.jakarta.jms.AQjmsDestination;
 
 public abstract class JmsUtils {
 
