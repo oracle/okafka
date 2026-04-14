@@ -393,7 +393,7 @@ public class FetchOffsets {
 			if (sequence == -1)
 				return -1;
 			long offset = subshard * MessageIdConverter.DEFAULT_SUBPARTITION_SIZE + sequence;
-			return offset;
+			return offset+1;
 
 		} catch (SQLException sqle) {
 			if (sqle.getErrorCode() == 1403) {

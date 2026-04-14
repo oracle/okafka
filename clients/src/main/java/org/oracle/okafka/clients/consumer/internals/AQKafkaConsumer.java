@@ -73,6 +73,10 @@ import org.oracle.okafka.common.requests.FetchRequest;
 import org.oracle.okafka.common.requests.FetchResponse;
 import org.oracle.okafka.common.requests.JoinGroupRequest;
 import org.oracle.okafka.common.requests.JoinGroupResponse;
+import org.oracle.okafka.common.requests.ListOffsetsRequest;
+import org.oracle.okafka.common.requests.ListOffsetsRequest.ListOffsetsPartition;
+import org.oracle.okafka.common.requests.ListOffsetsResponse;
+import org.oracle.okafka.common.requests.ListOffsetsResponse.ListOffsetsPartitionResponse;
 import org.oracle.okafka.common.requests.OffsetFetchRequest;
 import org.oracle.okafka.common.requests.OffsetFetchResponse;
 import org.oracle.okafka.common.requests.OffsetFetchResponse.PartitionOffsetData;
@@ -206,6 +210,8 @@ public final class AQKafkaConsumer extends AQClient{
 			return getMetadata(request);
 		case CONNECT_ME:
 			return connectMe(request);
+		case LIST_OFFSETS:
+			return listOffsets(request);
 		case OFFSET_FETCH:
 			return fetchOffsets(request);
 		}
@@ -1467,6 +1473,28 @@ public final class AQKafkaConsumer extends AQClient{
 
 		return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
 				request.createdTimeMs(), System.currentTimeMillis(), disconnected, null, null, offsetResponse);
+	}
+
+	private ClientResponse listOffsets(ClientRequest request) {
+		Connection jdbcConn = null;
+		TopicConsumers topicConsumer = null;
+
+		for (Node nodeNow : topicConsumersMap.keySet()) {
+			if (request.destination().equals("" + nodeNow.id())) {
+				topicConsumer = topicConsumersMap.get(nodeNow);
+				break;
+			}
+		}
+		try {
+			jdbcConn = topicConsumer.getDBConnection();
+			return getOffsetsResponse(request, jdbcConn);
+		} catch (Exception e) {
+			log.error("Exception while fetching offsets " + e.getMessage(), e);
+			ListOffsetsResponse offsetResponse = new ListOffsetsResponse(Collections.emptyMap());
+			offsetResponse.setException(e);
+			return new ClientResponse(request.makeHeader((short) 1), request.callback(), request.destination(),
+					request.createdTimeMs(), System.currentTimeMillis(), false, null, null, offsetResponse);
+		}
 	}
 
 	public ClientResponse connectMe(ClientRequest request)
