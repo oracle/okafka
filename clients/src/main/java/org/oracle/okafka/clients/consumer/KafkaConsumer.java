@@ -1548,20 +1548,17 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
-	/**
-	 * This method is not yet supported.
-	 */
 	@Override
 	public OffsetAndMetadata committed(TopicPartition partition) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+		return committed(partition, Duration.ofMillis(defaultApiTimeoutMs));
 	}
 
-	/**
-	 * This method is not yet supported.
-	 */
 	@Override
 	public OffsetAndMetadata committed(TopicPartition partition, final Duration timeout) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+		if (partition == null)
+			throw new IllegalArgumentException("TopicPartition cannot be null");
+		Map<TopicPartition, OffsetAndMetadata> offsets = committed(Collections.singleton(partition), timeout);
+		return offsets.get(partition);
 	}
 
 	/**
@@ -1629,36 +1626,40 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 		throw new FeatureNotSupportedException("This feature is not suported for this release.");
 	}
 
-	/**
-	 * This method is not yet supported.
-	 */
 	@Override
 	public Map<TopicPartition, Long> beginningOffsets(Collection<TopicPartition> partitions) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+		return beginningOffsets(partitions, Duration.ofMillis(defaultApiTimeoutMs));
 	}
 
-	/**
-	 * This method is not yet supported.
-	 */
 	@Override
 	public Map<TopicPartition, Long> beginningOffsets(Collection<TopicPartition> partitions, Duration timeout) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+        acquireAndEnsureOpen();
+        try {
+        	return client.fetchBeginningOffsets(partitions, time.timer(timeout));
+        } finally {
+        	release();
+        }
 	}
 
 	/**
-	 * This method is not yet supported.
+	 * Get the end offsets for the given partitions using the default API timeout.
 	 */
 	@Override
 	public Map<TopicPartition, Long> endOffsets(Collection<TopicPartition> partitions) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+		return endOffsets(partitions, Duration.ofMillis(defaultApiTimeoutMs));
 	}
 
 	/**
-	 * This method is not yet supported.
+	 * Get the end offsets for the given partitions.
 	 */
 	@Override
 	public Map<TopicPartition, Long> endOffsets(Collection<TopicPartition> partitions, Duration timeout) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+		acquireAndEnsureOpen();
+		try {
+			return client.fetchEndOffsets(partitions, time.timer(timeout));
+		} finally {
+			release();
+		}
 	}
 
 	/**
@@ -1860,11 +1861,28 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 	}
 
 	/**
-	 * This method is not yet supported.
+	 * Get the current lag for the given partition as endOffset - committedOffset.
 	 */
 	@Override
 	public OptionalLong currentLag(TopicPartition topicPartition) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+		acquireAndEnsureOpen();
+		try {
+			if (topicPartition == null)
+				throw new IllegalArgumentException("TopicPartition cannot be null");
+
+			if (!subscriptions.isAssigned(topicPartition))
+				throw new IllegalStateException("No current assignment for partition " + topicPartition);
+
+			OffsetAndMetadata committedOffset = committed(topicPartition);
+			Long endOffset = endOffsets(Collections.singleton(topicPartition)).get(topicPartition);
+
+			if (committedOffset == null || endOffset == null)
+				return OptionalLong.empty();
+
+			return OptionalLong.of(endOffset.longValue() - committedOffset.offset());
+		} finally {
+			release();
+		}
 	}
 	
 	/**

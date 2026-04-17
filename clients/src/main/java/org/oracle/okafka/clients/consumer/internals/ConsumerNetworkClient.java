@@ -32,6 +32,7 @@ package org.oracle.okafka.clients.consumer.internals;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -88,6 +89,10 @@ import org.oracle.okafka.common.requests.FetchRequest;
 import org.oracle.okafka.common.requests.FetchResponse;
 import org.oracle.okafka.common.requests.JoinGroupRequest;
 import org.oracle.okafka.common.requests.JoinGroupResponse;
+import org.oracle.okafka.common.requests.ListOffsetsRequest;
+import org.oracle.okafka.common.requests.ListOffsetsRequest.ListOffsetsPartition;
+import org.oracle.okafka.common.requests.ListOffsetsResponse;
+import org.oracle.okafka.common.requests.ListOffsetsResponse.ListOffsetsPartitionResponse;
 import org.oracle.okafka.common.requests.MetadataRequest;
 import org.oracle.okafka.common.requests.OffsetFetchRequest;
 import org.oracle.okafka.common.requests.OffsetFetchResponse;
@@ -1032,6 +1037,142 @@ public class ConsumerNetworkClient {
 		} while (retry && timer.notExpired());
 
 		throw new TimeoutException("Timeout expired while fetching Committed Offsets");
+
+	}
+
+	public Map<TopicPartition, Long> fetchBeginningOffsets(Collection<TopicPartition> partitions, Timer timer) {
+
+		if (partitions.isEmpty())
+			return Collections.emptyMap();
+
+		Map<String, List<ListOffsetsPartition>> topicOffsetPartitionMap = new HashMap<>();
+		for (TopicPartition tp : partitions) {
+			if (topicOffsetPartitionMap.containsKey(tp.topic())) {
+				topicOffsetPartitionMap.get(tp.topic())
+						.add(new ListOffsetsPartition().setPartitionIndex(tp.partition())
+								.setTimestamp(ListOffsetsRequest.EARLIEST_TIMESTAMP));
+			} else {
+				List<ListOffsetsPartition> newOffsetPartitionList = new ArrayList<>();
+				newOffsetPartitionList.add(new ListOffsetsPartition().setPartitionIndex(tp.partition())
+						.setTimestamp(ListOffsetsRequest.EARLIEST_TIMESTAMP));
+				topicOffsetPartitionMap.put(tp.topic(), newOffsetPartitionList);
+			}
+		}
+
+		long now = time.milliseconds();
+		ListOffsetsRequest.Builder requestBuilder = new ListOffsetsRequest.Builder(topicOffsetPartitionMap);
+		
+		metadata.requestUpdate();
+		maybeUpdateMetadata(timer.remainingMs());
+
+		boolean retry = false;
+
+		do {
+			retry = false;
+			Node node = client.leastLoadedNode(now);
+			if (node == null || !client.ready(node, now))
+				throw new KafkaException("Couldn't connect to any node for Fetching Beginning Offsets");
+			ClientRequest clientRequest = client.newClientRequest(node, requestBuilder, now, true, requestTimeoutMs, null);
+			log.debug("Sending List Offset Request for beginning offsets");
+			ClientResponse response = this.client.send(clientRequest, now);
+			ListOffsetsResponse offsetResponse = (ListOffsetsResponse) response.responseBody();
+			log.debug("Recieved List Offset Response for beginning offsets");
+
+			if (offsetResponse.getException() == null && !response.wasDisconnected()) {
+				Map<TopicPartition, Long> offsetResponseMap = new HashMap<>();
+				Map<String, List<ListOffsetsPartitionResponse>> offsetPartitionResponseMap = offsetResponse
+						.getOffsetPartitionResponseMap();
+				for (Map.Entry<String, List<ListOffsetsPartitionResponse>> entry : offsetPartitionResponseMap.entrySet()) {
+					for (ListOffsetsPartitionResponse partitionResponse : entry.getValue()) {
+						if (partitionResponse.getError() == null)
+							offsetResponseMap.put(
+									new TopicPartition(entry.getKey(), partitionResponse.partitionIndex()),
+									partitionResponse.offset());
+						else
+							log.warn("Skipping return beginning offset for {}-{} due to error {}.", entry.getKey(),
+									partitionResponse.partitionIndex(), partitionResponse.getError());
+					}
+				}
+
+				return offsetResponseMap;
+			} else if (response.wasDisconnected())
+				retry = true;
+			else {
+				log.error("Exception Caught: ", offsetResponse.getException());
+				throw new KafkaException("Unexpected error fetching Beginning Offsets", offsetResponse.getException());
+			}
+
+		} while (retry && timer.notExpired());
+
+		throw new TimeoutException("Timeout expired while fetching Beginning Offsets");
+
+	}
+
+	public Map<TopicPartition, Long> fetchEndOffsets(Collection<TopicPartition> partitions, Timer timer) {
+
+		if (partitions.isEmpty())
+			return Collections.emptyMap();
+
+		Map<String, List<ListOffsetsPartition>> topicOffsetPartitionMap = new HashMap<>();
+		for (TopicPartition tp : partitions) {
+			if (topicOffsetPartitionMap.containsKey(tp.topic())) {
+				topicOffsetPartitionMap.get(tp.topic())
+						.add(new ListOffsetsPartition().setPartitionIndex(tp.partition())
+								.setTimestamp(ListOffsetsRequest.LATEST_TIMESTAMP));
+			} else {
+				List<ListOffsetsPartition> newOffsetPartitionList = new ArrayList<>();
+				newOffsetPartitionList.add(new ListOffsetsPartition().setPartitionIndex(tp.partition())
+						.setTimestamp(ListOffsetsRequest.LATEST_TIMESTAMP));
+				topicOffsetPartitionMap.put(tp.topic(), newOffsetPartitionList);
+			}
+		}
+
+		long now = time.milliseconds();
+		ListOffsetsRequest.Builder requestBuilder = new ListOffsetsRequest.Builder(topicOffsetPartitionMap);
+
+		metadata.requestUpdate();
+		maybeUpdateMetadata(timer.remainingMs());
+
+		boolean retry = false;
+
+		do {
+			retry = false;
+			Node node = client.leastLoadedNode(now);
+			if (node == null || !client.ready(node, now))
+				throw new KafkaException("Couldn't connect to any node for Fetching End Offsets");
+			ClientRequest clientRequest = client.newClientRequest(node, requestBuilder, now, true, requestTimeoutMs, null);
+			log.debug("Sending List Offset Request for end offsets");
+			ClientResponse response = this.client.send(clientRequest, now);
+			ListOffsetsResponse offsetResponse = (ListOffsetsResponse) response.responseBody();
+			log.debug("Recieved List Offset Response for end offsets");
+
+			if (offsetResponse.getException() == null && !response.wasDisconnected()) {
+				Map<TopicPartition, Long> offsetResponseMap = new HashMap<>();
+				Map<String, List<ListOffsetsPartitionResponse>> offsetPartitionResponseMap = offsetResponse
+						.getOffsetPartitionResponseMap();
+				for (Map.Entry<String, List<ListOffsetsPartitionResponse>> entry : offsetPartitionResponseMap.entrySet()) {
+					for (ListOffsetsPartitionResponse partitionResponse : entry.getValue()) {
+						if (partitionResponse.getError() == null)
+							offsetResponseMap.put(
+									new TopicPartition(entry.getKey(), partitionResponse.partitionIndex()),
+									partitionResponse.offset());
+						else
+							log.warn("Skipping return end offset for {}-{} due to error {}.", entry.getKey(),
+									partitionResponse.partitionIndex(), partitionResponse.getError());
+					}
+				}
+
+				return offsetResponseMap;
+			} else if (response.wasDisconnected())
+				retry = true;
+			else {
+				log.error("Exception Caught: ", offsetResponse.getException());
+				throw new KafkaException("Unexpected error fetching End Offsets", offsetResponse.getException());
+			}
+
+		} while (retry && timer.notExpired());
+
+		throw new TimeoutException("Timeout expired while fetching End Offsets");
 
 	}
 
