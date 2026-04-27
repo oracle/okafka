@@ -207,22 +207,28 @@ public class ConnectionUtils {
 	public static String getFullHostname(Connection con) throws SQLException {
 		String query = "select value from gv$listener_network where inst_id = "
 				+ "(SELECT SYS_CONTEXT('USERENV', 'INSTANCE') AS instance_number FROM DUAL) and upper(type) = 'LOCAL LISTENER'";
-		String str = "";
 		PreparedStatement stmt = null;
 		ResultSet rs = null;
 		try {
 			stmt = con.prepareStatement(query);
 			stmt.execute();
 			rs = stmt.getResultSet();
-			if (rs.next())
-				str = rs.getString(1);
+			while (rs.next()) {
+				String str = rs.getString(1);
+				if (str == null)
+					continue;
+
+				String host = TNSParser.getProperty(str.toUpperCase(), "HOST");
+				if (host != null && host.length() > 0)
+					return host;
+			}
 		} finally {
 			if (rs != null)
 				rs.close();
 			if (stmt != null)
 				stmt.close();
 		}
-		return TNSParser.getProperty(str.toUpperCase(), "HOST");
+		return null;
 	}
 	
 	public static String getDBVersion(Connection conn) throws Exception

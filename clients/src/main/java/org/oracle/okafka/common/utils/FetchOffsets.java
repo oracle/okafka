@@ -94,7 +94,7 @@ public class FetchOffsets {
 			        "        END; " +
 			        "    END LOOP; " +
 			        "    IF NOT found THEN " +
-			        "        RAISE_APPLICATION_ERROR(20003, 'No messages in the given partition'); " +
+			        "        RAISE NO_DATA_FOUND; " +
 			        "    END IF; " +
 			        "    ? := msg_id; " +
 			        "    ? := next_timestamp; " +

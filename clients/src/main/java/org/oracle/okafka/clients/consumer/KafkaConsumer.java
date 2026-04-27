@@ -68,6 +68,7 @@ import org.apache.kafka.clients.consumer.ConsumerPartitionAssignor;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.NoOffsetForPartitionException;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.clients.consumer.OffsetCommitCallback;
@@ -1533,19 +1534,49 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 	}
 
 	/**
-	 * This method is not yet supported.
+	 * Returns the next offset that this consumer would fetch for the given partition.
 	 */
 	@Override
 	public long position(TopicPartition partition) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+		return position(partition, Duration.ofMillis(defaultApiTimeoutMs));
 	}
 
 	/**
-	 * This method is not yet supported.
+	 * Returns the next offset that this consumer would fetch for the given partition.
 	 */
 	@Override
 	public long position(TopicPartition partition, final Duration timeout) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+		if (partition == null)
+			throw new IllegalArgumentException("TopicPartition cannot be null");
+
+		acquireAndEnsureOpen();
+		try {
+			if (!subscriptions.isAssigned(partition))
+				throw new IllegalStateException("You can only check the position for partitions assigned to this consumer.");
+
+			FetchPosition fetchPosition = subscriptions.hasValidPosition(partition) ? subscriptions.position(partition) : null;
+			if (fetchPosition != null && fetchPosition.offset >= 0)
+				return fetchPosition.offset + 1;
+
+			OffsetAndMetadata committedOffset = committed(partition, timeout);
+			if (committedOffset != null && committedOffset.offset() >= 0)
+				return committedOffset.offset();
+
+			OffsetResetStrategy strategy = subscriptions.resetStrategy(partition);
+			if (strategy == OffsetResetStrategy.EARLIEST) {
+				Long offset = beginningOffsets(Collections.singleton(partition), timeout).get(partition);
+				if (offset != null)
+					return offset;
+			} else if (strategy == OffsetResetStrategy.LATEST) {
+				Long offset = endOffsets(Collections.singleton(partition), timeout).get(partition);
+				if (offset != null)
+					return offset;
+			}
+
+			throw new NoOffsetForPartitionException(Collections.singleton(partition));
+		} finally {
+			release();
+		}
 	}
 
 	@Override
@@ -1570,19 +1601,27 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 	}
 
 	/**
-	 * This method is not yet supported.
+	 * Get metadata about the partitions for a given topic.
 	 */
 	@Override
 	public List<PartitionInfo> partitionsFor(String topic) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+		return partitionsFor(topic, Duration.ofMillis(defaultApiTimeoutMs));
 	}
 
 	/**
-	 * This method is not yet supported.
+	 * Get metadata about the partitions for a given topic.
 	 */
 	@Override
 	public List<PartitionInfo> partitionsFor(String topic, Duration timeout) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+		if (topic == null)
+			throw new IllegalArgumentException("Topic cannot be null");
+
+		acquireAndEnsureOpen();
+		try {
+			return topicMetadataFetcher.getTopicMetadata(topic, time.timer(timeout));
+		} finally {
+			release();
+		}
 	}
 
 	/**
@@ -1610,20 +1649,31 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 	}
 
 	/**
-	 * This method is not yet supported.
+	 * Look up offsets by timestamp using the default API timeout.
 	 */
 	@Override
 	public Map<TopicPartition, OffsetAndTimestamp> offsetsForTimes(Map<TopicPartition, Long> timestampsToSearch) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+		return offsetsForTimes(timestampsToSearch, Duration.ofMillis(defaultApiTimeoutMs));
 	}
 
 	/**
-	 * This method is not yet supported.
+	 * Look up offsets by timestamp.
 	 */
 	@Override
 	public Map<TopicPartition, OffsetAndTimestamp> offsetsForTimes(Map<TopicPartition, Long> timestampsToSearch,
 			Duration timeout) {
-		throw new FeatureNotSupportedException("This feature is not suported for this release.");
+		acquireAndEnsureOpen();
+		try {
+			for (Map.Entry<TopicPartition, Long> entry : timestampsToSearch.entrySet()) {
+				if (entry.getValue() < 0) {
+					throw new IllegalArgumentException("The target time for partition " + entry.getKey() + " is "
+							+ entry.getValue() + ". The target time cannot be negative.");
+				}
+			}
+			return client.fetchOffsetsForTimes(timestampsToSearch, time.timer(timeout));
+		} finally {
+			release();
+		}
 	}
 
 	@Override
