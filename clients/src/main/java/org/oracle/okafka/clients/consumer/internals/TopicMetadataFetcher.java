@@ -2,6 +2,7 @@ package org.oracle.okafka.clients.consumer.internals;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +30,13 @@ public class TopicMetadataFetcher {
 	public Map<String, List<PartitionInfo>> getAllTopicMetadata(Timer timer) {
 		MetadataRequest.Builder request = MetadataRequest.Builder.listAllTopics(true);
 		return getTopicMetadata(request, timer);
+	}
+
+	public List<PartitionInfo> getTopicMetadata(String topic, Timer timer) {
+		MetadataRequest.Builder request = new MetadataRequest.Builder(Collections.singletonList(topic), false,
+				Collections.singletonList(topic));
+		Map<String, List<PartitionInfo>> topicMetadata = getTopicMetadata(request, timer);
+		return topicMetadata.get(topic);
 	}
 
 	private Map<String, List<PartitionInfo>> getTopicMetadata(MetadataRequest.Builder builder, Timer timer) {

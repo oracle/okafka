@@ -43,6 +43,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.consumer.ConsumerGroupMetadata;
+import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
 import org.apache.kafka.clients.consumer.ConsumerPartitionAssignor;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.common.errors.DisconnectException;
@@ -1174,6 +1175,80 @@ public class ConsumerNetworkClient {
 
 		throw new TimeoutException("Timeout expired while fetching End Offsets");
 
+	}
+
+	public Map<TopicPartition, OffsetAndTimestamp> fetchOffsetsForTimes(Map<TopicPartition, Long> timestampsToSearch,
+			Timer timer) {
+
+		if (timestampsToSearch.isEmpty())
+			return Collections.emptyMap();
+
+		Map<String, List<ListOffsetsPartition>> topicOffsetPartitionMap = new HashMap<>();
+		for (Map.Entry<TopicPartition, Long> entry : timestampsToSearch.entrySet()) {
+			TopicPartition tp = entry.getKey();
+			if (topicOffsetPartitionMap.containsKey(tp.topic())) {
+				topicOffsetPartitionMap.get(tp.topic())
+						.add(new ListOffsetsPartition().setPartitionIndex(tp.partition()).setTimestamp(entry.getValue()));
+			} else {
+				List<ListOffsetsPartition> newOffsetPartitionList = new ArrayList<>();
+				newOffsetPartitionList
+						.add(new ListOffsetsPartition().setPartitionIndex(tp.partition()).setTimestamp(entry.getValue()));
+				topicOffsetPartitionMap.put(tp.topic(), newOffsetPartitionList);
+			}
+		}
+
+		long now = time.milliseconds();
+		ListOffsetsRequest.Builder requestBuilder = new ListOffsetsRequest.Builder(topicOffsetPartitionMap);
+
+		metadata.requestUpdate();
+		maybeUpdateMetadata(timer.remainingMs());
+
+		boolean retry = false;
+
+		do {
+			retry = false;
+			Node node = client.leastLoadedNode(now);
+			if (node == null || !client.ready(node, now))
+				throw new KafkaException("Couldn't connect to any node for Fetching Offsets By Timestamp");
+			ClientRequest clientRequest = client.newClientRequest(node, requestBuilder, now, true, requestTimeoutMs, null);
+			log.debug("Sending List Offset Request for offsets by timestamp");
+			ClientResponse response = this.client.send(clientRequest, now);
+			ListOffsetsResponse offsetResponse = (ListOffsetsResponse) response.responseBody();
+			log.debug("Recieved List Offset Response for offsets by timestamp");
+
+			if (offsetResponse.getException() == null && !response.wasDisconnected()) {
+				Map<TopicPartition, OffsetAndTimestamp> offsetResponseMap = new HashMap<>();
+				Map<String, List<ListOffsetsPartitionResponse>> offsetPartitionResponseMap = offsetResponse
+						.getOffsetPartitionResponseMap();
+				for (Map.Entry<String, List<ListOffsetsPartitionResponse>> entry : offsetPartitionResponseMap.entrySet()) {
+					for (ListOffsetsPartitionResponse partitionResponse : entry.getValue()) {
+						TopicPartition topicPartition = new TopicPartition(entry.getKey(),
+								partitionResponse.partitionIndex());
+						if (partitionResponse.getError() == null) {
+							if (partitionResponse.offset() >= 0 && partitionResponse.timestamp() >= 0) {
+								offsetResponseMap.put(topicPartition,
+										new OffsetAndTimestamp(partitionResponse.offset(), partitionResponse.timestamp()));
+							} else {
+								offsetResponseMap.put(topicPartition, null);
+							}
+						} else {
+							log.warn("Skipping return offsetsForTimes for {}-{} due to error {}.", entry.getKey(),
+									partitionResponse.partitionIndex(), partitionResponse.getError());
+						}
+					}
+				}
+
+				return offsetResponseMap;
+			} else if (response.wasDisconnected())
+				retry = true;
+			else {
+				log.error("Exception Caught: ", offsetResponse.getException());
+				throw new KafkaException("Unexpected error fetching Offsets By Timestamp", offsetResponse.getException());
+			}
+
+		} while (retry && timer.notExpired());
+
+		throw new TimeoutException("Timeout expired while fetching Offsets By Timestamp");
 	}
 
 	public void unsubscribe() {
