@@ -1555,8 +1555,11 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 				throw new IllegalStateException("You can only check the position for partitions assigned to this consumer.");
 
 			FetchPosition fetchPosition = subscriptions.hasValidPosition(partition) ? subscriptions.position(partition) : null;
-			if (fetchPosition != null && fetchPosition.offset >= 0)
+			if (fetchPosition != null && fetchPosition.offset >= 0) {
+				if (!subscriptions.consumedSinceAssignment(partition))
+					return fetchPosition.offset;
 				return fetchPosition.offset + 1;
+			}
 
 			OffsetAndMetadata committedOffset = committed(partition, timeout);
 			if (committedOffset != null && committedOffset.offset() >= 0)

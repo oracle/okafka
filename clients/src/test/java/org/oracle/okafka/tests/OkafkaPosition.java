@@ -2,13 +2,14 @@ package org.oracle.okafka.tests;
 
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.Collection;
 import java.util.Properties;
 import java.util.concurrent.Future;
 
 import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.producer.Producer;
@@ -24,7 +25,7 @@ public class OkafkaPosition {
 
 	private static final String TOPIC_NAME = "TEQ_POSITION";
 	private static final String GROUP_ID = "G_POSITION";
-	private static final Duration POLL_TIMEOUT = Duration.ofMillis(1000);
+	private static final Duration POLL_TIMEOUT = Duration.ofSeconds(10);
 	private static final long CONSUME_TIMEOUT_MS = 60000L;
 	private static final int TOTAL_MESSAGES = 1000;
 	private static final int MESSAGES_TO_CONSUME = TOTAL_MESSAGES / 2;
@@ -48,7 +49,7 @@ public class OkafkaPosition {
 
 		Admin admin = null;
 		Producer<String, String> producer = null;
-		Consumer<String, String> consumer = null;
+		KafkaConsumer<String, String> consumer = null;
 
 		try {
 			admin = AdminClient.create(OkafkaSetup.setup());
@@ -60,7 +61,39 @@ public class OkafkaPosition {
 			produceMessages(producer, topic, TOTAL_MESSAGES);
 
 			consumer = new KafkaConsumer<String, String>(consumerProps);
-			consumer.subscribe(Arrays.asList(topic));
+			final KafkaConsumer<String, String> rebalanceConsumer = consumer;
+			final long[] rebalancePosition = new long[] { -1L };
+			final boolean[] assignmentHappened = new boolean[] { false };
+			consumer.subscribe(Arrays.asList(topic), new ConsumerRebalanceListener() {
+				@Override
+				public synchronized void onPartitionsRevoked(Collection<TopicPartition> partitions) {
+					System.out.println("Partitions revoked in position test: " + partitions);
+				}
+
+				@Override
+				public synchronized void onPartitionsAssigned(Collection<TopicPartition> partitions) {
+					System.out.println("Partitions assigned in position test: " + partitions);
+					assignmentHappened[0] = true;
+					try {
+						rebalancePosition[0] = rebalanceConsumer.position(topicPartition);
+						System.out.println("Position inside rebalance callback before consuming messages: "
+								+ rebalancePosition[0]);
+					} catch (Exception e) {
+						System.out.println("Exception while calling position inside rebalance callback " + e);
+						e.printStackTrace();
+					}
+				}
+			});
+
+			try {
+				long positionBeforeFirstPoll = consumer.position(topicPartition);
+				System.out.println("Position before first poll: " + positionBeforeFirstPoll);
+			} catch (Exception e) {
+				System.out.println("Exception while calling position before first poll " + e);
+			}
+
+			consumer.poll(POLL_TIMEOUT);
+
 			long consumedCount = consumeMessages(consumer, MESSAGES_TO_CONSUME);
 			long position = consumer.position(topicPartition);
 
@@ -126,14 +159,19 @@ public class OkafkaPosition {
 		long deadline = System.currentTimeMillis() + CONSUME_TIMEOUT_MS;
 		while (consumed < count && System.currentTimeMillis() < deadline) {
 			ConsumerRecords<String, String> records = consumer.poll(POLL_TIMEOUT);
-			if (records != null && records.count() > 0) {
-				for (ConsumerRecord<String, String> record : records) {
-					System.out.printf("Consumed record partition=%d offset=%d key=%s value=%s%n",
-							record.partition(), record.offset(), record.key(), record.value());
-				}
-				consumed += records.count();
-			}
+			consumed += printRecords(records);
 		}
 		return consumed;
+	}
+
+	private long printRecords(ConsumerRecords<String, String> records) {
+		if (records == null || records.count() == 0)
+			return 0L;
+
+		for (ConsumerRecord<String, String> record : records) {
+			System.out.printf("Consumed record partition=%d offset=%d key=%s value=%s%n",
+					record.partition(), record.offset(), record.key(), record.value());
+		}
+		return records.count();
 	}
 }
