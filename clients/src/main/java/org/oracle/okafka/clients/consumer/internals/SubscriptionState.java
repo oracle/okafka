@@ -453,6 +453,10 @@ public class SubscriptionState {
         assignedState(tp).position(position);
     }
 
+    public synchronized boolean consumedSinceAssignment(TopicPartition tp) {
+        return assignedState(tp).consumedSinceAssignment();
+    }
+
     /**
      * Enter the offset validation state if the leader for this partition is known to support a usable version of the
      * OffsetsForLeaderEpoch API. If the leader node does not support the API, simply complete the offset validation.
@@ -760,7 +764,8 @@ public class SubscriptionState {
     private static class TopicPartitionState {
 
         private FetchState fetchState;
-        private FetchPosition position; // last consumed position
+        private FetchPosition position; // tracks fetch progress for this assignment
+        private boolean consumedSinceAssignment;
 
         private Long highWatermark; // the high watermark from last fetch
         private Long logStartOffset; // the log start offset
@@ -775,6 +780,7 @@ public class SubscriptionState {
             this.paused = false;
             this.fetchState = FetchStates.INITIALIZING;
             this.position = null;
+            this.consumedSinceAssignment = false;
             this.highWatermark = null;
             this.logStartOffset = null;
             this.lastStableOffset = null;
@@ -792,6 +798,7 @@ public class SubscriptionState {
                     throw new IllegalStateException("Transitioned subscription state to " + nextState + ", but position is null");
                 } else if (!nextState.requiresPosition()) {
                     this.position = null;
+                    this.consumedSinceAssignment = false;
                 }
             }
         }
@@ -926,6 +933,7 @@ public class SubscriptionState {
         private void seekValidated(FetchPosition position) {
             transitionState(FetchStates.FETCHING, () -> {
                 this.position = position;
+                this.consumedSinceAssignment = false;
                 this.resetStrategy = null;
                 this.nextRetryTimeMs = null;
             });
@@ -940,6 +948,11 @@ public class SubscriptionState {
             if (!hasValidPosition())
                 throw new IllegalStateException("Cannot set a new position without a valid current position");
             this.position = position;
+            this.consumedSinceAssignment = true;
+        }
+
+        private boolean consumedSinceAssignment() {
+            return consumedSinceAssignment;
         }
 
         private FetchPosition validPosition() {
