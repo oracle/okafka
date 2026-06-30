@@ -1,46 +1,42 @@
 package org.oracle.okafka.tests;
 
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 
+import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.Assert;
 import org.junit.Test;
-import org.oracle.okafka.clients.consumer.KafkaConsumer;
 
 public class OkafkaEndOffsets {
 
-	@Test
-	public void EndOffsetsTest() {
-		Properties prop = OkafkaSetup.setup();
-		prop.put("group.id", "S1");
-		prop.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-		prop.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+	@Test(timeout = 120000)
+	public void okafkaEndOffsetsTest() throws Exception {
+		String topic = OkafkaTestSupport.uniqueTopic("TEQ_END");
+		String groupId = OkafkaTestSupport.uniqueGroup("G_END");
+		TopicPartition topicPartition = new TopicPartition(topic, 0);
+		Set<TopicPartition> topicPartitions = Collections.singleton(topicPartition);
 
-		Consumer<String, String> consumer = new KafkaConsumer<String, String>(prop);
-		try {
-			Set<TopicPartition> topicPartitions = new HashSet<>();
-			topicPartitions.add(new TopicPartition("TEQ", 0));
-			topicPartitions.add(new TopicPartition("TEQ", 1));
-			topicPartitions.add(new TopicPartition("TEQ", 2));
-
-			Map<TopicPartition, Long> consumerOffsets = consumer.endOffsets(topicPartitions);
-			System.out.println("Consumer end offsets: " + consumerOffsets);
-			for (TopicPartition tp : topicPartitions) {
-				Long consumerOffset = consumerOffsets.get(tp);
-				System.out.println("TopicPartition " + tp + " consumerOffset=" + consumerOffset);
+		try (Admin admin = OkafkaTestSupport.admin()) {
+			try {
+				OkafkaTestSupport.createTopic(admin, topic, 1);
+				try (Producer<String, String> producer = OkafkaTestSupport.producer()) {
+					OkafkaTestSupport.produceRecords(producer, topic, 5);
+				}
+				try (Consumer<String, String> consumer = OkafkaTestSupport
+						.consumer(OkafkaTestSupport.consumerProperties(groupId))) {
+					Map<TopicPartition, Long> consumerOffsets = consumer.endOffsets(topicPartitions);
+					Assert.assertEquals("End offset should be available for the test partition", 1,
+							consumerOffsets.size());
+					Assert.assertEquals("End offset should equal produced record count", 5L,
+							consumerOffsets.get(topicPartition).longValue());
+				}
+			} finally {
+				OkafkaTestSupport.deleteTopicIfExists(admin, topic);
 			}
-		} catch (Exception e) {
-			System.out.println("Exception while fetching end offsets " + e);
-			e.printStackTrace();
-		} finally {
-			System.out.println("Closing Consumer");
-			consumer.close();
 		}
-
-		System.out.println("Test: OkafkaEndOffsets completed");
 	}
 }

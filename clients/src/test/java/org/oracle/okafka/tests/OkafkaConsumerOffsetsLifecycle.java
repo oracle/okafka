@@ -34,15 +34,15 @@ public class OkafkaConsumerOffsetsLifecycle {
 	private static final int SMALL_MAX_POLL_RECORDS = 1;
 
 	@Test
-	public void ConsumerOffsetsLifecycleTest() {
-		String topic = "TEQ_OFFSETS";
-		String groupId = "G_OFFSETS";
+	public void okafkaConsumerOffsetsLifecycleTest() {
+		String topic = OkafkaTestSupport.uniqueTopic("TEQ_OFFSETS");
+		String groupId = OkafkaTestSupport.uniqueGroup("G_OFFSETS");
 		TopicPartition topicPartition = new TopicPartition(topic, 0);
 		Set<TopicPartition> topicPartitions = Collections.singleton(topicPartition);
 
-		Properties adminProps = OkafkaSetup.setup();
-		Properties producerProps = OkafkaSetup.setup();
-		Properties consumerProps = OkafkaSetup.setup();
+		Properties adminProps = OkafkaTestSupport.baseProperties();
+		Properties producerProps = OkafkaTestSupport.baseProperties();
+		Properties consumerProps = OkafkaTestSupport.baseProperties();
 
 		producerProps.put("key.serializer", "org.apache.kafka.common.serialization.StringSerializer");
 		producerProps.put("value.serializer", "org.apache.kafka.common.serialization.StringSerializer");
@@ -63,8 +63,8 @@ public class OkafkaConsumerOffsetsLifecycle {
 
 		try {
 			admin = AdminClient.create(adminProps);
-			deleteTopicIfExists(admin, topic);
-			admin.createTopics(Arrays.asList(new NewTopic(topic, 1, (short) 1))).all().get();
+			OkafkaTestSupport.get(admin.createTopics(Arrays.asList(new NewTopic(topic, 1, (short) 1))).all(),
+					"create topic " + topic);
 
 			producer = new KafkaProducer<String, String>(producerProps);
 			consumerHandle = new ConsumerHandle(new KafkaConsumer<String, String>(consumerProps), LARGE_MAX_POLL_RECORDS);
@@ -165,9 +165,7 @@ public class OkafkaConsumerOffsetsLifecycle {
 			assertSnapshot("step20-after-restart-without-commit", consumerHandle.consumer, topicPartition, topicPartitions, 0L,
 					producedCount, committedCount, false);
 		} catch (Exception e) {
-			System.out.println("Exception while testing consumer offsets lifecycle " + e);
-			e.printStackTrace();
-			Assert.fail("ConsumerOffsetsLifecycleTest failed with exception: " + e.getMessage());
+			throw new AssertionError("okafkaConsumerOffsetsLifecycleTest failed with exception", e);
 		} finally {
 			if (consumerHandle != null && consumerHandle.consumer != null) {
 				System.out.println("Closing Consumer");
@@ -179,25 +177,14 @@ public class OkafkaConsumerOffsetsLifecycle {
 			}
 			if (admin != null) {
 				try {
-					admin.deleteTopics(Arrays.asList(topic)).all().get();
-				} catch (Exception cleanupEx) {
-					System.out.println("Exception while deleting topic " + topic + " " + cleanupEx);
-					cleanupEx.printStackTrace();
+					OkafkaTestSupport.deleteTopicIfExists(admin, topic);
+				} finally {
+					admin.close();
 				}
-				admin.close();
 			}
 		}
 
 		System.out.println("Test: OkafkaConsumerOffsetsLifecycle completed");
-	}
-
-	private void deleteTopicIfExists(Admin admin, String topic) {
-		try {
-			admin.deleteTopics(Arrays.asList(topic)).all().get();
-			System.out.println("Deleted existing topic before test: " + topic);
-		} catch (Exception e) {
-			System.out.println("Topic did not exist or could not be deleted before create: " + topic + " " + e.getMessage());
-		}
 	}
 
 	private void waitForAssignment(Consumer<String, String> consumer, TopicPartition topicPartition) {
@@ -218,10 +205,10 @@ public class OkafkaConsumerOffsetsLifecycle {
 			long sequence = startIndex + i;
 			lastFuture = producer.send(new ProducerRecord<String, String>(topic, 0, "K" + sequence, "V" + sequence));
 			if ((i + 1) % 2000 == 0 && lastFuture != null)
-				lastFuture.get();
+				OkafkaTestSupport.get(lastFuture, "produce batch to " + topic);
 		}
 		if (lastFuture != null)
-			lastFuture.get();
+			OkafkaTestSupport.get(lastFuture, "produce records to " + topic);
 		producer.flush();
 		System.out.println("Produced " + count + " messages to " + topic);
 		return count;

@@ -1,69 +1,39 @@
 package org.oracle.okafka.tests;
 
-
-import java.io.IOException;
-import java.time.Duration;
 import java.util.Arrays;
 import java.util.Properties;
+
+import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.producer.Producer;
+import org.junit.Assert;
 import org.junit.Test;
-import org.oracle.okafka.clients.consumer.KafkaConsumer;
 
 public class OkafkaAutoOffsetReset {
 
-	@Test
-	public void autoOffsetSeekTest() throws IOException {
-		Properties prop = new Properties();
-		prop = OkafkaSetup.setup();
-        prop.put("group.id" , "S1");
-		prop.put("max.poll.records", 1000);
-		prop.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-		prop.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-		prop.put("auto.offset.reset", "earliest");
+	@Test(timeout = 120000)
+	public void okafkaAutoOffsetResetTest() throws Exception {
+		String topic = OkafkaTestSupport.uniqueTopic("TEQ_AUTO_OFFSET");
+		String groupId = OkafkaTestSupport.uniqueGroup("G_AUTO_OFFSET");
+		try (Admin admin = OkafkaTestSupport.admin()) {
+			try {
+				OkafkaTestSupport.createTopic(admin, topic, 1);
+				try (Producer<String, String> producer = OkafkaTestSupport.producer()) {
+					OkafkaTestSupport.produceRecords(producer, topic, 10);
+				}
 
-		Consumer<String, String> consumer = new KafkaConsumer<String, String>(prop);
-		
-		consumer.subscribe(Arrays.asList("TEQ"));
-		
-		int expectedMsgCnt = 1000;
-		int msgCnt = 0;		
-		try {
-			 while(true) {
-		     try {
-		    	ConsumerRecords <String, String> records = consumer.poll(Duration.ofMillis(10000));
-		   
-		    	for (ConsumerRecord<String, String> record : records)				
-		    		System.out.printf("partition = %d, offset = %d, key = %s, value =%s\n  ", record.partition(), record.offset(), record.key(), record.value());
-
-		    		if(records != null && records.count() > 0) {
-		    		   msgCnt += records.count();
-		    		   System.out.println("Committing records " + records.count());
-		    		   consumer.commitSync();
-		    						
-		    		  if(msgCnt >= expectedMsgCnt )
-		    		  {
-		    			System.out.println("Received " + msgCnt + " Expected " + expectedMsgCnt +". Exiting Now.");
-		    			break;
-		    		  }
-		    		}
-		    		else {
-		    			System.out.println("No Record Fetched. Retrying in 1 second");
-		    			Thread.sleep(1000);
-		    		}
-		    	}catch(Exception e)
-		    	{
-		    	 throw e;
-		    	}
-		    }
-		  }catch(Exception e)
-		   {
-		    System.out.println("Exception from consumer " + e);
-		    e.printStackTrace();
-		   }finally {
-		    System.out.println("Closing Consumer");
-		    consumer.close();
-		   }
+				Properties prop = OkafkaTestSupport.consumerProperties(groupId);
+				prop.put("max.poll.records", "10");
+				prop.put("auto.offset.reset", "earliest");
+				try (Consumer<String, String> consumer = OkafkaTestSupport.consumer(prop)) {
+					consumer.subscribe(Arrays.asList(topic));
+					int consumed = OkafkaTestSupport.consumeExactly(consumer, 10);
+					Assert.assertEquals("Earliest reset should consume all existing records for a new group", 10,
+							consumed);
+				}
+			} finally {
+				OkafkaTestSupport.deleteTopicIfExists(admin, topic);
+			}
 		}
-     }
+	}
+}

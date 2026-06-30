@@ -1,36 +1,27 @@
 package org.oracle.okafka.tests;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Map;
 
 import org.apache.kafka.clients.admin.Admin;
-import org.apache.kafka.clients.admin.DescribeTopicsResult;
 import org.apache.kafka.clients.admin.TopicDescription;
-import org.apache.kafka.common.KafkaFuture;
-import org.apache.kafka.common.TopicCollection;
+import org.junit.Assert;
 import org.junit.Test;
-import org.oracle.okafka.clients.admin.AdminClient;
 
 public class OkafkaDescribeTopics {
 
-	@Test
-	public void AdminTest() {
-		try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
-			DescribeTopicsResult res = admin.describeTopics(
-					TopicCollection.TopicNameCollection.ofTopicNames(new ArrayList<String>(Arrays.asList("TEQ"))));
-
-			Map<String, KafkaFuture<TopicDescription>> description = res.topicNameValues();
-
-			for (Map.Entry<String, KafkaFuture<TopicDescription>> entry : description.entrySet()) {
-				System.out.println("Description - " + entry.getValue().get());
+	@Test(timeout = 120000)
+	public void okafkaDescribeTopicsTest() throws Exception {
+		String topic = OkafkaTestSupport.uniqueTopic("TEQ_DESCRIBE");
+		try (Admin admin = OkafkaTestSupport.admin()) {
+			try {
+				OkafkaTestSupport.createTopic(admin, topic, 2);
+				TopicDescription description = OkafkaTestSupport
+						.get(admin.describeTopics(Arrays.asList(topic)).topicNameValues().get(topic), "describe topic");
+				Assert.assertEquals("Topic description should return requested topic", topic, description.name());
+				Assert.assertEquals("Topic should have two partitions", 2, description.partitions().size());
+			} finally {
+				OkafkaTestSupport.deleteTopicIfExists(admin, topic);
 			}
-		} catch (Exception e) {
-			System.out.println("Exception while Describing topic " + e);
-			e.printStackTrace();
 		}
-
-		System.out.println("Test: OkafkaDescribeTopic Complete");
-
 	}
 }

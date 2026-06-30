@@ -1,30 +1,24 @@
 package org.oracle.okafka.tests;
 
+import java.util.Set;
 
 import org.apache.kafka.clients.admin.Admin;
+import org.junit.Assert;
 import org.junit.Test;
-import org.oracle.okafka.clients.admin.AdminClient;
-import org.apache.kafka.clients.admin.ListTopicsOptions;
-import org.apache.kafka.clients.admin.ListTopicsResult;
 
 public class OkafkaListTopics {
 
-	@Test
-	public void AdminTest() {
-        try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
-        	
-        	ListTopicsResult res=admin.listTopics(new ListTopicsOptions());
-        	
-        	System.out.println(res.names().get());
-
+	@Test(timeout = 120000)
+	public void okafkaListTopicsTest() throws Exception {
+		String topic = OkafkaTestSupport.uniqueTopic("TEQ_LIST_TOPICS");
+		try (Admin admin = OkafkaTestSupport.admin()) {
+			try {
+				OkafkaTestSupport.createTopic(admin, topic, 1);
+				Set<String> topics = OkafkaTestSupport.get(admin.listTopics().names(), "list topics");
+				Assert.assertTrue("Created topic should be returned by listTopics", topics.contains(topic));
+			} finally {
+				OkafkaTestSupport.deleteTopicIfExists(admin, topic);
+			}
 		}
-		catch(Exception e)
-		{
-			System.out.println("Exception while Listing Topics " + e);
-			e.printStackTrace();
-		}
-		
-		System.out.println("Test: OkafkaListTopics complete");
-
 	}
 }

@@ -1,46 +1,33 @@
 package org.oracle.okafka.tests;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Map;
 
 import org.apache.kafka.clients.admin.Admin;
-import org.apache.kafka.clients.admin.DescribeTopicsResult;
 import org.apache.kafka.clients.admin.TopicDescription;
-
-import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.TopicCollection;
 import org.apache.kafka.common.Uuid;
+import org.junit.Assert;
 import org.junit.Test;
-import org.oracle.okafka.clients.admin.AdminClient;
 
 public class OkafkaDescribeTopicsById {
-	@Test
-	public void AdminTest() {
-		try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
+	@Test(timeout = 120000)
+	public void okafkaDescribeTopicsByIdTest() throws Exception {
+		String topic = OkafkaTestSupport.uniqueTopic("TEQ_DESCRIBE_ID");
+		try (Admin admin = OkafkaTestSupport.admin()) {
+			try {
+				OkafkaTestSupport.createTopic(admin, topic, 1);
+				TopicDescription byName = OkafkaTestSupport
+						.get(admin.describeTopics(Arrays.asList(topic)).topicNameValues().get(topic), "describe topic");
+				Uuid topicId = byName.topicId();
+				TopicDescription byId = OkafkaTestSupport.get(admin
+						.describeTopics(TopicCollection.TopicIdCollection.ofTopicIds(Arrays.asList(topicId)))
+						.topicIdValues().get(topicId), "describe topic by id");
 
-			DescribeTopicsResult res1 = admin.describeTopics(
-					TopicCollection.TopicNameCollection.ofTopicNames(new ArrayList<String>(Arrays.asList("TEQ"))));
-
-			Map<String, KafkaFuture<TopicDescription>> description1 = res1.topicNameValues();
-
-			Uuid topicId = description1.get("TEQ").get().topicId();
-
-			DescribeTopicsResult res2 = admin.describeTopics(
-					TopicCollection.TopicIdCollection.ofTopicIds(new ArrayList<Uuid>(Arrays.asList(topicId))));
-
-			Map<Uuid, KafkaFuture<TopicDescription>> descriptionById = res2.topicIdValues();
-
-			for (Map.Entry<Uuid, KafkaFuture<TopicDescription>> entry : descriptionById.entrySet()) {
-				System.out.println("Description - " + entry.getValue().get());
+				Assert.assertEquals("Description by ID should return original topic name", topic, byId.name());
+				Assert.assertEquals("Description by ID should return original topic ID", topicId, byId.topicId());
+			} finally {
+				OkafkaTestSupport.deleteTopicIfExists(admin, topic);
 			}
-
-		} catch (Exception e) {
-			System.out.println("Exception while Describing topic " + e);
-			e.printStackTrace();
 		}
-
-		System.out.println("Test: OkafkaDescribeTopicsById Complete");
-
 	}
 }

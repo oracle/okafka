@@ -1,60 +1,38 @@
 package org.oracle.okafka.tests;
 
-import org.junit.Test;
-import java.time.Duration;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Properties;
+
+import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.common.TopicPartition;
-import org.oracle.okafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.Producer;
+import org.junit.Assert;
+import org.junit.Test;
 
 public class SimpleOkafkaConsumer {
 
-	@Test
-	public void ConsumerTest() {
-		Properties prop = new Properties();
-		prop = OkafkaSetup.setup();
-		prop.put("group.id", "S1");
-		prop.put("max.poll.records", 1000);
-		prop.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-		prop.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-		Consumer<String, String> consumer = new KafkaConsumer<String, String>(prop);
-		consumer.subscribe(Arrays.asList("TEQ"));
-		int expectedMsgCnt = 1000;
-		int msgCnt = 0;
-		try {
-			while (true) {
-				try {
-					ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(10000));
-					Collection<TopicPartition> partitions = records.partitions();
-					for (ConsumerRecord<String, String> record : records)
-						System.out.printf("partition = %d, offset = %d, key = %s, value =%s\n  ", record.partition(),
-								record.offset(), record.key(), record.value());
-
-					if (records != null && records.count() > 0) {
-						msgCnt += records.count();
-						System.out.println("Committing records " + records.count());
-						consumer.commitSync();
-
-						if (msgCnt >= expectedMsgCnt) {
-							System.out.println("Received " + msgCnt + " Expected " + expectedMsgCnt + ". Exiting Now.");
-							break;
-						}
-					} else {
-						System.out.println("No Record Fetched. Retrying in 1 second");
-						Thread.sleep(1000);
-					}
-				} catch (Exception e) {
-					throw e;
+	@Test(timeout = 120000)
+	public void simpleOkafkaConsumerTest() throws Exception {
+		String topic = OkafkaTestSupport.uniqueTopic("TEQ_CONSUMER");
+		String groupId = OkafkaTestSupport.uniqueGroup("G_CONSUMER");
+		try (Admin admin = OkafkaTestSupport.admin()) {
+			try {
+				OkafkaTestSupport.createTopic(admin, topic, 1);
+				try (Producer<String, String> producer = OkafkaTestSupport.producer()) {
+					OkafkaTestSupport.produceRecords(producer, topic, 1000);
 				}
+
+				Properties prop = OkafkaTestSupport.consumerProperties(groupId);
+				prop.put("max.poll.records", "1000");
+				prop.put("auto.offset.reset", "earliest");
+				try (Consumer<String, String> consumer = OkafkaTestSupport.consumer(prop)) {
+					consumer.subscribe(Arrays.asList(topic));
+					int consumed = OkafkaTestSupport.consumeExactly(consumer, 1000);
+					Assert.assertEquals("Consumer should read all produced records", 1000, consumed);
+				}
+			} finally {
+				OkafkaTestSupport.deleteTopicIfExists(admin, topic);
 			}
-		} catch (Exception e) {
-			System.out.println("Exception from consumer " + e);
-			e.printStackTrace();
-		} finally {
-			System.out.println("Closing Consumer");
-			consumer.close();
 		}
 	}
 }

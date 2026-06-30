@@ -1,38 +1,22 @@
 package org.oracle.okafka.tests;
 
-import java.util.Arrays;
-import java.util.concurrent.ExecutionException;
-
 import org.apache.kafka.clients.admin.Admin;
-import org.apache.kafka.clients.admin.CreateTopicsResult;
-import org.apache.kafka.clients.admin.NewTopic;
-import org.apache.kafka.common.KafkaFuture;
+import org.junit.Assert;
 import org.junit.Test;
-import org.oracle.okafka.clients.admin.AdminClient;
 
 public class SimpleOkafkaAdmin {
 
-	@Test
-	public void AdminTest() {
-
-		try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
-			CreateTopicsResult result = admin.createTopics(Arrays.asList(new NewTopic("TEQ", 5, (short) 1)));
+	@Test(timeout = 120000)
+	public void simpleOkafkaAdminTest() throws Exception {
+		String topic = OkafkaTestSupport.uniqueTopic("TEQ_ADMIN");
+		try (Admin admin = OkafkaTestSupport.admin()) {
 			try {
-				KafkaFuture<Void> ftr = result.all();
-				ftr.get();
-				System.out.println("Main Thread Out of wait now");
-			} catch (InterruptedException | ExecutionException e) {
-
-				throw new IllegalStateException(e);
+				OkafkaTestSupport.createTopic(admin, topic, 5);
+				Assert.assertTrue("Created topic should be returned by listTopics",
+						OkafkaTestSupport.get(admin.listTopics().names(), "list topics").contains(topic));
+			} finally {
+				OkafkaTestSupport.deleteTopicIfExists(admin, topic);
 			}
-			System.out.println("Auto Closing admin now");
-
-		} catch (Exception e) {
-			System.out.println("Exception while creating topic " + e);
-			e.printStackTrace();
 		}
-
-		System.out.println("Main thread complete ");
-
 	}
 }

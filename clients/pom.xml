@@ -93,34 +93,6 @@
             <version>4.13.2</version>
             <scope>test</scope>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/org.easymock/easymock -->
-        <dependency>
-            <groupId>org.easymock</groupId>
-            <artifactId>easymock</artifactId>
-            <version>4.3</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.powermock/powermock-module-junit4 -->
-        <dependency>
-            <groupId>org.powermock</groupId>
-            <artifactId>powermock-module-junit4</artifactId>
-            <version>2.0.9</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.powermock/powermock-api-support -->
-        <dependency>
-            <groupId>org.powermock</groupId>
-            <artifactId>powermock-api-support</artifactId>
-            <version>2.0.9</version>
-            <scope>test</scope>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/org.powermock/powermock-api-easymock -->
-        <dependency>
-            <groupId>org.powermock</groupId>
-            <artifactId>powermock-api-easymock</artifactId>
-            <version>2.0.9</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
     <build>
         <extensions>

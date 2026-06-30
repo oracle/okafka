@@ -1,97 +1,44 @@
 package org.oracle.okafka.tests;
 
-import java.io.IOException;
 import java.time.Duration;
 import java.util.Arrays;
-import java.util.Collection;
+import java.util.Collections;
 import java.util.Properties;
+
+import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.common.TopicPartition;
+import org.junit.Assert;
 import org.junit.Test;
-import org.oracle.okafka.clients.consumer.KafkaConsumer;
 
 public class OkafkaSeekToBeginning {
-	@Test
-	public void SeekBeginningTest() throws IOException {
-		Properties prop = new Properties();
-		prop = OkafkaSetup.setup();
-        prop.put("group.id" , "S1");
-		prop.put("max.poll.records", 1000);
-		prop.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-		prop.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-		
-        Consumer<String, String> consumer = new KafkaConsumer<String, String>(prop);
-		try {
-				
-				consumer.subscribe(Arrays.asList("TEQ"), new ConsumerRebalanceListener() {
-			        @Override
-			        public synchronized void onPartitionsRevoked(Collection<TopicPartition> partitions) {
-			        	System.out.println("Partitions revoked for rebalance.");
-			        }
-			        @Override
-			        public synchronized void onPartitionsAssigned(Collection<TopicPartition> partitions) {
-			        	 System.out.println("New Partitions assigned after rebalance");
-			        	try {
-			        		consumer.seekToBeginning(partitions);
-			       	    }
-			        	 catch (Exception e) {
-			                 e.printStackTrace();
-			        	 }
-			        }
-			    });
+
+	@Test(timeout = 120000)
+	public void okafkaSeekToBeginningTest() throws Exception {
+		String topic = OkafkaTestSupport.uniqueTopic("TEQ_SEEK_BEGIN");
+		String groupId = OkafkaTestSupport.uniqueGroup("G_SEEK_BEGIN");
+		TopicPartition topicPartition = new TopicPartition(topic, 0);
+		try (Admin admin = OkafkaTestSupport.admin()) {
+			try {
+				OkafkaTestSupport.createTopic(admin, topic, 1);
+				try (Producer<String, String> producer = OkafkaTestSupport.producer()) {
+					OkafkaTestSupport.produceRecords(producer, topic, 10);
+				}
+
+				Properties prop = OkafkaTestSupport.consumerProperties(groupId);
+				prop.put("max.poll.records", "10");
+				prop.put("auto.offset.reset", "latest");
+				try (Consumer<String, String> consumer = OkafkaTestSupport.consumer(prop)) {
+					consumer.subscribe(Arrays.asList(topic));
+					OkafkaTestSupport.waitForAssignment(consumer, Collections.singleton(topicPartition));
+					consumer.seekToBeginning(Collections.singleton(topicPartition));
+					int consumed = OkafkaTestSupport.consumeUpTo(consumer, 10, Duration.ofSeconds(60));
+					Assert.assertEquals("seekToBeginning should allow reading all existing records", 10, consumed);
+				}
+			} finally {
+				OkafkaTestSupport.deleteTopicIfExists(admin, topic);
 			}
-			catch(Exception e) {
-				System.out.println(e);
-				e.printStackTrace();
-			}
-			int expectedMsgCnt = 1000;
-    		int msgCnt = 0;
-    		try {
-    			
-    			while(true) {
-    				try {
-    					ConsumerRecords <String, String> records = consumer.poll(Duration.ofMillis(10000));
-    				
-    					for (ConsumerRecord<String, String> record : records)				
-    						System.out.printf("partition = %d, offset = %d, key = %s, value =%s\n  ", record.partition(), record.offset(), record.key(), record.value());
-
-    					if(records != null && records.count() > 0) {
-    						msgCnt += records.count();
-    						System.out.println("Committing records " + records.count());
-    						consumer.commitSync();
-    						
-    						if(msgCnt >= expectedMsgCnt )
-    						{
-    							System.out.println("Received " + msgCnt + " Expected " + expectedMsgCnt +". Exiting Now.");
-    							break;
-    						}
-    					}
-    					else {
-    						System.out.println("No Record Fetched. Retrying in 1 second");
-    						Thread.sleep(1000);
-    					}
-    					
-    				}catch(Exception e)
-    				{
-    					throw e;
-    				}
-    				}			
-    			
-    		}catch(Exception e)
-    		{
-    			System.out.println("Exception from consumer " + e);
-    			e.printStackTrace();
-    		}finally {
-    			System.out.println("Closing Consumer");
-    			consumer.close();
-    		}
-    	}
-
-    }
-
-
-
-
+		}
+	}
+}

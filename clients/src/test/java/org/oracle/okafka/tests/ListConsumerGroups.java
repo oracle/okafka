@@ -1,37 +1,42 @@
 package org.oracle.okafka.tests;
 
-import java.util.Collection;
-import java.util.stream.Collectors;
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.Properties;
 
 import org.apache.kafka.clients.admin.Admin;
-import org.apache.kafka.clients.admin.ConsumerGroupListing;
-import org.apache.kafka.clients.admin.ListConsumerGroupsResult;
-import org.oracle.okafka.clients.admin.AdminClient;
-
+import org.apache.kafka.clients.consumer.Consumer;
+import org.apache.kafka.clients.producer.Producer;
+import org.junit.Assert;
 import org.junit.Test;
 
 public class ListConsumerGroups {
 	
-	@Test
-	public void ListConsumerGroupsTest() {
-
-		try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
-
-			ListConsumerGroupsResult result = admin.listConsumerGroups();
+	@Test(timeout = 120000)
+	public void listConsumerGroupsTest() throws Exception {
+		String topic = OkafkaTestSupport.uniqueTopic("TEQ_LIST_GROUPS");
+		String groupId = OkafkaTestSupport.uniqueGroup("G_LIST_GROUPS");
+		try (Admin admin = OkafkaTestSupport.admin()) {
 			try {
-				Collection<ConsumerGroupListing> consumerGroups = result.all().get();
-				String groupNames = consumerGroups.stream().map(ConsumerGroupListing::groupId)
-						.collect(Collectors.joining(", "));
-				System.out.println("Consumer Groups: " + groupNames);
-				System.out.println("Main Thread Out of wait now");
-			} catch (Exception e) {
-				System.out.println(e);
+				OkafkaTestSupport.createTopic(admin, topic, 1);
+				try (Producer<String, String> producer = OkafkaTestSupport.producer()) {
+					OkafkaTestSupport.produceRecords(producer, topic, 1);
+				}
+				Properties props = OkafkaTestSupport.consumerProperties(groupId);
+				props.put("auto.offset.reset", "earliest");
+				try (Consumer<String, String> consumer = OkafkaTestSupport.consumer(props)) {
+					consumer.subscribe(Arrays.asList(topic));
+					OkafkaTestSupport.consumeExactly(consumer, 1);
+				}
+				OkafkaTestSupport.eventually("consumer group to be listed: " + groupId, Duration.ofSeconds(30),
+						() -> OkafkaTestSupport.get(admin.listConsumerGroups().all(), "list consumer groups")
+								.stream().anyMatch(group -> group.groupId().equals(groupId)));
+				Assert.assertTrue("Committed consumer group should be listed: " + groupId,
+						OkafkaTestSupport.get(admin.listConsumerGroups().all(), "list consumer groups")
+								.stream().anyMatch(group -> group.groupId().equals(groupId)));
+			} finally {
+				OkafkaTestSupport.deleteTopicIfExists(admin, topic);
 			}
-			System.out.println("Auto Closing admin now");
-		} catch (Exception e) {
-			System.out.println("Exception while listing Consumer Groups " + e);
-			e.printStackTrace();
 		}
-		System.out.println("Test: ListConsumerGroups completed");
 	}
 }

@@ -44,8 +44,10 @@ ext {
 project(':clients') {
     apply plugin : 'java-library'
 
-    sourceCompatibility = minJavaVersion
-    targetCompatibility = minJavaVersion
+    java {
+        sourceCompatibility = minJavaVersion
+        targetCompatibility = minJavaVersion
+    }
 
     sourceSets {
         main {
@@ -70,10 +72,6 @@ project(':clients') {
         implementation group: 'org.apache.kafka', name: 'kafka-clients', version: '3.9.2'     
        
         // Test dependencies
-        testImplementation group: 'org.easymock', name: 'easymock', version: '3.6'
-        testImplementation group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.0-beta.5'
-        testImplementation group: 'org.powermock', name: 'powermock-api-support', version: '2.0.5'
-        testImplementation group: 'org.powermock', name: 'powermock-api-easymock', version: '2.0.0-beta.5'
 	    testImplementation group: 'junit', name: 'junit', version: '4.12'
     }
 
@@ -124,8 +122,40 @@ project(':clients') {
         duplicatesStrategy 'exclude'
     }
 
-    tasks.withType(Test) {
-    onlyIf { false }
+    tasks.named('test') {
+        description = 'Runs fast unit tests. OKafka TEQ integration tests run with integrationTest.'
+        exclude 'org/oracle/okafka/tests/**'
+        testLogging {
+            events 'passed', 'skipped', 'failed'
+            exceptionFormat 'full'
+        }
+    }
+
+    tasks.register('integrationTest', Test) {
+        description = 'Runs OKafka integration tests that require Oracle TEQ configuration.'
+        group = 'verification'
+        testClassesDirs = sourceSets.test.output.classesDirs
+        classpath = sourceSets.test.runtimeClasspath
+        include 'org/oracle/okafka/tests/**'
+        shouldRunAfter tasks.named('test')
+        testLogging {
+            events 'passed', 'skipped', 'failed'
+            exceptionFormat 'full'
+        }
+    }
+
+    tasks.register('runIntegrationTestSuite', JavaExec) {
+        description = 'Runs the OKafka integration test suite through org.oracle.okafka.tests.TestRunner.'
+        group = 'verification'
+        dependsOn tasks.named('testClasses')
+        classpath = sourceSets.test.runtimeClasspath
+        mainClass = 'org.oracle.okafka.tests.TestRunner'
+    }
+
+    tasks.named('check') {
+        if (project.hasProperty('runIntegrationTests')) {
+            dependsOn tasks.named('integrationTest')
+        }
     }
 }
 
@@ -134,8 +164,10 @@ project(':examples:consumer') {
     apply plugin : 'java'
     apply plugin : 'application'
 
-    sourceCompatibility = minJavaVersion
-    targetCompatibility = minJavaVersion
+    java {
+        sourceCompatibility = minJavaVersion
+        targetCompatibility = minJavaVersion
+    }
 
     dependencies {
         // These dependencies are used by the application.
@@ -171,8 +203,10 @@ project(':examples:producer') {
     apply plugin : 'java'
     apply plugin : 'application'
 
-    sourceCompatibility = minJavaVersion
-    targetCompatibility = minJavaVersion
+    java {
+        sourceCompatibility = minJavaVersion
+        targetCompatibility = minJavaVersion
+    }
 
     dependencies {
         // These dependencies are used by the application.

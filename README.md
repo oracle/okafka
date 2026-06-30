@@ -161,13 +161,51 @@ To build the `okafka.jar` file which includes all the dependent jar files in its
 
 This generates `okafka-full-23.8.0.0.jar` in `okafka_source_dir/clients/build/libs`.
 
+### Gradle build and test commands
+
+The default Gradle build compiles and packages the project, but does not run OKafka integration tests. Integration tests require Oracle Database or Autonomous Database connection details in `clients/src/test/resources/test.config` and `clients/src/test/resources/ojdbc.properties`.
+
+On Windows, run these commands from the repository root:
+
+```powershell
+# Build only, without OKafka integration tests
+.\gradlew.bat :clients:build --console=plain
+
+# Clean build only, without OKafka integration tests
+.\gradlew.bat clean build --console=plain
+
+# Run all OKafka integration tests
+.\gradlew.bat :clients:integrationTest --rerun-tasks --console=plain
+
+# Build first, then run all OKafka integration tests
+.\gradlew.bat :clients:build :clients:integrationTest --rerun-tasks --console=plain
+
+# Run the normal Gradle verification lifecycle with OKafka integration tests enabled
+.\gradlew.bat :clients:check -PrunIntegrationTests --rerun-tasks --console=plain
+
+# Run one OKafka integration test class
+.\gradlew.bat :clients:integrationTest --tests org.oracle.okafka.tests.SimpleOkafkaAdmin --rerun-tasks --console=plain
+
+# Run one OKafka integration test method
+.\gradlew.bat :clients:integrationTest --tests org.oracle.okafka.tests.SimpleOkafkaAdmin.AdminTest --rerun-tasks --console=plain
+
+# Run the explicit TestRunner suite, which prints pass/fail stats class by class
+.\gradlew.bat :clients:runIntegrationTestSuite --console=plain
+```
+
+On Linux or macOS, use `./gradlew` instead of `.\gradlew.bat`.
+
 ## Build javadoc
 
-This command generates javadoc in `okafka_source_dir/clients/build/docs/javadoc`
+Generate Javadoc with the Gradle wrapper:
 
-```shell
-gradle javadoc
+```powershell
+.\gradlew.bat :clients:javadoc --console=plain
 ```
+
+The generated files are written to `okafka_source_dir/clients/build/docs/javadoc`.
+
+On Linux or macOS, use `./gradlew :clients:javadoc --console=plain`.
 
 ## Examples
 

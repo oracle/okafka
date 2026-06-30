@@ -1,46 +1,38 @@
 package org.oracle.okafka.tests;
 
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 
+import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.common.TopicPartition;
 import org.junit.Assert;
 import org.junit.Test;
-import org.oracle.okafka.clients.consumer.KafkaConsumer;
 
 public class OkafkaBeginningOffsets {
 
-	@Test
-	public void BeginningOffsetsTest() {
-		Properties prop = OkafkaSetup.setup();
-		prop.put("group.id", "S1");
-		prop.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-		prop.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
+	@Test(timeout = 120000)
+	public void okafkaBeginningOffsetsTest() throws Exception {
+		String topic = OkafkaTestSupport.uniqueTopic("TEQ_BEGINNING");
+		String groupId = OkafkaTestSupport.uniqueGroup("G_BEGINNING");
+		TopicPartition topicPartition = new TopicPartition(topic, 0);
+		Set<TopicPartition> topicPartitions = Collections.singleton(topicPartition);
 
-		Consumer<String, String> consumer = new KafkaConsumer<String, String>(prop);
-		try {
-			Set<TopicPartition> topicPartitions = new HashSet<>();
-			topicPartitions.add(new TopicPartition("TEQ", 0));
-			topicPartitions.add(new TopicPartition("TEQ", 1));
-			topicPartitions.add(new TopicPartition("TEQ", 2));
-
-			Map<TopicPartition, Long> consumerOffsets = consumer.beginningOffsets(topicPartitions);
-			System.out.println("Consumer beginning offsets: " + consumerOffsets);
-			for (TopicPartition tp : topicPartitions) {
-				Long consumerOffset = consumerOffsets.get(tp);
-				System.out.println("TopicPartition " + tp + " consumerOffset=" + consumerOffset);
+		try (Admin admin = OkafkaTestSupport.admin()) {
+			try {
+				OkafkaTestSupport.createTopic(admin, topic, 1);
+				try (Consumer<String, String> consumer = OkafkaTestSupport
+						.consumer(OkafkaTestSupport.consumerProperties(groupId))) {
+					Map<TopicPartition, Long> consumerOffsets = consumer.beginningOffsets(topicPartitions);
+					Assert.assertEquals("Beginning offset should be available for the test partition", 1,
+							consumerOffsets.size());
+					Assert.assertEquals("New topic should begin at offset zero", 0L,
+							consumerOffsets.get(topicPartition).longValue());
+				}
+			} finally {
+				OkafkaTestSupport.deleteTopicIfExists(admin, topic);
 			}
-		} catch (Exception e) {
-			System.out.println("Exception while fetching beginning offsets " + e);
-			e.printStackTrace();
-		} finally {
-			System.out.println("Closing Consumer");
-			consumer.close();
 		}
-
-		System.out.println("Test: OkafkaBeginningOffsets completed");
 	}
 }

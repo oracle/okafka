@@ -1,42 +1,29 @@
 package org.oracle.okafka.tests;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.concurrent.ExecutionException;
 
 import org.apache.kafka.clients.admin.Admin;
-import org.apache.kafka.clients.admin.CreateTopicsResult;
-import org.apache.kafka.clients.admin.DeleteTopicsResult;
-import org.apache.kafka.clients.admin.NewTopic;
-import org.apache.kafka.common.KafkaFuture;
+import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.common.TopicCollection;
 import org.apache.kafka.common.Uuid;
+import org.junit.Assert;
 import org.junit.Test;
-import org.oracle.okafka.clients.admin.AdminClient;
 
 public class OkafkaDeleteTopicById {
-	@Test
-	public void DeleteTopicByIdTest() {
-		try (Admin admin = AdminClient.create(OkafkaSetup.setup())) {
 
-			CreateTopicsResult result = admin.createTopics(Arrays.asList(new NewTopic("TEQ", 5, (short) 1)));
-			Uuid createdTopicId = result.topicId("TEQ").get();
+	@Test(timeout = 120000)
+	public void okafkaDeleteTopicByIdTest() throws Exception {
+		String topic = OkafkaTestSupport.uniqueTopic("TEQ_DELETE_TOPIC_ID");
+		try (Admin admin = OkafkaTestSupport.admin()) {
+			OkafkaTestSupport.createTopic(admin, topic, 1);
+			TopicDescription description = OkafkaTestSupport
+					.get(admin.describeTopics(Arrays.asList(topic)).topicNameValues().get(topic), "describe topic");
+			Uuid topicId = description.topicId();
 
-			DeleteTopicsResult delResult = admin.deleteTopics(
-					TopicCollection.TopicNameCollection.ofTopicIds(new ArrayList<Uuid>(Arrays.asList(createdTopicId))));
-			try {
-				KafkaFuture<Void> ftr = delResult.all();
-				ftr.get();
-				System.out.println("Main Thread Out of wait now");
-			} catch (InterruptedException | ExecutionException e) {
-
-				throw new IllegalStateException(e);
-			}
-			System.out.println("Auto Closing admin now");
-		} catch (Exception e) {
-			System.out.println("Exception while deleting topic " + e);
-			e.printStackTrace();
+			OkafkaTestSupport.get(admin.deleteTopics(TopicCollection.TopicIdCollection.ofTopicIds(Arrays.asList(topicId)))
+					.all(), "delete topic by id");
+			Assert.assertFalse("Deleted topic should no longer be listed",
+					OkafkaTestSupport.get(admin.listTopics().names(), "list topics").contains(topic));
 		}
-		System.out.println("Test: OkfakaDeleteTopicById completed");
 	}
 }

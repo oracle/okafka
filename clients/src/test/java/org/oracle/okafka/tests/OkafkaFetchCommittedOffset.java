@@ -1,47 +1,48 @@
 package org.oracle.okafka.tests;
 
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.Collections;
 
+import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
+import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.common.TopicPartition;
+import org.junit.Assert;
 import org.junit.Test;
-import org.oracle.okafka.clients.consumer.KafkaConsumer;
 
 public class OkafkaFetchCommittedOffset {
 
-	@Test
-	public void FetchCommittedOffsetTest() {
-		Properties prop = new Properties();
-		prop = OkafkaSetup.setup();
-		prop.put("group.id", "S1");
-		prop.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-		prop.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
-		
-		Consumer<String, String> consumer = new KafkaConsumer<String, String>(prop);
-		try {
-			Set<TopicPartition> topicPartitons = new HashSet<>();
-			topicPartitons.add(new TopicPartition("TEQ",0));
-			topicPartitons.add(new TopicPartition("TEQ",1));
-			topicPartitons.add(new TopicPartition("TEQ",2));
-			topicPartitons.add(new TopicPartition("TEQ",3));
-			topicPartitons.add(new TopicPartition("TEQ",4));
-
-        	Map<TopicPartition,OffsetAndMetadata> committedMap = consumer.committed(topicPartitons);
-        	System.out.println(committedMap);
-        	
-		} catch (Exception e) {
-			System.out.println("Exception while Fetching Committed Offset " + e);
-			e.printStackTrace();
-		} finally {
-			System.out.println("Test: OkafkaFetchCommittedOffset complete");
-			System.out.println("Closing Consumer");
-			consumer.close();
+	@Test(timeout = 120000)
+	public void okafkaFetchCommittedOffsetTest() throws Exception {
+		String topic = OkafkaTestSupport.uniqueTopic("TEQ_COMMITTED");
+		String groupId = OkafkaTestSupport.uniqueGroup("G_COMMITTED");
+		TopicPartition topicPartition = new TopicPartition(topic, 0);
+		Set<TopicPartition> topicPartitions = Collections.singleton(topicPartition);
+		try (Admin admin = OkafkaTestSupport.admin()) {
+			try {
+				OkafkaTestSupport.createTopic(admin, topic, 1);
+				try (Producer<String, String> producer = OkafkaTestSupport.producer()) {
+					OkafkaTestSupport.produceRecords(producer, topic, 3);
+				}
+				Properties prop = OkafkaTestSupport.consumerProperties(groupId);
+				prop.put("auto.offset.reset", "earliest");
+				prop.put("max.poll.records", "3");
+				try (Consumer<String, String> consumer = OkafkaTestSupport.consumer(prop)) {
+					consumer.subscribe(Arrays.asList(topic));
+					OkafkaTestSupport.consumeExactly(consumer, 3);
+					Map<TopicPartition, OffsetAndMetadata> committedMap = consumer.committed(topicPartitions);
+					Assert.assertNotNull("Committed offset should be present after commit",
+							committedMap.get(topicPartition));
+					Assert.assertEquals("Committed offset should equal consumed record count", 3L,
+							committedMap.get(topicPartition).offset());
+				}
+			} finally {
+				OkafkaTestSupport.deleteTopicIfExists(admin, topic);
+			}
 		}
 	}
-
 }
