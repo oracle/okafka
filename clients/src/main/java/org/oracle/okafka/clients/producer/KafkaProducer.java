@@ -88,6 +88,7 @@ import org.apache.kafka.common.utils.Time;
 import org.apache.kafka.common.utils.Utils;
 import org.oracle.okafka.clients.Metadata;
 import org.oracle.okafka.clients.producer.internals.AQKafkaProducer;
+import org.oracle.okafka.clients.producer.internals.MessageExpiration;
 import org.oracle.okafka.clients.producer.internals.OracleTransactionManager;
 import org.oracle.okafka.clients.producer.internals.OkafkaProducerMetrics;
 import org.oracle.okafka.clients.producer.internals.SenderThread;
@@ -1980,6 +1981,7 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
 
 			setReadOnly(record.headers());
 			Header[] headers = record.headers().toArray();
+			MessageExpiration.timeToLive(headers);
 
 			int serializedSize = AbstractRecords.estimateSizeInBytesUpperBound(apiVersions.maxUsableProduceMagic(),
 					compression.type(), serializedKey, serializedValue, headers);
