@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import org.apache.kafka.clients.consumer.ConsumerGroupMetadata;
 import org.apache.kafka.clients.consumer.OffsetAndTimestamp;
@@ -136,6 +137,7 @@ public class ConsumerNetworkClient {
 	String consumerGroupId;
 	private final AQKafkaConsumer aqConsumer;
 	private final ConsumerCoordinatorMetrics sensors;
+	private final Consumer<Map<TopicPartition, OffsetAndMetadata>> autoCommitCallback;
 	private long lastRebalanceStartMs = -1L;
     private long lastRebalanceEndMs = -1L;
 	
@@ -156,7 +158,8 @@ public class ConsumerNetworkClient {
 			int sessionTimeoutMs,
 			long defaultApiTimeoutMs,
 			AQKafkaConsumer aqConsumer,
-			Metrics metrics) {
+			Metrics metrics,
+			Consumer<Map<TopicPartition, OffsetAndMetadata>> autoCommitCallback) {
 		this.consumerGroupId = groupId;
 		this.log = logContext.logger(ConsumerNetworkClient.class);
 		this.client = client;
@@ -173,7 +176,8 @@ public class ConsumerNetworkClient {
 		//Snapshot of subscription. Useful for ensuring if all topics are subscribed.
 		this.subscriptionSnapshot = new HashSet<>();
 		this.defaultApiTimeoutMs = defaultApiTimeoutMs;
-        this.aqConsumer = aqConsumer;
+		this.aqConsumer = aqConsumer;
+		this.autoCommitCallback = autoCommitCallback;
         this.sensors = new ConsumerCoordinatorMetrics(metrics, "consumer");
 		if (autoCommitEnabled)
 			this.nextAutoCommitDeadline = time.milliseconds() + autoCommitIntervalMs;
@@ -974,9 +978,13 @@ public class ConsumerNetworkClient {
 	 */
 	private void doCommitOffsetsSync() {
 		Map<TopicPartition, OffsetAndMetadata> allConsumedOffsets = subscriptions.allConsumed();
+		if (allConsumedOffsets.isEmpty())
+			return;
+		Map<TopicPartition, OffsetAndMetadata> committedOffsets = new HashMap<>(allConsumedOffsets);
 
 		try {
 			commitOffsetsSync(allConsumedOffsets, 0);
+			autoCommitCallback.accept(committedOffsets);
 
 		} catch(Exception exception) {
 			//nothing to do
@@ -1306,10 +1314,14 @@ public class ConsumerNetworkClient {
 		KafkaException autoCommitException = null;
 		if(autoCommitEnabled) {
 			Map<TopicPartition, OffsetAndMetadata> allConsumedOffsets = subscriptions.allConsumed();
-			try {
-				commitOffsetsSync(allConsumedOffsets, timeoutMs);
-			} catch (Exception exception) {
-				autoCommitException= new KafkaException("failed to commit consumed messages", exception);
+			if (!allConsumedOffsets.isEmpty()) {
+				Map<TopicPartition, OffsetAndMetadata> committedOffsets = new HashMap<>(allConsumedOffsets);
+				try {
+					commitOffsetsSync(allConsumedOffsets, timeoutMs);
+					autoCommitCallback.accept(committedOffsets);
+				} catch (Exception exception) {
+					autoCommitException= new KafkaException("failed to commit consumed messages", exception);
+				}
 			}
 		}
 		this.client.close();
