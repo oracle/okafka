@@ -126,6 +126,77 @@ You can get a detailed description of the Producer, Consumer and Administration 
 >> topic.name=<Oracle Database TxEventQ Topic, use uppercase>
 >> ```
 
+### Per-message expiration
+
+Set a relative time to live (TTL) on an individual producer record using a
+standard Kafka header:
+
+```java
+import java.time.Duration;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.oracle.okafka.clients.producer.OKafkaHeaders;
+
+ProducerRecord<String, String> record =
+    new ProducerRecord<>("ORDERS", "order-123", "payload");
+record.headers().add(OKafkaHeaders.timeToLive(Duration.ofMinutes(1)));
+producer.send(record);
+```
+
+Each record may have a different TTL, including records in the same batch.
+Both bulk and transactional sends pass the lifetime to AQ JMS. TTL starts at
+enqueue, not when the application calls `send()`; time in the accumulator is
+not subtracted. A retry that enqueues again supplies the relative lifetime again.
+Send completion reports enqueue success, not consumption before expiration.
+
+When consuming a V2 record, retrieve the original TTL value in milliseconds:
+
+```java
+long ttlMillis = OKafkaHeaders.timeToLive(record.headers());
+```
+
+This returns `-1` when the TTL header is absent, `0` when the producer
+explicitly requested no expiration, or the positive millisecond value encoded
+by the producer. It returns the encoded value rather than AQ's whole-second
+rounded lifetime.
+
+The header contract is:
+
+- Name: `x-okafka-ttl-ms`, case-sensitive.
+- Value: exactly eight bytes encoding a big-endian signed long in milliseconds.
+- Missing header: preserve the send path's existing default lifetime.
+- Zero: no per-message expiration.
+- Positive values: rounded up to whole seconds before sending to AQ JMS.
+- Maximum: 2,147,483,000 milliseconds (about 24.85 days), to avoid the AQ API
+  23.3 enqueue paths narrowing milliseconds to a 32-bit integer.
+- Negative values, duplicates, null values, invalid byte lengths, and excessive
+  lifetimes are rejected. The helper rounds fractional milliseconds up.
+
+V2 messages preserve the header in their payload; V1 applies TTL but does not
+preserve Kafka headers on consumption. Existing offset conversion is unchanged.
+Priority and delay headers are not interpreted by this feature.
+
+Topic creation's `retention.ms` is separate from per-message expiration and is
+not used as a default TTL. Zero TTL does not override topic retention. Expiration
+controls eligibility for normal delivery; it does not require immediate physical
+deletion. Inspect the expiration deadline and verify consumption after it rather
+than relying on the presence of rows or `MSG_STATE` alone.
+
+To run the database integration test, configure `clients/src/test/resources/test.config`
+and its JDBC/wallet settings, then run from the repository root:
+
+```powershell
+.\gradlew.bat :clients:integrationTest --tests org.oracle.okafka.tests.OkafkaExpiration --rerun-tasks
+```
+
+The test creates a unique `TEQEXP_<timestamp>` topic with one-hour retention,
+sends five records with the TTL configured in the test, one explicit zero-TTL
+control, and one headerless control. The first consumer verifies every record's
+TTL header value, then after the TTL plus 15 seconds another group receives
+only the two non-expiring controls. It deletes the exact topic in cleanup. A
+topic left behind by an interrupted run does not block later runs. Validate
+transactional commit/rollback, retries, supported database versions, and
+restart/seek across expired records separately before release.
+
 ### Building okafka.jar
 
 Simplest way to build the `okafka.jar` file is by using Gradle build tool.

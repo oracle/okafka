@@ -359,6 +359,24 @@ producerProperties.put("value.serializer", StringSerializer.class.getName());
 
 Keep `send(...).get()` and `flush()` semantics for smoke tests when the original code waits for delivery.
 
+### Optional per-message expiration
+
+OKafka supports a TxEventQ-specific TTL through
+`org.oracle.okafka.clients.producer.OKafkaHeaders.timeToLive(Duration)`:
+
+```java
+record.headers().add(OKafkaHeaders.timeToLive(Duration.ofMinutes(1)));
+producer.send(record);
+```
+
+Keep the standard Kafka `ProducerRecord` and `send()` APIs. This header's
+expiration behavior is specific to OKafka; an Apache Kafka producer will not
+apply TxEventQ expiration simply because the header is present. TTL is per
+record and separate from topic-wide `retention.ms`. Do not add TTL during a
+migration unless the application requires expiration. See the
+[header contract and integration test](../README.md#per-message-expiration)
+for encoding, limits, rounding, and validation details.
+
 ## Consumer Conversion
 
 Before:

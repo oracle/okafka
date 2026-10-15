@@ -360,7 +360,9 @@ public final class AQKafkaProducer extends AQClient {
 							serializedValue != null ? ByteBuffer.wrap(serializedValue) : null , headers, msgVersion);
 
 			try {
-				tps.publish(byteMessage, DeliveryMode.PERSISTENT, 0, AQjmsConstants.EXPIRATION_NEVER);
+				long ttl = MessageExpiration.timeToLive(headers);
+				tps.publish(byteMessage, DeliveryMode.PERSISTENT, 0,
+						ttl < 0 ? AQjmsConstants.EXPIRATION_NEVER : ttl);
 			}catch(JMSException e)
 			{
 				log.error("Exception while producing transactionl message " + e.getMessage());
@@ -528,7 +530,8 @@ public final class AQKafkaProducer extends AQClient {
 					}
 				}
 
-				final List<AQjmsBytesMessage> messages = new ArrayList<>();	
+				final List<AQjmsBytesMessage> messages = new ArrayList<>();
+				final List<Long> timeToLives = new ArrayList<>();
 				Iterator<MutableRecordBatch> mutableRecordBatchIterator = memoryRecords.batchIterator();
 				while(mutableRecordBatchIterator.hasNext()) {
 					Iterator<Record>  recordIterator = mutableRecordBatchIterator.next().iterator();
@@ -536,6 +539,7 @@ public final class AQKafkaProducer extends AQClient {
 						Record record = recordIterator.next();
 						byteMessage = createBytesMessage(session, topicPartition, record.key(), record.value(), record.headers(), msgVersion);
 						messages.add(byteMessage);
+						timeToLives.add(MessageExpiration.timeToLive(record.headers()));
 					}
 				}
 
@@ -544,7 +548,7 @@ public final class AQKafkaProducer extends AQClient {
 
 				log.trace("sending messages to topic : {} with partition: {}, number of messages: {}", topicPartition.topic(), topicPartition.partition(), msgs.length);
 
-				sendToAQ(msgs, publisher);
+				sendToAQ(msgs, publisher, timeToLives);
 				if(idempotentProducer)
 				{
 					try {
@@ -733,10 +737,25 @@ public final class AQKafkaProducer extends AQClient {
 	 * @param publisher topic publisher used for sending messages
 	 * @throws JMSException throws JMSException
 	 */
-	private void sendToAQ(AQjmsBytesMessage[] messages, TopicPublisher publisher) throws JMSException {
+	private void sendToAQ(AQjmsBytesMessage[] messages, TopicPublisher publisher, List<Long> timeToLives) throws JMSException {
 		//Sends messages in bulk using topic publisher;
-		log.info("In BulkSend: #messages = " + messages.length);
-		((AQjmsProducer)publisher).bulkSend(publisher.getTopic(), messages);
+		boolean hasExpiration = timeToLives.stream().anyMatch(ttl -> ttl >= 0);
+		if (!hasExpiration) {
+			((AQjmsProducer) publisher).bulkSend(publisher.getTopic(), messages);
+			return;
+		}
+		int[] deliveryModes = new int[messages.length];
+		int[] priorities = new int[messages.length];
+		long[] lifetimes = new long[messages.length];
+		int deliveryMode = publisher.getDeliveryMode();
+		int priority = publisher.getPriority();
+		long defaultLifetime = publisher.getTimeToLive();
+		for (int i = 0; i < messages.length; i++) {
+			deliveryModes[i] = deliveryMode;
+			priorities[i] = priority;
+			lifetimes[i] = timeToLives.get(i) < 0 ? defaultLifetime : timeToLives.get(i);
+		}
+		((AQjmsProducer) publisher).bulkSend(publisher.getTopic(), messages, deliveryModes, priorities, lifetimes);
 	}
 
 	/**
