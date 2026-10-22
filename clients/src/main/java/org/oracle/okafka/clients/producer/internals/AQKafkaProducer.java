@@ -43,6 +43,7 @@ import org.apache.kafka.clients.producer.RecordMetadata;
 import org.oracle.okafka.clients.Metadata;
 import org.oracle.okafka.clients.NetworkClient;
 import org.oracle.okafka.clients.TopicTeqParameters;
+import org.oracle.okafka.clients.producer.OKafkaHeaders;
 import org.oracle.okafka.clients.producer.ProducerConfig;
 import org.oracle.okafka.clients.producer.internals.OracleTransactionManager.TransactionState;
 import org.oracle.okafka.common.Node;
@@ -360,7 +361,9 @@ public final class AQKafkaProducer extends AQClient {
 							serializedValue != null ? ByteBuffer.wrap(serializedValue) : null , headers, msgVersion);
 
 			try {
-				tps.publish(byteMessage, DeliveryMode.PERSISTENT, 0, AQjmsConstants.EXPIRATION_NEVER);
+				long ttl = MessageExpiration.timeToLive(headers);
+				tps.publish(byteMessage, DeliveryMode.PERSISTENT, 0,
+						ttl <= 0 ? AQjmsConstants.EXPIRATION_NEVER : ttl);
 			}catch(JMSException e)
 			{
 				log.error("Exception while producing transactionl message " + e.getMessage());
@@ -528,14 +531,24 @@ public final class AQKafkaProducer extends AQClient {
 					}
 				}
 
-				final List<AQjmsBytesMessage> messages = new ArrayList<>();	
+				final List<AQjmsBytesMessage> messages = new ArrayList<>();
+				final List<Long> timeToLives = new ArrayList<>();
+				boolean hasTtlHeader = false;
 				Iterator<MutableRecordBatch> mutableRecordBatchIterator = memoryRecords.batchIterator();
 				while(mutableRecordBatchIterator.hasNext()) {
 					Iterator<Record>  recordIterator = mutableRecordBatchIterator.next().iterator();
 					while(recordIterator.hasNext()) {
 						Record record = recordIterator.next();
-						byteMessage = createBytesMessage(session, topicPartition, record.key(), record.value(), record.headers(), msgVersion);
+						Header[] headers = record.headers();
+						byteMessage = createBytesMessage(session, topicPartition, record.key(), record.value(), headers, msgVersion);
 						messages.add(byteMessage);
+						timeToLives.add(MessageExpiration.timeToLive(headers));
+						for (Header header : headers) {
+							if (OKafkaHeaders.TTL_MS.equals(header.key())) {
+								hasTtlHeader = true;
+								break;
+							}
+						}
 					}
 				}
 
@@ -544,7 +557,7 @@ public final class AQKafkaProducer extends AQClient {
 
 				log.trace("sending messages to topic : {} with partition: {}, number of messages: {}", topicPartition.topic(), topicPartition.partition(), msgs.length);
 
-				sendToAQ(msgs, publisher);
+				sendToAQ(msgs, publisher, timeToLives, hasTtlHeader);
 				if(idempotentProducer)
 				{
 					try {
@@ -733,10 +746,31 @@ public final class AQKafkaProducer extends AQClient {
 	 * @param publisher topic publisher used for sending messages
 	 * @throws JMSException throws JMSException
 	 */
-	private void sendToAQ(AQjmsBytesMessage[] messages, TopicPublisher publisher) throws JMSException {
+	private void sendToAQ(AQjmsBytesMessage[] messages, TopicPublisher publisher, List<Long> timeToLives, boolean hasTtlHeader) throws JMSException {
 		//Sends messages in bulk using topic publisher;
-		log.info("In BulkSend: #messages = " + messages.length);
-		((AQjmsProducer)publisher).bulkSend(publisher.getTopic(), messages);
+		if (!hasTtlHeader) {
+			((AQjmsProducer) publisher).bulkSend(publisher.getTopic(), messages);
+			return;
+		}
+		int[] deliveryModes = new int[messages.length];
+		int[] priorities = new int[messages.length];
+		long[] lifetimes = new long[messages.length];
+		int deliveryMode = publisher.getDeliveryMode();
+		int priority = publisher.getPriority();
+		long defaultLifetime = AQjmsConstants.EXPIRATION_NEVER;
+		for (int i = 0; i < messages.length; i++) {
+			deliveryModes[i] = deliveryMode;
+			priorities[i] = priority;
+			long timeToLive = timeToLives.get(i);
+			if (timeToLive == -1) {
+				lifetimes[i] = defaultLifetime;
+			} else if (timeToLive == 0) {
+				lifetimes[i] = AQjmsConstants.EXPIRATION_NEVER;
+			} else {
+				lifetimes[i] = timeToLive;
+			}
+		}
+		((AQjmsProducer) publisher).bulkSend(publisher.getTopic(), messages, deliveryModes, priorities, lifetimes);
 	}
 
 	/**

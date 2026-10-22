@@ -665,7 +665,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 					this.assignors, config.getBoolean(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG),
 					config.getInt(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG), time, retryBackoffMs,
 					maxPollIntervalMs, this.requestTimeoutMs, sessionTimeoutMs, defaultApiTimeoutMs, aqConsumer,
-					metrics);
+					metrics, this.interceptors::onCommit);
 			
 			this.topicMetadataFetcher = new TopicMetadataFetcher(logContext,this.client);
 
@@ -1377,6 +1377,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 	public void commitAsync(OffsetCommitCallback callback) {
 		try {
 			client.commitOffsetsSync(subscriptions.allConsumed(), defaultApiTimeoutMs);
+			interceptors.onCommit(this.subscriptions.allConsumed());
 			if (callback != null)
 				callback.onComplete(this.subscriptions.allConsumed(), null);
 		} catch (Exception exception) {
