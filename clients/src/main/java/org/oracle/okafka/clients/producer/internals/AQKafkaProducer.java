@@ -35,6 +35,7 @@ import oracle.jms.AQjmsConstants;
 import oracle.jms.AQjmsException;
 import oracle.jms.AQjmsProducer;
 import oracle.jms.AQjmsSession;
+import oracle.jdbc.internal.NetStat;
 
 import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
@@ -411,9 +412,56 @@ public final class AQKafkaProducer extends AQClient {
 	}
 
 	public ClientResponse send(ClientRequest request) {
-		ClientResponse cr = parseRequest(request, ApiKeys.convertToOracleApiKey(request.apiKey()));	
-		selectorMetrics.recordCompletedReceive(cr.destination(), cr.requestLatencyMs());
-		return cr;
+		ApiKeys key = ApiKeys.convertToOracleApiKey(request.apiKey());
+		selectorMetrics.recordRequest(request.destination());
+		NetStat networkStats = null;
+		long sentBefore = 0;
+		long receivedBefore = 0;
+		try {
+			if (key != ApiKeys.PRODUCE)
+				networkStats = getNetworkStats(request.destination());
+			if (networkStats != null) {
+				sentBefore = networkStats.getTotalBytesSent();
+				receivedBefore = networkStats.getTotalBytesReceived();
+			}
+		} catch (Exception e) {
+			networkStats = null;
+			log.debug("Skipping network byte measurement: initial counters unavailable", e);
+		}
+		ClientResponse response = null;
+		try {
+			response = parseRequest(request, key);
+			return response;
+		} finally {
+			if (networkStats != null) {
+				try {
+					long sentBytes = Math.max(0, networkStats.getTotalBytesSent() - sentBefore);
+					long receivedBytes = response == null ? 0
+							: Math.max(0, networkStats.getTotalBytesReceived() - receivedBefore);
+					long now = System.currentTimeMillis();
+					selectorMetrics.recordRequestBytes(request.destination(), sentBytes, now);
+					if (response != null)
+						selectorMetrics.recordResponseBytes(response.destination(), receivedBytes, now);
+				} catch (Exception e) {
+					log.debug("Skipping network byte measurement: final recording failed", e);
+				}
+			}
+			if (response != null)
+				selectorMetrics.recordCompletedReceive(response.destination());
+		}
+	}
+
+	private NetStat getNetworkStats(String destination) {
+		for (Map.Entry<Node, TopicPublishers> entry : topicPublishersMap.entrySet()) {
+			if (destination.equals(String.valueOf(entry.getKey().id()))) {
+				try {
+					return ConnectionUtils.getNetworkStats(((AQjmsSession) entry.getValue().getSession()).getDBConnection());
+				} catch (JMSException e) {
+					return null;
+				}
+			}
+		}
+		return null;
 	}
 
 	/**
@@ -492,6 +540,20 @@ public final class AQKafkaProducer extends AQClient {
 				}
 				log.debug("Found a publisher " + nodePublishers +" for node " + node);
 				TopicSession session = nodePublishers.getSession();
+				// Each retry snapshots its own connection; failed attempts are not recorded.
+				NetStat attemptStats = null;
+				long sentBefore = 0;
+				long receivedBefore = 0;
+				try {
+					attemptStats = ConnectionUtils.getNetworkStats(((AQjmsSession) session).getDBConnection());
+					if (attemptStats != null) {
+						sentBefore = attemptStats.getTotalBytesSent();
+						receivedBefore = attemptStats.getTotalBytesReceived();
+					}
+				} catch (Exception e) {
+					attemptStats = null;
+					log.debug("Skipping publish byte measurement: initial counters unavailable", e);
+				}
 
 				if(idempotentProducer)
 				{
@@ -592,7 +654,17 @@ public final class AQKafkaProducer extends AQClient {
 						throw e;
 					}
 				}
-				selectorMetrics.recordCompletedSend(request.destination(),batchSize, System.currentTimeMillis());
+				if (attemptStats != null) {
+					try {
+						long sentBytes = Math.max(0, attemptStats.getTotalBytesSent() - sentBefore);
+						long receivedBytes = Math.max(0, attemptStats.getTotalBytesReceived() - receivedBefore);
+						long now = System.currentTimeMillis();
+						selectorMetrics.recordRequestBytes(request.destination(), sentBytes, now);
+						selectorMetrics.recordResponseBytes(request.destination(), receivedBytes, now);
+					} catch (Exception e) {
+						log.debug("Skipping publish byte measurement: final recording failed", e);
+					}
+				}
 				log.trace("Messages sent successfully to topic : {} with partition: {}, number of messages: {}", topicPartition.topic(), topicPartition.partition(), msgs.length);
 				retryCnt = 0;
 			}

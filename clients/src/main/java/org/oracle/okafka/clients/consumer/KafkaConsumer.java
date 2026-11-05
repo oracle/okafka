@@ -1099,7 +1099,7 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 		}
 
 		Map<TopicPartition, List<ConsumerRecord<K, V>>> consumerRecords = new HashMap<>();
-		Map<TopicPartition, Integer> headersSize = new HashMap();
+		Map<TopicPartition, Integer> headerSizes = new HashMap<>();
 		ConsumerRecord<K, V> record;
 		String topic = null;
 		int partition = -1;
@@ -1108,9 +1108,9 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 		byte[] valueArray = null;
 		int keyLen = 0;
 		int valueLen = 0;
-		int hSize = 0;
 
 		for (AQjmsBytesMessage message : messages) {
+			int hSize = 0;
 			keyArray = null;
 			valueArray = null;
 			keyLen = 0;
@@ -1241,9 +1241,9 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 				consumerRecords.put(tp, new ArrayList<ConsumerRecord<K, V>>());
 			consumerRecords.get(tp).add(record);
 
-			if (!headersSize.containsKey(tp))
-				headersSize.put(tp, hSize);
-			headersSize.put(tp, headersSize.get(tp) + hSize);
+			if (!headerSizes.containsKey(tp))
+				headerSizes.put(tp, 0);
+			headerSizes.put(tp, headerSizes.get(tp) + hSize);
 
 		}
 
@@ -1259,8 +1259,8 @@ public class KafkaConsumer<K, V> implements Consumer<K, V> {
 			for (int i = 0; i < recordCount; i++) {
 				bytes += recordList.get(i).serializedKeySize();
 				bytes += recordList.get(i).serializedValueSize();
-				bytes += hSize;
 			}
+			bytes += headerSizes.get(entry.getKey());
 			fetchResponseMetricAggregator.record(entry.getKey(), bytes, recordCount);
 		}
 		return consumerRecords;
