@@ -39,6 +39,7 @@ import oracle.jms.AQjmsBytesMessage;
 import oracle.jms.AQjmsConnection;
 import oracle.jms.AQjmsConsumer;
 import oracle.jms.AQjmsSession;
+import oracle.jdbc.internal.NetStat;
 
 import org.apache.kafka.clients.ClientRequest;
 import org.apache.kafka.clients.ClientResponse;
@@ -175,12 +176,54 @@ public final class AQKafkaConsumer extends AQClient{
 	}
 
 	public ClientResponse send(ClientRequest request) {
-		this.selectorMetrics.requestCompletedSend(request.destination());
-		ClientResponse cr = parseRequest(request, ApiKeys.convertToOracleApiKey(request.apiKey()));
-		if(cr!=null) {
-			this.selectorMetrics.recordCompletedReceive(cr.destination(),cr.requestLatencyMs());
+		this.selectorMetrics.recordRequest(request.destination());
+		NetStat networkStats = null;
+		long sentBefore = 0;
+		long receivedBefore = 0;
+		try {
+			networkStats = getNetworkStats(request.destination());
+			if (networkStats != null) {
+				sentBefore = networkStats.getTotalBytesSent();
+				receivedBefore = networkStats.getTotalBytesReceived();
+			}
+		} catch (Exception e) {
+			networkStats = null;
+			log.debug("Skipping network byte measurement: initial counters unavailable", e);
 		}
-		return cr;
+		ClientResponse response = null;
+		try {
+			response = parseRequest(request, ApiKeys.convertToOracleApiKey(request.apiKey()));
+			return response;
+		} finally {
+			if (networkStats != null) {
+				try {
+					long sentBytes = Math.max(0, networkStats.getTotalBytesSent() - sentBefore);
+					long receivedBytes = response == null ? 0
+							: Math.max(0, networkStats.getTotalBytesReceived() - receivedBefore);
+					long now = System.currentTimeMillis();
+					this.selectorMetrics.recordRequestBytes(request.destination(), sentBytes, now);
+					if (response != null)
+						this.selectorMetrics.recordResponseBytes(response.destination(), receivedBytes, now);
+				} catch (Exception e) {
+					log.debug("Skipping network byte measurement: final recording failed", e);
+				}
+			}
+			if (response != null)
+				this.selectorMetrics.recordCompletedReceive(response.destination(), response.requestLatencyMs());
+		}
+	}
+
+	private NetStat getNetworkStats(String destination) {
+		for (Map.Entry<Node, TopicConsumers> entry : topicConsumersMap.entrySet()) {
+			if (destination.equals(String.valueOf(entry.getKey().id()))) {
+				try {
+					return ConnectionUtils.getNetworkStats(((AQjmsSession) entry.getValue().getSession()).getDBConnection());
+				} catch (JMSException e) {
+					return null;
+				}
+			}
+		}
+		return null;
 	}
 	
 	/**

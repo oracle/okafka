@@ -38,6 +38,7 @@ import org.oracle.okafka.common.utils.MessageIdConverter.OKafkaOffset;
 import org.slf4j.Logger;
 
 import oracle.jdbc.internal.OracleConnection;
+import oracle.jdbc.internal.NetStat;
 import oracle.jdbc.pool.OracleDataSource;
 import oracle.jms.AQjmsFactory;
 import oracle.jms.AQjmsSession;
@@ -46,6 +47,7 @@ import oracle.jms.AQjmsTopicConnectionFactory;
 public class ConnectionUtils {
 	
 	static final int CONNECTION_VALIDATION_TIMEOUT_SEC = 5;
+	private static final String ORACLE_JDBC_ENABLE_METRICS = "oracle.jdbc.diagnostic.enableMetrics";
 	
 	public static String createUrl(Node node, AbstractConfig configs) {
 
@@ -69,6 +71,7 @@ public class ConnectionUtils {
 		dataSource.setURL(dbUrl);
 		log.info("Connecting to Oracle Database : "+ dbUrl);
 		dataSource.setConnectionProperty(CommonClientConfigs.ORACLE_NET_TNS_ADMIN, configs.getString(CommonClientConfigs.ORACLE_NET_TNS_ADMIN));
+		dataSource.setConnectionProperty(ORACLE_JDBC_ENABLE_METRICS, "true");
 		if( !configs.getString(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG).equalsIgnoreCase("PLAINTEXT")) {
 			dataSource.setConnectionProperty("oracle.net.wallet_location", "file:" + configs.getString(CommonClientConfigs.ORACLE_NET_TNS_ADMIN));
 			if(!node.isBootstrap())
@@ -80,6 +83,16 @@ public class ConnectionUtils {
 	public static Connection createJDBCConnection(Node node, AbstractConfig configs, Logger log) throws SQLException{
 			Connection conn =  getOracleDataSource(node, configs, log).getConnection();
 			return conn;
+	}
+
+	public static NetStat getNetworkStats(Connection connection) {
+		if (connection == null)
+			return null;
+		try {
+			return connection.unwrap(OracleConnection.class).getNetworkStat();
+		} catch (SQLException e) {
+			return null;
+		}
 	}
 	
 	public static TopicConnection createTopicConnection(java.sql.Connection dbConn, AbstractConfig configs, Logger log)

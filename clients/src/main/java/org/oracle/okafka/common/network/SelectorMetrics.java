@@ -33,7 +33,10 @@ public class SelectorMetrics {
     public final Sensor connectionClosed;
     public final Sensor connectionCreated;
     public final Sensor requestsSent;
+    public final Sensor requestSizes;
     public final Sensor responsesReceived;
+    public final Sensor bytesSent;
+    public final Sensor bytesReceived;
     
     
     /* Names of metrics that are not registered through sensors */
@@ -66,15 +69,21 @@ public class SelectorMetrics {
 
 		this.requestsSent = sensor("requests-sent:" + tagsSuffix);
 		this.requestsSent.add(createMeter(metrics, metricGrpName, metricTags, new WindowedCount(), "request", "requests sent"));
+		this.requestSizes = sensor("request-sizes:" + tagsSuffix);
 		MetricName metricName = metrics.metricName("request-size-avg", metricGrpName, "The average size of requests sent.", metricTags);
-		this.requestsSent.add(metricName, new Avg());
+		this.requestSizes.add(metricName, new Avg());
 		metricName = metrics.metricName("request-size-max", metricGrpName, "The maximum size of any request sent.", metricTags);
-		this.requestsSent.add(metricName, new Max());
+		this.requestSizes.add(metricName, new Max());
 
 
 		this.responsesReceived = sensor("responses-received:" + tagsSuffix);
 		this.responsesReceived.add(createMeter(metrics, metricGrpName, metricTags,
 				new WindowedCount(), "response", "responses received"));
+
+		this.bytesSent = sensor("bytes-sent:" + tagsSuffix);
+		this.bytesSent.add(createMeter(metrics, metricGrpName, metricTags, "outgoing-byte", "outgoing bytes"));
+		this.bytesReceived = sensor("bytes-received:" + tagsSuffix);
+		this.bytesReceived.add(createMeter(metrics, metricGrpName, metricTags, "incoming-byte", "incoming bytes"));
 		
 		/*
 		metricName=metrics.metricName("connection-count", metricGrpName,"The current number of active connections.", metricTags);
@@ -130,10 +139,11 @@ public class SelectorMetrics {
 
 				nodeRequest = sensor(nodeRequestName);
 				nodeRequest.add(createMeter(metrics, perConnectionMetricGrpName, tags, new WindowedCount(), "request", "requests sent"));
+				Sensor nodeRequestSize = sensor("node-" + connectionId + ".request-sizes");
 				metricName = metrics.metricName("request-size-avg", perConnectionMetricGrpName, "The average size of requests sent.", tags);
-				nodeRequest.add(metricName, new Avg());
+				nodeRequestSize.add(metricName, new Avg());
 				metricName = metrics.metricName("request-size-max", perConnectionMetricGrpName, "The maximum size of any request sent.", tags);
-				nodeRequest.add(metricName, new Max());
+				nodeRequestSize.add(metricName, new Max());
 
 				String bytesSentName = "node-" + connectionId + ".bytes-sent";
 				Sensor bytesSent = sensor(bytesSentName);
@@ -157,7 +167,7 @@ public class SelectorMetrics {
 		}
 	}
 	
-	 public void requestCompletedSend(String connectionId) {
+	 public void recordRequest(String connectionId) {
             requestsSent.record();
             if (!connectionId.isEmpty()) {
                 String nodeRequestName = "node-" + connectionId + ".requests-sent";
@@ -168,30 +178,58 @@ public class SelectorMetrics {
             }
         }
 
+	 public void requestCompletedSend(String connectionId) {
+		recordRequest(connectionId);
+	}
+
 	public void recordCompletedSend(String connectionId, long totalBytes, long currentTimeMs) {
-		requestsSent.record(totalBytes, currentTimeMs, false);
+		recordRequest(connectionId);
+		recordRequestBytes(connectionId, totalBytes, currentTimeMs);
+	}
+
+	public void recordRequestBytes(String connectionId, long totalBytes, long currentTimeMs) {
+		requestSizes.record(totalBytes, currentTimeMs, false);
+		bytesSent.record(totalBytes, currentTimeMs, false);
 		if (!connectionId.isEmpty()) {
-			String nodeRequestName = "node-" + connectionId + ".requests-sent";
-			Sensor nodeRequest = this.metrics.getSensor(nodeRequestName);
-			if (nodeRequest != null) {
-				nodeRequest.record(totalBytes, currentTimeMs);
+			Sensor nodeRequestSize = this.metrics.getSensor("node-" + connectionId + ".request-sizes");
+			if (nodeRequestSize != null) {
+				nodeRequestSize.record(totalBytes, currentTimeMs);
+			}
+			Sensor nodeBytesSent = this.metrics.getSensor("node-" + connectionId + ".bytes-sent");
+			if (nodeBytesSent != null) {
+				nodeBytesSent.record(totalBytes, currentTimeMs, false);
 			}
 		}
 	}
 	
-	public void recordCompletedReceive(String connectionId,double latencyMs) {
+	public void recordCompletedReceive(String connectionId) {
         responsesReceived.record();
         if (!connectionId.isEmpty()) {
             String nodeRequestName = "node-" + connectionId + ".responses-received";
             Sensor nodeRequest = this.metrics.getSensor(nodeRequestName);
             if (nodeRequest != null)
                 nodeRequest.record();
+        }
+    }
+
+	public void recordCompletedReceive(String connectionId,double latencyMs) {
+        recordCompletedReceive(connectionId);
+        if (!connectionId.isEmpty()) {
             String nodeTimeName="node-" + connectionId + ".latency";
             Sensor nodeRequestTime=this.metrics.getSensor(nodeTimeName);
             if(nodeRequestTime!=null) 
             	nodeRequestTime.record(latencyMs);
         }
     }
+
+	public void recordResponseBytes(String connectionId, long totalBytes, long currentTimeMs) {
+		bytesReceived.record(totalBytes, currentTimeMs, false);
+		if (!connectionId.isEmpty()) {
+			Sensor nodeBytesReceived = this.metrics.getSensor("node-" + connectionId + ".bytes-received");
+			if (nodeBytesReceived != null)
+				nodeBytesReceived.record(totalBytes, currentTimeMs, false);
+		}
+	}
 
 	public void close() {
 		for (MetricName metricName : topLevelMetricNames)
